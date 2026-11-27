@@ -126,7 +126,7 @@ window.docx = (function () {
       check("numbered Scope section present", allText.indexOf("Scope of this assessment") !== -1);
       check("Results by layer present", allText.indexOf("Results by layer") !== -1);
       check("register includes judgement + evidence columns", allText.indexOf("Judgement") !== -1 && allText.indexOf("Evidence captured") !== -1);
-      check("register carries captured evidence text", allText.indexOf("No known exploitable vulnerabilities open at release") !== -1);
+      check("register carries captured evidence text", allText.indexOf("No known exploitable vulnerabilities were open at release") !== -1);
 
       section("Recommendations (prose roadmap)");
       check("Recommendations section present", allText.indexOf("Recommendations: conformance gap roadmap") !== -1);

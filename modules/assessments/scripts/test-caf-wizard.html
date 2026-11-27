@@ -89,7 +89,7 @@ H.test(function (ok) {
     m.querySelector(".wizard-answer .caf-state-btn.caf-state-achieved").click(); m = main();
     ok(/Recommended action/.test(m.querySelector(".wizard-answer").textContent),
        "a recommendation already recorded stays visible when the outcome stops being a gap");
-    ok(/meets its target, so it is recorded as advice/.test(m.querySelector(".wizard-answer").textContent),
+    ok(/not a gap, so it is recorded as advice/.test(m.querySelector(".wizard-answer").textContent),
        "and is labelled as advice rather than outstanding work");
     ok((A.Engine.findResponse(tid, curId) || {}).owner === "Head of OT Security",
        "with the typed owner still on the response");

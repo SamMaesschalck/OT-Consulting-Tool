@@ -69,11 +69,11 @@ window.App.Tour24 = (function () {
   }
   var rows = [
     // ---- SP.01  Solution staffing ----------------------------------------
-    { id: "SP.01.01-BR", ml: "ML3", ev: "Fleet engineers complete a 62443-2-4 duties briefing before joining a vessel; records seen for the last two crew changes." },
-    { id: "SP.01.01-RE1", ml: "ML2", ev: "Subcontractor briefing pack exists and is signed, but only one subcontracted job has used it so far." },
-    { id: "SP.01.02-BR", ml: "ML3", ev: "Owner's security rules are part of the vessel induction, with signed read-and-sign sheets." },
+    { id: "SP.01.01-BR", ml: "ML3", ev: "Fleet engineers complete a 62443-2-4 duties briefing before joining a vessel, and records were seen for the last two crew changes." },
+    { id: "SP.01.01-RE1", ml: "ML2", ev: "A subcontractor briefing pack exists and is signed, but only one subcontracted job has used it so far." },
+    { id: "SP.01.02-BR", ml: "ML3", ev: "The owner's security rules are part of the vessel induction, with signed read-and-sign sheets." },
     { id: "SP.01.02-RE1", ml: "ML3" },
-    { id: "SP.01.03-BR", ml: "ML3", ev: "Confidentiality clauses in all employment contracts, renewed on promotion." },
+    { id: "SP.01.03-BR", ml: "ML3", ev: "All employment contracts carry confidentiality clauses, renewed on promotion." },
     { id: "SP.01.03-RE1", ml: "ML2" },
     { id: "SP.01.04-BR", ml: "ML2" },
     { id: "SP.01.04-RE1", ml: "ML1", ev: "Background checks for subcontractors are left to each subcontractor and are not verified.",
@@ -81,7 +81,7 @@ window.App.Tour24 = (function () {
         "An unvetted subcontractor can reach the vessel control systems with the same access as Tarnmoor's own staff.") },
     { id: "SP.01.05-BR", ml: "ML3", ev: "A named security contact is in the service contract and on each vessel's contact sheet." },
     { id: "SP.01.06-BR", ml: "ML2" },
-    { id: "SP.01.07-BR", ml: "ML1", ev: "Staff changes are passed on informally by the superintendent; there is no defined notice to the owner.",
+    { id: "SP.01.07-BR", ml: "ML1", ev: "Staff changes are passed on informally by the superintendent, and there is no defined notice to the owner.",
       rem: rem(20, "Low", "Fleet Superintendent", "Notify the shipowner in writing of every change to staff with access, within an agreed time.",
         "The owner cannot remove access it does not know should be removed.") },
 
@@ -94,7 +94,7 @@ window.App.Tour24 = (function () {
     { id: "SP.02.02-RE2", ml: "not-met", ev: "No scans for unknown devices or weaknesses are run on any vessel.",
       rem: rem(4, "High", "Technical Manager", "Schedule passive discovery scans on each vessel at every port call and report the results to the owner.",
         "Unknown devices on the vessel network, such as a forgotten modem, go unnoticed until they are used against it.") },
-    { id: "SP.02.02-RE3", unknown: true, note: "Whether the vessel control network tolerates active scanning has not been tested; the vendor's guidance was not available on the day. Marked unknown." },
+    { id: "SP.02.02-RE3", unknown: true, note: "Whether the vessel control network tolerates active scanning has not been tested, and the vendor's guidance was not available on the day." },
     { id: "SP.02.03-BR", ml: "ML2" },
     { id: "SP.02.03-RE1", ml: "ML2" },
 
@@ -115,7 +115,7 @@ window.App.Tour24 = (function () {
         "The owner cannot plan compensating measures for weaknesses it has not been told about.") },
     { id: "SP.03.04-BR", ml: "ML3" },
     { id: "SP.03.05-BR", ml: "ML2" },
-    { id: "SP.03.05-RE1", unknown: true, note: "Certificate stores on the bridge workstations could not be inspected during the visit. Marked unknown." },
+    { id: "SP.03.05-RE1", unknown: true, note: "Certificate stores on the bridge workstations could not be inspected during the visit." },
     { id: "SP.03.06-BR", ml: "ML3" },
     { id: "SP.03.07-BR", ml: "ML2" },
     { id: "SP.03.07-RE1", ml: "not-met", ev: "Engineering workstations use password-only login.",
@@ -124,15 +124,15 @@ window.App.Tour24 = (function () {
     { id: "SP.03.08-BR", ml: "ML2" },
     { id: "SP.03.08-RE1", ml: "ML2" },
     { id: "SP.03.08-RE2", ml: "ML1", ev: "Network device administration traffic is not always encrypted.",
-      rem: rem(15, "Medium", "IT and Systems Lead", "Use encrypted management protocols only on switches and firewalls, and disable the rest.",
+      rem: rem(15, "Medium", "IT and Systems Lead", "On switches and firewalls, use only encrypted management protocols and disable the others.",
         "Admin credentials sent in clear text can be read by anyone on the same network segment.") },
-    { id: "SP.03.08-RE3", ml: "ML1", ev: "Switches are managed over a password login only; the devices support certificate-based mutual authentication but it is switched off.",
+    { id: "SP.03.08-RE3", ml: "ML1", ev: "Switches are managed over a password login only. The devices support certificate-based mutual authentication, but it is switched off.",
       rem: rem(18, "Low", "IT and Systems Lead", "Turn on mutual authentication for device administration where the equipment supports it.",
         "Without it an administrator can be tricked into logging in to an impostor device.") },
     { id: "SP.03.09-BR", ml: "ML2" },
     { id: "SP.03.10-BR", ml: "ML1", ev: "Sensitive data on board has not been identified in writing.",
       rem: rem(11, "Medium", "Data Protection Lead", "List the data on board that needs protection and agree it with the owner.",
-        "Data nobody has identified is protected only by chance, if at all.") },
+        "Data that nobody has identified is protected only by chance.") },
     { id: "SP.03.10-RE1", ml: "ML2" },
     { id: "SP.03.10-RE2", ml: "ML1", ev: "Log and history retention is left at each product default and has not been written down.",
       rem: rem(19, "Low", "Data Protection Lead", "Document how long each kind of data is kept on board and how retention is set.",
@@ -159,7 +159,7 @@ window.App.Tour24 = (function () {
     { id: "SP.06.03-BR", ml: "ML2" },
 
     // ---- SP.07  Remote access --------------------------------------------
-    { id: "SP.07.01-BR", ml: "ML3", ev: "One approved remote access tool is used fleet-wide; others are blocked at the vessel firewall." },
+    { id: "SP.07.01-BR", ml: "ML3", ev: "One approved remote access tool is used fleet-wide, and others are blocked at the vessel firewall." },
     { id: "SP.07.02-BR", ml: "ML2" },
     { id: "SP.07.03-BR", ml: "ML3" },
     { id: "SP.07.04-BR", ml: "ML3", ev: "Each remote session is approved by the master or chief engineer in the session log." },
@@ -167,7 +167,7 @@ window.App.Tour24 = (function () {
 
     // ---- SP.08  Event management -----------------------------------------
     { id: "SP.08.01-BR", ml: "ML2" },
-    { id: "SP.08.01-RE1", ml: "not-met", ev: "Compromises found on board are reported by email from the chief engineer; nothing is reported automatically.",
+    { id: "SP.08.01-RE1", ml: "not-met", ev: "Compromises found on board are reported by email from the chief engineer, and nothing is reported automatically.",
       rem: rem(7, "Medium", "IT and Systems Lead", "Set up automatic reporting of detected compromises from each vessel to the shore operations centre.",
         "A compromise found on board at sea may not be reported until the next port call.") },
     { id: "SP.08.02-BR", ml: "ML2" },
@@ -176,14 +176,14 @@ window.App.Tour24 = (function () {
         "Events kept only on board cannot be correlated across the fleet.") },
     { id: "SP.08.02-RE2", ml: "not-met", ev: "Security logging has never been tested end to end.",
       rem: rem(5, "High", "IT and Systems Lead", "Test that security logging works on each vessel and record the result.",
-        "Logging that has silently failed leaves no trail when an incident needs one.") },
+        "If logging has failed without anyone noticing, there is no trail when an incident needs one.") },
     { id: "SP.08.03-BR", ml: "ML3" },
     { id: "SP.08.03-RE1", ml: "ML2" },
-    { id: "SP.08.04-BR", unknown: true, note: "The event storm statement depends on the control system vendor's test data, which was requested but not received. Marked unknown." },
+    { id: "SP.08.04-BR", unknown: true, note: "The event storm statement depends on the control system vendor's test data, which was requested but not received." },
 
     // ---- SP.09  Account management ---------------------------------------
     { id: "SP.09.01-BR", ml: "ML3" },
-    { id: "SP.09.02-BR", ml: "ML3", ev: "Every engineer has a named account; shared logins were removed in 2025." },
+    { id: "SP.09.02-BR", ml: "ML3", ev: "Every engineer has a named account, and shared logins were removed in 2025." },
     { id: "SP.09.02-RE1", ml: "ML2" },
     { id: "SP.09.02-RE2", ml: "ML2" },
     { id: "SP.09.02-RE3", ml: "ML3" },
@@ -215,7 +215,7 @@ window.App.Tour24 = (function () {
         "A product that is installed but not detecting gives false comfort.") },
     { id: "SP.10.04-BR", ml: "ML2" },
     { id: "SP.10.05-BR", ml: "ML3" },
-    { id: "SP.10.05-RE1", ml: "ML4", ev: "Dedicated, numbered USB media are issued per vessel; misuse is tracked and has fallen each quarter.", note: "Strongest practice seen in the assessment; worth sharing with the owner's other contractors." },
+    { id: "SP.10.05-RE1", ml: "ML4", ev: "Dedicated, numbered USB media are issued per vessel. Misuse is tracked and has fallen each quarter.", note: "This was the strongest practice seen in the assessment, and it is worth sharing with the owner's other contractors." },
     { id: "SP.10.05-RE2", ml: "ML3" },
 
     // ---- SP.11  Patch management -----------------------------------------
@@ -246,7 +246,7 @@ window.App.Tour24 = (function () {
         "If a restore fails at sea, the vessel runs without its automation until it reaches port.") },
     { id: "SP.12.06-BR", ml: "ML3" },
     { id: "SP.12.07-BR", ml: "ML3" },
-    { id: "SP.12.08-BR", ml: "ML1", ev: "Backup jobs are run by hand; who ran them and the result are not logged.",
+    { id: "SP.12.08-BR", ml: "ML1", ev: "Backup jobs are run by hand, and nobody logs who ran them or the result.",
       rem: rem(24, "Low", "IT and Systems Lead", "Log every backup and restore with who ran it and the result.",
         "Without a log there is no evidence that backups are running to schedule.") },
     { id: "SP.12.09-BR", ml: "ML1", ev: "Recovery steps exist in the engineers' notes but there is no disaster recovery plan.",

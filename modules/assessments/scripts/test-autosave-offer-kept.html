@@ -258,7 +258,7 @@ H.test(function (ok, done) {
         confirms = []; confirmAnswer = false;
         document.getElementById("btn-new").click();
         ok(confirms.length === 1, "with a saved project on screen New still asks", confirms.join(" | "));
-        ok(/saved file is not changed/.test(confirms[0] || "") && !/kept in this browser/.test(confirms[0] || ""),
+        ok(/saved file stays as it is/.test(confirms[0] || "") && !/kept in this browser/.test(confirms[0] || ""),
            "and says the saved file is not changed, not that unsaved work is kept", confirms[0]);
         ok(client() === "Today Customer Ltd", "declining keeps it on screen");
         confirmAnswer = true;

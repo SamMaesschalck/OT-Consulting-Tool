@@ -89,7 +89,7 @@ H.test(function (ok, done) {
     ok(card() === document.querySelector("#main .card"), "and leads the page");
     ok(/^\d+ still to write$/.test(pill()), "the pill counts what is still to write", pill());
     ok(!!line(/^Exposure note: still to be written/) && !!line(/^Top priorities: still to be written/) &&
-       !!line(/^Method \(how the assessment was run\): still to be written/),"consultant input lines, by the card's own labels");
+       !!line(/^How the assessment was run \(Method\): still to be written/),"consultant input lines, by the card's own labels");
     ok(!!line(/^Proposed next steps: still to be written/), "the next steps line");
     var zname = E.state.engagement.targets[1].name;
     var il = line(new RegExp("\\(" + zname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\): Business impact and recommended action still to be written"));
@@ -104,7 +104,7 @@ H.test(function (ok, done) {
     var anchor = document.querySelector('[data-check-anchor="narrative-regulatoryExposure"]');
     ok(anchor && anchor.classList.contains("check-flash") && document.activeElement === anchor.querySelector("textarea"),
        "Write it: lands in the exposure box, flashed and focused");
-    click(line(/^Method/));
+    click(line(/^How the assessment was run/));
     anchor = document.querySelector('[data-check-anchor="narrative-method"]');
     ok(anchor && document.activeElement === anchor.querySelector("textarea"), "and the method box");
     var std = Array.prototype.filter.call(anchor.querySelectorAll("button"), function (b) { return /standard description/.test(b.textContent); })[0];
@@ -201,7 +201,7 @@ H.test(function (ok, done) {
     E.updateRiskAppetiteSetup({ verdictOverride: other, verdictRationale: "" });
     return fresh();
   }).then(function () {
-    var l = line(/^Your verdict: the reasoning behind the verdict you set is not recorded/);
+    var l = line(/^Your verdict: the reasoning for it is not recorded yet/);
     ok(!!l, "a verdict with no reasoning is a blocker", lines("block").map(function (x) { return x.textContent; }).join(" | "));
     click(l);
     var a = document.querySelector('[data-check-anchor="ra-rationale"]');

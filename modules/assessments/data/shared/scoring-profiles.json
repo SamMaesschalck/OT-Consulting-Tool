@@ -334,7 +334,7 @@
             "limited": "The organisation has low criticality and attracts little geopolitical or targeted interest. It has limited connections to others and light regulation. The consequence of a compromise is contained.",
             "moderate": "The organisation has some criticality or regulated status and is exposed to commodity threats and opportunistic attack. A compromise would matter but would not spread beyond it.",
             "high": "The organisation is significantly critical, for example an essential service or a site with safety-relevant OT. Targeted interest is plausible and regulatory exposure is notable. A compromise would have serious operational or safety consequences.",
-            "severe": "The organisation is critical national infrastructure or equivalent, and credible state-level or advanced attackers may target it. A compromise could affect safety of life or spread beyond the organisation, and regulatory obligations are heavy."
+            "severe": "The organisation is critical national infrastructure or equivalent, and credible state-level or advanced attackers may target it. A compromise would affect safety of life or spread beyond the organisation, and regulatory obligations are heavy."
           }
         },
         "appetite": {

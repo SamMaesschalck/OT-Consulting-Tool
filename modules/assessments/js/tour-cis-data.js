@@ -17,7 +17,7 @@ window.App.TourCIS = (function () {
 
   var metadata = {
     clientName: "Brightpath Retail Group",
-    siteName: "Enterprise IT (IG1 - essential cyber hygiene)",
+    siteName: "Enterprise IT (IG1, essential cyber hygiene)",
     consultant: "S. Maesschalck",
     dateOfVisit: "2026-06-17",
     documentRevision: "1.0",
@@ -30,7 +30,7 @@ window.App.TourCIS = (function () {
     regulatoryExposure:
       "Brightpath Retail Group assesses its enterprise IT against CIS Critical Security Controls v8.1.2 Implementation Group 1 (IG1) as its baseline of essential cyber hygiene, driven by payment-card (PCI DSS) obligations and cyber-insurance requirements. This is an alignment and gap analysis against the CIS Safeguard descriptions and is not a certified CIS assessment. The Safeguards not yet implemented cluster around multi-factor authentication, logging and vulnerability management, which are the areas insurers and card schemes scrutinise most.",
     topPriorities:
-      "The two most urgent priorities are enforcing multi-factor authentication on externally-exposed and remote access (6.3, 6.4), which removes the most common route to account takeover, and establishing audit-log collection and a vulnerability-management process (8.2, 7.1), so that attacks can be detected and known weaknesses are fixed on a schedule. Protecting and isolating recovery data (11.3) follows close behind."
+      "The two most urgent priorities are multi-factor authentication on externally-exposed and remote access (6.3, 6.4), which removes the most common route to account takeover, and central audit-log collection with a vulnerability-management process (8.2, 7.1). Together these mean attacks can be detected and known weaknesses are fixed on a schedule. Protecting and isolating recovery data (11.3) follows close behind."
   };
 
   // Curated gaps (state: partially | not) with remediation. All are IG1
@@ -40,7 +40,7 @@ window.App.TourCIS = (function () {
       rem: { rank: 1, band: "High", owner: "IT Security Manager",
         action: "Enforce MFA on all externally-exposed applications, prioritising the store-management and supplier portals.",
         impact: "Externally-exposed apps without MFA are the most common route to account takeover." } },
-    { id: "8.2", state: "not", ev: "Security logs are generated on servers but are not centrally collected; endpoint and network logs are not retained.",
+    { id: "8.2", state: "not", ev: "Security logs are generated on servers but are not centrally collected, and endpoint and network logs are not retained.",
       rem: { rank: 2, band: "High", owner: "IT Operations Lead",
         action: "Collect audit logs centrally from servers, endpoints and network devices into a managed log store.",
         impact: "Without collected logs there is no way to detect or investigate an intrusion." } },
@@ -50,7 +50,7 @@ window.App.TourCIS = (function () {
         impact: "Ad hoc patching leaves known weaknesses open unpredictably." } },
     { id: "6.4", state: "partially", ev: "Remote network access uses a VPN, but MFA is enforced only for IT staff and not for other remote users.",
       rem: { rank: 4, band: "High", owner: "IT Security Manager",
-        action: "Require MFA for all remote network access, for every user whatever their role.",
+        action: "Require MFA for all remote network access, including users outside IT.",
         impact: "Single-factor remote access is readily defeated by credential theft." } },
     { id: "11.3", state: "not", ev: "Backups run, but recovery data is stored on the same domain and is reachable with the same admin credentials as production.",
       rem: { rank: 5, band: "High", owner: "IT Operations Lead",
@@ -62,7 +62,7 @@ window.App.TourCIS = (function () {
         impact: "Unpatched servers are high-value, internet-adjacent targets." } },
     { id: "1.1", state: "partially", ev: "An asset inventory exists in the helpdesk tool but is incomplete for cloud and mobile assets and is not reviewed on a cadence.",
       rem: { rank: 7, band: "Medium", owner: "IT Operations Lead",
-        action: "Complete the enterprise asset inventory (including cloud and mobile) and review it at least bi-annually.",
+        action: "Complete the enterprise asset inventory (including cloud and mobile) and review it at least twice a year.",
         impact: "Unknown assets cannot be patched, monitored or protected." } },
     { id: "2.1", state: "partially", ev: "Installed software is visible per-device, but there is no consolidated, maintained software inventory.",
       rem: { rank: 8, band: "Medium", owner: "IT Operations Lead",
@@ -72,7 +72,7 @@ window.App.TourCIS = (function () {
       rem: { rank: 9, band: "Medium", owner: "IT Operations Lead",
         action: "Document and maintain a secure-configuration process (benchmarks, exceptions, review) across asset types.",
         impact: "Inconsistent configuration leaves predictable weaknesses across the estate." } },
-    { id: "5.3", state: "not", ev: "There is no routine process to identify and disable dormant accounts; several unused accounts were found during the assessment.",
+    { id: "5.3", state: "not", ev: "There is no routine process to identify and disable dormant accounts, and several unused accounts were found during the assessment.",
       rem: { rank: 10, band: "Medium", owner: "IT Security Manager",
         action: "Automatically disable accounts after a defined period of inactivity and review dormant accounts regularly.",
         impact: "Dormant accounts are unmonitored entry points for attackers." } },
@@ -87,15 +87,15 @@ window.App.TourCIS = (function () {
     { id: "14.1", state: "partially", ev: "Security awareness is delivered at onboarding but not refreshed, and store staff are not reliably included.",
       rem: { rank: 13, band: "Low", owner: "IT Security Manager",
         action: "Establish an ongoing security-awareness programme with refresher training that includes store and seasonal staff.",
-        impact: "One-off onboarding training does not sustain phishing and handling awareness." } },
-    { id: "10.3", state: "not", ev: "Autorun/autoplay for removable media is not centrally disabled on end-user and point-of-sale devices.",
+        impact: "Training given once at onboarding does not keep staff alert to phishing or to safe data handling." } },
+    { id: "10.3", state: "not", ev: "Autorun and autoplay for removable media is not centrally disabled on end-user and point-of-sale devices.",
       rem: { rank: 14, band: "Low", owner: "IT Operations Lead",
         action: "Disable autorun and autoplay for removable media via central policy on all endpoints and POS devices.",
-        impact: "Autorun is a classic vector for malware introduced via USB devices in stores." } },
+        impact: "Autorun is a common way for malware on USB devices to get onto store systems." } },
     { id: "17.2", state: "partially", ev: "IT knows who to call internally, but there is no maintained contact list including external reporting parties and card-scheme contacts.",
       rem: { rank: 15, band: "Low", owner: "IT Security Manager",
         action: "Maintain incident-reporting contact information including external parties (card schemes, insurer, authorities).",
-        impact: "Missing contacts cost critical time during a live incident." } }
+        impact: "Without these contacts, time is lost during a live incident." } }
   ];
 
   function apply(E) {
@@ -112,7 +112,7 @@ window.App.TourCIS = (function () {
         E.setResponse(tid, o.id, { applicable: true, state: g.state, evidence: g.ev,
           priorityRank: g.rem.rank, priorityBand: g.rem.band, owner: g.rem.owner, action: g.rem.action, impact: g.rem.impact });
       } else {
-        E.setResponse(tid, o.id, { applicable: true, state: "achieved", evidence: o.title + " - implemented; evidence reviewed during the assessment." });
+        E.setResponse(tid, o.id, { applicable: true, state: "achieved", evidence: "The safeguard is implemented, and the evidence was reviewed during the assessment." });
       }
     });
     if (E.setReportNarrative) E.setReportNarrative(reportNarrative);

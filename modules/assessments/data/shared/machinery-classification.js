@@ -10,7 +10,7 @@ window.App.Data.shared.machineryClassification = {
   "classes": [
     { "id": "default", "label": "Not listed in Annex I (internal control)" },
     { "id": "annex-i-part-b", "label": "Annex I Part B (higher-risk category)" },
-    { "id": "annex-i-part-a", "label": "Annex I Part A (third party mandatory)" }
+    { "id": "annex-i-part-a", "label": "Annex I Part A (third-party assessment mandatory)" }
   ],
   "severity": { "default": 0, "annex-i-part-b": 1, "annex-i-part-a": 2 },
   "deriveClass": {

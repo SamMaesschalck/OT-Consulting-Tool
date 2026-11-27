@@ -274,7 +274,7 @@ window.App.ScoringRiskAppetite = (function () {
         label: "Not yet characterised",
         delta: null,
         severity: 0,
-        explanation: "Set both positions to see how well they fit."
+        explanation: "The fit is shown once both positions are set."
       };
     }
     var delta = coherenceDelta(exposureRank, appetiteRank, nBands);
@@ -303,7 +303,7 @@ window.App.ScoringRiskAppetite = (function () {
       key: "aligned", label: "Aligned", delta: delta, severity: 0, lean: lean,
       displayLabel: lean ? "Aligned, leaning " + lean : "Aligned",
       explanation: read.aligned ||
-        "Appetite broadly matches exposure. The organisation accepts risk roughly in line with what it faces, which says nothing about whether its security is good."
+        "Appetite broadly matches exposure. The organisation accepts risk roughly in line with what it faces. A match is not a judgement on how good its security is."
     };
   }
 
@@ -320,9 +320,9 @@ window.App.ScoringRiskAppetite = (function () {
              titleCase(stated.band) + " but its systems show " + titleCase(revealed.band) +
              ". In practice it is accepting risk that leadership may not know about.";
     } else {
-      note = "The systems are tighter than the stated appetite. The organisation describes " +
+      note = "The technical controls are tighter than the stated appetite suggests. The organisation describes " +
              titleCase(stated.band) + " but its systems show " + titleCase(revealed.band) +
-             ". Practice is ahead of the stated position, and the organisation could recognise this and write it into policy.";
+             ". Practice is ahead of the stated position, and the organisation could formalise it in policy.";
     }
     return {
       statedBand: stated.band, statedRank: stated.rank,

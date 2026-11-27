@@ -34,7 +34,7 @@
     var txt = card ? card.textContent : "";
     ok(/measures alignment with/i.test(txt) && /gaps/i.test(txt), "CIS about text describes an alignment & gap analysis");
     ok(txt.indexOf(A.Engine.state.instrument.framework) !== -1, "CIS about text names the standard", A.Engine.state.instrument.framework);
-    ok(/advisory and is not a formal audit/i.test(txt), "CIS about text carries the advisory caveat");
+    ok(/advisory. It is not a formal audit and does not certify/i.test(txt), "CIS about text carries the advisory caveat");
     ok(txt.length > 120 && txt.length < 700, "about text is a small paragraph", String(txt.length));
 
     // Case 2: first instrument (IEC 62443-3-3, capability-sl)

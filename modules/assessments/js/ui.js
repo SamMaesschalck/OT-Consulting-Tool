@@ -711,7 +711,7 @@ window.App.UI = (function () {
         : " It was probably made with a newer version";
       return "it contains " + (names.length === 1 ? "an assessment" : "assessments") + " of " + names.join(", ") +
         ", which this copy of the tool does not have." + where +
-        ": ask your SolutionsPT contact for the current version.";
+        ". Ask your SolutionsPT contact for the current version.";
     }
     var msg = String(e && e.message ? e.message : e);
     return msg + (/[.!?]$/.test(msg) ? "" : ".");
@@ -819,7 +819,7 @@ window.App.UI = (function () {
           ? "Start a new project? The open project has unsaved changes. " +
             "They are kept in this browser and offered the next time the app starts. " +
             "To keep them in a file, choose Cancel and Save first."
-          : "Start a new project? It replaces the open project, whose saved file is not changed.";
+          : "Start a new project? It replaces the open project. Its saved file stays as it is.";
         if (!confirm(newQuestion)) return;
       }
       // Bring the backstop up to date while it still describes the session on
@@ -1302,11 +1302,11 @@ window.App.UI = (function () {
       var remembered = E.getReportNarrative().issueAs === "final" ? "final" : "draft";
       var draftBtn = h("button", { type: "button", class: "scope-choice active", "data-issue": "draft" }, [
         h("strong", { text: "Draft" }),
-        h("div", { class: "muted small", text: "Every page carries a DRAFT watermark. Use it for review rounds." })
+        h("div", { class: "muted small", text: "This version is for review rounds and carries a DRAFT watermark on every page." })
       ]);
       var finalBtn = h("button", { type: "button", class: "scope-choice disabled", "data-issue": "final", disabled: "" }, [
         h("strong", { text: "Final" }),
-        h("div", { class: "muted small", text: "The file opens read-only and marked as final. Make the client's PDF from it." })
+        h("div", { class: "muted small", text: "The file opens read-only and marked as final, ready for the client's PDF." })
       ]);
       var issueNote = h("p", { class: "export-issue-note muted" });
       var setIssue = function (which) {
@@ -1342,7 +1342,7 @@ window.App.UI = (function () {
           var n = issueBlockerLines(list).length;
           if (n) {
             issueNote.className = "export-issue-note blocked";
-            issueNote.appendChild(document.createTextNode("Final is not available yet: " + n + " thing" + (n === 1 ? " is" : "s are") +
+            issueNote.appendChild(document.createTextNode("Final is not available yet. " + n + " item" + (n === 1 ? " is" : "s are") +
               " still to write. "));
             issueNote.appendChild(h("button", { type: "button", class: "issue-go", text: "See what is left", onClick: function () {
               closeModal();
@@ -1368,7 +1368,7 @@ window.App.UI = (function () {
         var RV = window.App.Review, list = RV.warningList();
         var lines = [];
         if (shape === "org" && canOrgWide) {
-          lines.push({ kind: "org-not-reviewed", text: "The organisation-wide report has not been reviewed. Send for review packs only this " + noun + "'s own report, without the roll-up across " + pluralLabel(noun) + "." });
+          lines.push({ kind: "org-not-reviewed", text: "The organisation-wide report has not been reviewed, because Send for review includes only the report for this " + noun + "." });
           // Those hashes belong to a different document.
           list = list.filter(function (w) { return w.kind !== "changed-since-approval"; });
         } else if (whole && RV.store && RV.store() && selectedIds().length && selectedIds().length < targets.length) {
@@ -1407,7 +1407,7 @@ window.App.UI = (function () {
     var modal = h("div", { class: "modal-backdrop" }, [
       h("div", { class: "modal export-modal" }, [
         h("div", { class: "modal-h" }, [
-          h("h2", { text: kind === "xlsx" ? "Export scope - Excel" : "Word export" }),
+          h("h2", { text: kind === "xlsx" ? "Excel export" : "Word export" }),
           h("button", { class: "btn ghost", style: "color:var(--text);", onClick: closeModal, text: "Close" })
         ]),
         h("div", { class: "modal-b" }, [
@@ -1516,7 +1516,7 @@ window.App.UI = (function () {
         onClick: function () { E.activateInstrument(inst.id); }
       }, [
         h("span", null, [inst.title]),
-        inst.status === "placeholder" ? h("span", { class: "badge", text: "stub" }) : null
+        inst.status === "placeholder" ? h("span", { class: "badge", text: "coming soon" }) : null
       ]);
     }
 
@@ -1530,7 +1530,7 @@ window.App.UI = (function () {
     var collapsed = instrumentSectionCollapsed;
     s.appendChild(h("div", {
       class: "nav-section-title nav-section-toggle" + (collapsed ? " collapsed" : ""),
-      title: collapsed ? "Show the full instrument list" : "Collapse to the selected instrument only",
+      title: collapsed ? "Show all assessments" : "Show only the selected assessment",
       onClick: function () { setInstrumentSectionCollapsed(!instrumentSectionCollapsed); buildSidebar(); }
     }, [
       h("span", null, ["Assessment"]),
@@ -1550,7 +1550,7 @@ window.App.UI = (function () {
         h("div", { class: "nav-current-title", text: E.state.instrument.title }),
         (siblings.length > 1 && openAss)
           ? h("div", { class: "nav-current-which",
-              title: "This file holds " + siblings.length + " assessments of this instrument",
+              title: "This file holds " + siblings.length + " assessments against this framework",
               text: window.App.Storage.assessmentLabel(openAss, E.state.instrument) })
           : null,
         instrumentProgressNode(E.state.instrument),
@@ -1812,11 +1812,11 @@ window.App.UI = (function () {
     s.appendChild(h("div", { class: "nav-section-title", text: "Verdict" }));
     s.appendChild(h("div", {
       class: "nav-item" + (view === "ra-verdict" ? " active" : ""),
-      title: "Your own verdict on the fit",
+      title: "Your verdict on the fit",
       onClick: function () { go("ra-verdict"); }
     }, [
       h("span", { class: "nav-slim", "aria-hidden": "true", text: "VD" }),
-      h("span", { class: "nav-label" }, ["Assessor's read"]),
+      h("span", { class: "nav-label" }, ["Assessor's verdict"]),
       // Short in the sidebar; the full "Aligned, leaning under-protected" is the tooltip.
       v && v.label ? h("span", { class: "badge neutral", title: v.displayLabel || v.label,
         text: (v.lean ? "Aligned (leaning)" : v.label) + (v.overridden ? " *" : "") }) : null
@@ -1987,7 +1987,7 @@ window.App.UI = (function () {
         var meta = E.getCAFProfileMeta(p.id) || {};
         var levelName = p.level === "basic" ? "Basic" : (p.level === "enhanced" ? "Enhanced" : p.level);
         var ver = meta.profileVersion && meta.profileVersion !== "UNSET" ? (" v" + meta.profileVersion) : "";
-        var statusTag = p.status === "placeholder" ? " - placeholder" : "";
+        var statusTag = p.status === "placeholder" ? " (incomplete)" : "";
         var opt = h("option", { value: p.id, text: levelName + ver + statusTag });
         if (p.id === activeId) opt.setAttribute("selected", "");
         levelSel.appendChild(opt);
@@ -2255,7 +2255,7 @@ window.App.UI = (function () {
       return;
     }
     var index = instrumentSearchIndex();
-    if (index.length === 0) { toast("Nothing to search in this instrument yet.", "warn"); return; }
+    if (index.length === 0) { toast("Nothing to search in this assessment yet.", "warn"); return; }
 
     var input = h("input", {
       type: "text", class: "find-input",
@@ -2360,7 +2360,7 @@ window.App.UI = (function () {
           : "Active profile"
       }, [
         document.createTextNode("Profile: " + (meta.name || "General CAF")),
-        meta.status === "placeholder" ? h("span", { class: "chip-tag", text: "placeholder" }) : null
+        meta.status === "placeholder" ? h("span", { class: "chip-tag", text: "incomplete" }) : null
       ]);
       if (bits.length > 0) el.appendChild(document.createTextNode("    "));
       el.appendChild(chip);
@@ -2377,8 +2377,8 @@ window.App.UI = (function () {
       h("h2", { text: inst.title }),
       h("p", { text: inst.comingSoon || "This assessment is not available yet. Its content and scoring will come in a later release." }),
       h("div", { class: "muted" }, [
-        h("div", null, ["Scoring family: " + (inst.scoringFamily || "-")]),
-        h("div", null, ["Target dimension: " + (inst.targetDimensionLabel || "-")]),
+        h("div", null, ["Scoring method: " + (inst.scoringFamily || "-")]),
+        h("div", null, ["Unit assessed: " + (inst.targetDimensionLabel || "-")]),
       ])
     ]);
     refs.main.appendChild(card);
@@ -2400,29 +2400,49 @@ window.App.UI = (function () {
     return inst.framework || inst.title;
   }
 
+  // The programme noun in UK spelling. The instrument data keeps the US
+  // "program" where it quotes a standard's title (2-4's "Service Provider
+  // Security Program"); running prose on screen uses "programme".
+  function ukProgrammeNoun(inst) {
+    return String(window.App.Report.mlNoun(inst, "programmeNoun") || "security programme")
+      .replace(/\bprogram\b/g, "programme");
+  }
+
   function engagementAboutText() {
     var inst = E.state.instrument;
     var d = (inst && inst.display) || {};
     if (d.about) return d.about;
     var ref = aboutStandardRef(inst);
+    // Framework names that read as titles take "the" in a sentence.
+    var theRef = /^(NCSC|CIS) /.test(ref) ? "the " + ref : ref;
     switch (E.state.scoringFamily) {
       case "capability-sl":
-        return "This assessment measures the security capability of the system in scope against " + ref + " at the target security level set for the engagement. The shortfalls become a prioritised roadmap. The review is advisory and does not certify the system.";
+        return "This assessment measures the security capability of the system in scope against " + ref + " at the target security levels set for the engagement. The shortfalls feed a prioritised roadmap. The review is advisory and does not certify the system.";
       case "domain-letter":
-        return "This screener is a guided interview that grades the organisation's security in a small number of domains. It gives a quick view of posture and does not audit individual controls.";
-      case "program-maturity-ml":
-        return "This assessment rates the maturity of the " + (d.programmeNoun || "security programme") + " against " + ref + ", on a four-level scale for each requirement. The results show which gaps to close first. The review is advisory and does not certify the programme.";
-      case "nis2-conformance":
-        return "This assessment checks each obligation in " + ref + " and records where the organisation falls short. The gaps feed a prioritised roadmap. The review is advisory and does not determine legal compliance.";
-      case "csms-conformance":
-        if (isCRA()) {
-          return "This assessment checks the product against the essential cybersecurity requirements of " + ref + ". The review is advisory and is not a conformity assessment.";
+        if (inst.targetDimension === "supplier") {
+          return "This screener is a guided interview that grades the cyber exposure a supplier brings in a small number of domains. It gives a quick view and does not audit individual controls.";
         }
-        return "This assessment reviews the cyber security management system against " + ref + " to find what is in place and where it needs work. The review is advisory and does not certify the system.";
+        return "This screener is a guided interview that grades the organisation's OT security in a small number of domains. It gives a quick view of posture and does not audit individual controls.";
+      case "program-maturity-ml": {
+        var noun = ukProgrammeNoun(inst).replace(/^service provider /, "service provider's ");
+        var certNoun = /lifecycle$/.test(noun) ? "lifecycle" : "programme";
+        return "This assessment rates the maturity of the " + noun + " against " + ref + ", on a four-level scale for each requirement. The results show which gaps to close first. The review is advisory and does not certify the " + certNoun + ".";
+      }
+      case "nis2-conformance":
+        return "This assessment checks the organisation against the obligations in " + ref + " and records where it falls short. The gaps feed a prioritised roadmap. The review is advisory and does not determine legal compliance.";
+      case "csms-conformance": {
+        if (isCRA()) {
+          var product = d.productNoun || "product";
+          return "This assessment checks the " + product + " against the essential requirements of " + ref + ". The review is advisory. It is not a conformity assessment and does not certify the " + product + ".";
+        }
+        return "This assessment reviews the organisation's cyber security management system (CSMS) against " + ref + " and records what is in place and where it needs work. The review is advisory and does not certify the CSMS.";
+      }
       case "caf-achieved":
-        return "This assessment measures alignment with " + ref + " for the selected profile and turns the gaps into a prioritised improvement roadmap. The review is advisory and is not a formal audit.";
+        return "This assessment measures alignment with " + theRef + " for the selected profile and turns the gaps into a prioritised improvement roadmap. The review is advisory. It is not a formal audit and does not certify the organisation.";
+      case "risk-appetite-coherence":
+        return "This assessment is led by interview. It compares the organisation's inherent risk exposure with its apparent risk appetite and records the assessor's judgement on how well the two fit. The review is advisory and does not measure the organisation against a standard.";
       default:
-        return "This assessment measures the gaps against " + ref + " and turns them into a prioritised improvement roadmap. The review is advisory and is not a formal audit.";
+        return "This assessment measures the gaps against " + theRef + " and turns them into a prioritised improvement roadmap. The review is advisory. It is not a formal audit and does not certify the organisation.";
     }
   }
 
@@ -2541,10 +2561,10 @@ window.App.UI = (function () {
   var FAMILY_PURPOSE = {
     "capability-sl": "Each requirement is rated against a target security level.",
     "domain-letter": "A short guided interview grades the security posture in each domain.",
-    "program-maturity-ml": "Each requirement is rated on a four-level maturity scale.",
+    "program-maturity-ml": "Requirements are rated for maturity from ML1 to ML4.",
     "nis2-conformance": "Each obligation is checked for conformance and the gaps are listed.",
     "csms-conformance": "Each element of the management system is checked for conformance.",
-    "caf-achieved": "Each outcome is compared with the state the selected profile expects.",
+    "caf-achieved": "Outcomes are compared with the states the selected profile expects.",
     // Not a gap analysis, and the fallback below would have said it was.
     "risk-appetite-coherence": "An interview measures inherent exposure against risk appetite and how well the two fit."
   };
@@ -2569,7 +2589,7 @@ window.App.UI = (function () {
     var hasInstrument = !!E.state.instrument;
     refs.main.appendChild(h("h1", { class: "page-title", text: hasInstrument ? "Change assessment" : "Start an assessment" }));
     refs.main.appendChild(h("p", { class: "page-sub", text: hasInstrument
-      ? "Each assessment keeps its own answers. The customer and site are shared across the file."
+      ? "Each assessment keeps its own answers. The client and site are shared across the file."
       : "Choose the framework for this engagement." }));
 
     refs.main.appendChild(homeEngagementStrip());
@@ -2692,7 +2712,7 @@ window.App.UI = (function () {
     return h("div", { class: "home-strip" }, [
       h("div", { class: "home-strip-title", text: "Who is this engagement for?" }),
       h("div", { class: "home-fields" }, cells),
-      h("p", { class: "muted home-strip-note", text: "These details are optional for now and every assessment in the project shares them." })
+      h("p", { class: "muted home-strip-note", text: "Every assessment in the project shares these details. You can fill them in later." })
     ]);
   }
 
@@ -2742,7 +2762,7 @@ window.App.UI = (function () {
     // context. A chip on a menu card was the wrong place to raise it.
     var tags = [];
     if (isCurrent) tags.push(h("span", { class: "pill met", text: "Current" }));
-    if (isStub) tags.push(h("span", { class: "pill na", text: "Not yet built" }));
+    if (isStub) tags.push(h("span", { class: "pill na", text: "Coming soon" }));
 
     // Progress reads as work-in-the-project, not as a score.
     var progNode = null;
@@ -2784,7 +2804,7 @@ window.App.UI = (function () {
       (isStub || !existing.length) ? null : h("button", {
         class: "home-card-new",
         text: "+ New assessment",
-        title: "Start another assessment of this instrument",
+        title: "Start another assessment against this framework",
         onClick: function (ev) { ev.stopPropagation(); startNewAssessment(inst); }
       })
     ]);
@@ -2970,7 +2990,7 @@ window.App.UI = (function () {
     }
 
     var details = h("details", null, [
-      h("summary", { style: "cursor:pointer; color:var(--brand-blue); font-weight:600; font-size:13px;", text: "Show typical documents & stakeholders" }),
+      h("summary", { style: "cursor:pointer; color:var(--brand-blue); font-weight:600; font-size:13px;", text: "Show typical documents and stakeholders" }),
       h("div", { class: "grid-3", style: "margin-top:12px;" }, [
         col("Commonly needed documents", entry.commonDocuments, false),
         col("Often forgotten", entry.oftenForgotten, true),
@@ -3052,7 +3072,7 @@ window.App.UI = (function () {
             // Evidence-register rows underpin the verdicts; a misclick must
             // not silently erase one. Blank rows delete without ceremony.
             var hasContent = cfg.fields.some(function (f) { return String(row[f.key] || "").trim() !== ""; });
-            if (hasContent && !confirm("Remove this " + cfg.title.toLowerCase().replace(/s$/, "") + " entry from the evidence register?")) return;
+            if (hasContent && !confirm("Remove this row from the evidence register?")) return;
             rows.splice(idx, 1); E.touchBasisOfAssessment(); render();
           },
           text: "Remove"
@@ -3102,7 +3122,7 @@ window.App.UI = (function () {
       ]);
     });
     return h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "How the " + window.App.Report.mlNoun(inst, "programmeNoun") + " assessment works" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "How the " + ukProgrammeNoun(inst) + " assessment works" })]),
       h("div", { class: "card-b" }, [
         h("p", { text: inst.framing || "" }),
         h("ul", null, [
@@ -3110,7 +3130,7 @@ window.App.UI = (function () {
             ". They are grouped into " + (inst.elements || []).length + " " +
             window.App.Report.mlNoun(inst, "elementNounPlural") + "."]),
           h("li", null, ["Give each requirement one maturity level, from ML1 to ML4, or Not met. ML2 and above assume the practice is documented."]),
-          h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the requirement from the score."]),
+          h("li", null, ["Unknown lowers coverage and confidence. Not applicable leaves the requirement out of the score."]),
           E.supportsElementScoping()
             ? h("li", null, ["You can set a whole " + window.App.Report.mlNoun(inst, "elementNoun").toLowerCase() + " out of scope on its page."])
             : null,
@@ -3462,7 +3482,7 @@ window.App.UI = (function () {
         h("p", { text: inst.framing || "" }),
         h("ul", null, [
           h("li", null, ["Judge each obligation as Achieved, Partially Achieved or Not Achieved against full conformance with NIS2."]),
-          h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the obligation from the score."]),
+          h("li", null, ["Unknown lowers coverage and confidence. Not applicable leaves the obligation out of the score."]),
           h("li", null, ["There is no overall grade or pass mark. The report gives a conformance profile by NIS2 area and a gap roadmap."]),
           h("li", null, ["The review is a readiness gap analysis and does not determine legal compliance with NIS2 or the national law that transposes it."])
         ]),
@@ -3810,7 +3830,7 @@ window.App.UI = (function () {
         // On an item that already meets its target, say what recording one
         // means: it is advice, and it is not counted as an outstanding gap.
         !isGap ? h("span", { class: "muted small",
-                             text: "this meets its target, so it is recorded as advice" }) : null,
+                             text: "this item is not a gap, so it is recorded as advice" }) : null,
         h("div", { class: "spacer" }, []),
         recRemoveButton(tid, itemId, resp,
           "Remove this recommendation?\n\nThe priority band, owner, recommended action and business impact will all be cleared.",
@@ -4369,9 +4389,9 @@ window.App.UI = (function () {
         h("p", { text: inst.framing || "" }),
         h("ul", null, [
           h("li", null, ["Judge each CSMS element as Not in place, Partially in place, Largely in place or In place against full conformance with ISA/IEC 62443-2-1:2010."]),
-          h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the element from the score."]),
+          h("li", null, ["Unknown lowers coverage and confidence. Not applicable leaves the element out of the score."]),
           h("li", null, ["There is no overall grade. The report gives a conformance profile by category and element group, and a gap roadmap."]),
-          h("li", null, ["The review is a conformance gap analysis and does not certify the system. The 2024 edition replaces this standard with the maturity-based Security Program, which has its own assessment."])
+          h("li", null, ["The review is a conformance gap analysis and does not certify the CSMS. The 2024 edition replaces this standard with the maturity-based Security Program, which has its own assessment."])
         ]),
         h("table", { class: "tbl", style: "margin-top:10px;" }, [
           h("thead", null, [h("tr", null, [h("th", null, ["Category"]), h("th", { class: "center" }, ["Elements"])])]),
@@ -4469,7 +4489,7 @@ window.App.UI = (function () {
 
   var RA_DISPOSITION_LABELS = {
     accepted: "Accepted in practice",
-    constrained: "Constrained, and managed"
+    constrained: "Constrained and managed"
   };
 
   // "Could not establish" on any item. Stored as notEstablished; older files
@@ -4526,9 +4546,9 @@ window.App.UI = (function () {
       h("label", { text: "Is this a choice, or a constraint?" }),
       row,
       h("p", { class: "muted small", style: "margin:4px 0 0;", text:
-        "A choice or an unmanaged state counts as appetite. A managed constraint, such as firmware "
+        "Choices, unmanaged states and unset answers count as appetite. A managed constraint, such as firmware "
         + "pinned by vendor certification with the risk compensated and tracked, is reported but not "
-        + "counted. An unset answer counts." })
+        + "counted." })
     ]);
   }
 
@@ -4544,11 +4564,11 @@ window.App.UI = (function () {
     var toggleSpec = spec.filter(function (s) { return s.type === "toggle"; })[0] || {};
 
     refs.main.appendChild(h("h1", { class: "page-title", text: "Sector and scope" }));
-    refs.main.appendChild(h("p", { class: "page-sub", text: "These set the starting points, and you can override them." }));
+    refs.main.appendChild(h("p", { class: "page-sub", text: "Your choices here set the starting points. You can override them later." }));
 
     // --- sector ---
     var sectors = RA.sectors();
-    var sel = h("select", { class: "input" }, [h("option", { value: "", text: "- choose a sector -" })].concat(
+    var sel = h("select", { class: "input" }, [h("option", { value: "", text: "Choose a sector" })].concat(
       sectors.map(function (s) {
         var o = h("option", { value: s.id, text: s.name + "  (baseline: " + RA.titleCase(s.baseline) + ")" });
         if (s.id === setup.sectorId) o.selected = true;
@@ -4619,7 +4639,7 @@ window.App.UI = (function () {
         h("p", { class: "muted", text: toggleSpec.drives ||
           "This adds the technical section and compares stated with revealed appetite." }),
         h("p", { class: "muted small", style: "margin-bottom:0;", text:
-          "Switching it off later hides the section." })
+          "Switching it off later hides the section and keeps its answers." })
       ])
     ]));
   }
@@ -4762,9 +4782,9 @@ window.App.UI = (function () {
     var v = scored.verdict || {};
     var computed = v.computed || v;
 
-    refs.main.appendChild(h("h1", { class: "page-title", text: "Assessor's read" }));
+    refs.main.appendChild(h("h1", { class: "page-title", text: "Assessor's verdict" }));
     refs.main.appendChild(h("p", { class: "page-sub", text:
-      "This page shows the computed verdict and records your judgement on it." }));
+      "Check the computed verdict and override it if your judgement differs." }));
 
     // What the plot shows.
     refs.main.appendChild(h("div", { class: "card" }, [
@@ -4866,7 +4886,7 @@ window.App.UI = (function () {
     // The band legend. Both axes are ordinal but neither is a ladder to climb,
     // so the definitions are shown flat, with no better/worse styling.
     refs.main.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: spec.label + ": what the bands mean" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "What the " + spec.label.toLowerCase() + " bands mean" })]),
       h("div", { class: "card-b" }, [
         spec.meaning ? h("p", { class: "muted", style: "margin-top:0;", text: spec.meaning }) : null,
         h("div", { class: "ra-band-legend" }, bands.map(function (b) {
@@ -4924,7 +4944,7 @@ window.App.UI = (function () {
 
       var ta = h("textarea", {
         class: "input", rows: "3",
-        placeholder: "Characterisation: what you heard, and what it tells you"
+        placeholder: "What you heard and what it tells you"
       });
       ta.value = resp.notes || "";
       ta.addEventListener("change", function () {
@@ -5162,9 +5182,9 @@ window.App.UI = (function () {
       Noun: noun.charAt(0).toUpperCase() + noun.slice(1),
       conformityLayer: il.conformityLayer || "P3",
       referenceTag: d.referenceTag || "EU CRA (Regulation (EU) 2024/2847)",
-      captureBanner: d.captureBanner || "This assessment is indicative. Where one provision maps to a question, the requirement uses the Regulation's wording, and the Regulation text governs. The review is not a conformity assessment and does not certify the product.",
+      captureBanner: d.captureBanner || "This assessment is indicative. Where one provision maps to a question, the requirement uses the Regulation's wording. In every case the Regulation text governs. The review is not a conformity assessment and does not certify the product.",
       productsCardNote: d.productsCardNote || "Select a product to set its classification below. Part I and most of the conformity layer are assessed for each product. Part II, Article 14 and the component due diligence obligations are shared across all products.",
-      wizardOrgNote: d.wizardOrgNote || "These organisation-wide obligations are answered once for every product. Do them first, then switch to By product.",
+      wizardOrgNote: d.wizardOrgNote || "These organisation-wide obligations are answered once and apply to every product. Do them first, then switch to By product.",
       wizardProductNote: d.wizardProductNote || "These obligations apply to each product. Pick a product below, work through it, then move to the next."
     };
   }
@@ -5193,12 +5213,16 @@ window.App.UI = (function () {
     if (!interlock || !interlock.triggered) return null;
     var missing = (interlock.missingLayers || []).join(" and ");
     var confId = craDisplay().conformityLayer;
+    // The instrument's layerInterlock message gives the reason; this card adds
+    // only which layers are missing, so the point is made once.
+    var why = interlock.message ||
+      ("Assessed on its own, " + confId + " covers only the paperwork, with no technical evidence behind it.");
     return h("div", { class: "card", style: "border-left:3px solid var(--gap);" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Conformity claim not substantiated by the technical layers" })]),
       h("div", { class: "card-b" }, [
-        h("p", { style: "margin-top:0;", text: interlock.message || "" }),
+        h("p", { style: "margin-top:0;", text: why }),
         h("p", { class: "muted", style: "margin-bottom:0;",
-          text: "The conformity layer (" + confId + ") is in scope but " + (missing || "a technical layer") + " " + ((interlock.missingLayers || []).length > 1 ? "are" : "is") + " not. On its own, " + confId + " checks the paperwork without substantiating it." })
+          text: (missing || "A technical layer") + " " + ((interlock.missingLayers || []).length > 1 ? "are" : "is") + " out of scope in this assessment." })
       ])
     ]);
   }
@@ -5354,7 +5378,7 @@ window.App.UI = (function () {
     // 2) Per product: classification (class + category) for the SELECTED product
     // (chosen in the Products card above). The product name is the target name.
     var prodKids = [
-      h("p", { class: "muted", style: "margin-top:0;", text: "For the " + d.noun + " selected above." })
+      h("p", { class: "muted", style: "margin-top:0;", text: "These settings apply to the " + d.noun + " selected above." })
     ];
     if (classSpec) prodKids.push(craClassificationField(classSpec, setup));
     cards.push(h("div", { class: "card" }, [
@@ -5513,7 +5537,7 @@ window.App.UI = (function () {
       refs.main.appendChild(h("div", { class: "card", style: "border-left:3px solid var(--brand-blue);" }, [
         h("div", { class: "card-b", style: "padding:10px 14px;" }, [
           h("div", { class: "muted", style: "font-size:12.5px;",
-            text: "Organisation-wide layer: these answers apply to every " + d.noun + "." })
+            text: "The answers on this layer apply to every " + d.noun + "." })
         ])
       ]));
     }
@@ -5807,8 +5831,8 @@ window.App.UI = (function () {
         intro: gs.intro || "This assessment measures alignment with the NCSC CAF 4.0 indicators of good practice, with an OT focus. It is not a formal CAF assessment or a regulatory submission.",
         profileHeading: gs.profileHeading || "Regulator profile (sets the expected states)",
         bullets: gs.bullets || [
-          "Choose one state for each contributing outcome: Achieved, Partially Achieved or Not Achieved. There are 41 outcomes across 4 objectives and 14 principles. Unknown lowers confidence, and Not applicable drops the outcome.",
-          "The regulator profile sets the expected state for each outcome, and the General profile expects Achieved throughout. The report shows the gaps.",
+          "Choose one state for each contributing outcome: Achieved, Partially Achieved or Not Achieved. There are 41 outcomes across 4 objectives and 14 principles. Unknown lowers confidence, and Not applicable leaves the outcome out.",
+          "The regulator profile sets the expected state for each outcome, and the General profile expects Achieved throughout. The report lists the outcomes that fall short.",
           "There is no overall CAF grade. The report gives counts by objective and principle and a roadmap of outcomes below the expected state."
         ],
         profilesHeading: gs.profilesHeading || "Available profiles"
@@ -6098,7 +6122,7 @@ window.App.UI = (function () {
             h("thead", null, [h("tr", null, [h("th", { text: "" }), h("th", { text: "Zone" }), h("th", { class: "center", text: "SL-T" })])]),
             h("tbody", null, zoneRows)
           ]),
-          h("p", { class: "muted", text: "One " + label.toLowerCase() + " per selected zone, with its Target SL set from the zone's SL-T. " + scopeNote + " Untick every zone to store the context only." })
+          h("p", { class: "muted", text: "Each selected zone is added as a " + label.toLowerCase() + ", with its Target SL taken from the zone's SL-T. " + scopeNote + " Untick every zone to store the context only." })
         ]),
         h("div", { class: "modal-f" }, [
           h("button", { class: "btn", onClick: closeModal, text: "Cancel" }),
@@ -6109,7 +6133,7 @@ window.App.UI = (function () {
               E.setRiskContext(ctx, { scope: true, zoneIds: zoneIds, fileName: fileName });
               closeModal();
               toast(zoneIds.length > 0
-                ? "Risk context imported: " + zoneIds.length + " " + label.toLowerCase() + "(s) scoped from zones."
+                ? "Risk context imported, with " + zoneIds.length + " zone" + (zoneIds.length === 1 ? "" : "s") + " added."
                 : "Risk context stored (no " + label.toLowerCase() + "s created).");
             },
             text: "Import"
@@ -6256,7 +6280,7 @@ window.App.UI = (function () {
                 : frRes.frTargetStatus === "unassessed" ? window.App.Report.bandPill("na", "Not assessed")
                 : window.App.Report.bandPill("gap", "Target not met"))),
           frRes.propUpByCompensating
-            ? h("span", { class: "pill exceeds", title: "Without the compensating measures this FR would achieve " + S.formatSL(frRes.achievedSLStrict), text: "Held by compensating" })
+            ? h("span", { class: "pill exceeds", title: "Without the compensating measures this FR would achieve " + S.formatSL(frRes.achievedSLStrict), text: "Relies on compensating measures" })
             : null,
           frRes.unassessedCount > 0 ? h("span", { class: "pill flag", text: plural(frRes.unassessedCount, "item") + " not assessed" }) : null
         ])
@@ -6272,7 +6296,7 @@ window.App.UI = (function () {
             h("div", { class: "val " + (!frRes.inScope ? "" : (frRes.frTargetMet ? "met" : (frRes.frTargetStatus === "incomplete" ? "near" : "gap"))), text: frRes.inScope ? S.formatSL(frRes.conformantAchievedSL) : "-" })
           ]),
           h("div", { class: "kpi" }, [
-            h("div", { class: "lbl", text: "Without compensating" }),
+            h("div", { class: "lbl", text: "Without compensating measures" }),
             h("div", { class: "val " + (frRes.propUpByCompensating ? "near" : ""), text: frRes.inScope ? S.formatSL(frRes.achievedSLStrict) : "-" })
           ]),
           h("div", { class: "kpi" }, [
@@ -6284,7 +6308,7 @@ window.App.UI = (function () {
         // the consultant is working rather than only in the report.
         (frRes.inScope && frRes.blockingItems.length)
           ? h("div", { style: "margin-top:12px;" }, [
-              h("div", { class: "sl-items-label", text: "Holding this FR at " + S.formatSL(frRes.conformantAchievedSL) }),
+              h("div", { class: "sl-items-label", text: "Items holding this FR at " + S.formatSL(frRes.conformantAchievedSL) }),
               h("div", { class: "hint", style: "margin-top:4px;", text:
                 frRes.blockingItems.map(function (i) { return i.label; }).join(", ") })
             ])
@@ -6352,7 +6376,7 @@ window.App.UI = (function () {
       title: "Partially met. It does not count toward a level and goes into the gap report." },
     { value: "not-met",          label: "Not met",       cls: "caf-state-not" },
     { value: "na",               label: "N/A",           cls: "na",
-      title: "Not applicable. Blocks the level until justified." }
+      title: "Not applicable. It blocks the level until you give a reason." }
   ];
 
   var SL_ITEM_LABEL = (function () {
@@ -6769,7 +6793,7 @@ window.App.UI = (function () {
       onChange();
     }, overriding ? "Revert to shared" : null,
        overriding ? ("The shared answer is " + (SL_ITEM_LABEL[scoredItem.sharedState] || scoredItem.sharedState) +
-                     ". Reverting drops this " + targetNoun() + "'s own answer.") : null);
+                     ". Reverting removes this " + targetNoun() + "'s own answer.") : null);
     if (clear) btns.appendChild(clear);
 
     var kids = [
@@ -6782,7 +6806,7 @@ window.App.UI = (function () {
         // already says it is connected to that layer, and says what reverting
         // would restore.
         inherited
-          ? h("span", { class: "pill inherit", title: "Inherited. Answer below to override it here.", text: "Shared" })
+          ? h("span", { class: "pill inherit", title: "This item takes the shared answer. Answer it here to override it.", text: "Shared" })
           : null,
         scoredItem.aboveTarget
           ? h("span", { class: "pill above", title: "Above the target for this " + targetNoun() + ", so it is never counted as a gap.", text: "Above target" })
@@ -6953,7 +6977,7 @@ window.App.UI = (function () {
       }).concat([
         h("button", {
           class: "sl-btn na" + (allNA ? " active" : ""),
-          title: "Not applicable. Blocks the level until justified.",
+          title: "Not applicable. It blocks the level until you give a reason.",
           onClick: function () {
             E.setRequirementSL(tid, req.id, "na", scoredReq.targetSL, resp.naNote || "");
             rerender();
@@ -7213,8 +7237,8 @@ window.App.UI = (function () {
         // something is missing.
         body = h("div", { class: "sl-level-none", text:
           (entry && entry.required)
-            ? "Nothing further required at this level."
-            : "Not selected at this level." });
+            ? "Nothing further is required at this level."
+            : "The requirement is not selected at this level." });
       } else {
         body = h("div", { class: "sl-level-items" }, newItems.map(function (i) {
           var desc = (entry && entry.verbatimText && String(entry.verbatimText).trim() !== "")
@@ -7263,7 +7287,7 @@ window.App.UI = (function () {
       text: "Example questions to ask"
     });
     var panel = open ? h("div", { class: "caf-state-guide" }, [
-      h("div", { class: "caf-summary-label", text: "Prompts to guide the interview" }),
+      h("div", { class: "caf-summary-label", text: "Interview prompts (use as needed)" }),
       h("ul", { class: "caf-questions" }, qs.map(function (q) { return h("li", null, [q]); }))
     ]) : null;
     return { toggle: toggle, panel: panel };
@@ -7520,7 +7544,7 @@ window.App.UI = (function () {
     var id = E.getActiveCAFProfileId();
     var entry = ((reg && reg.profiles) || []).filter(function (p) { return p.id === id; })[0];
     if (!entry) return "(none)";
-    return entry.name + (entry.status === "placeholder" ? " (placeholder)" : "");
+    return entry.name + (entry.status === "placeholder" ? " (incomplete)" : "");
   }
 
   // State pill + count-pills driven by the instrument's substantive states, so
@@ -7602,7 +7626,7 @@ window.App.UI = (function () {
       ]) });
     } else if (summaries.achieved || summaries.partially || summaries.notAchieved) {
       blocks.push({ toggleLabel: "What each state means", node: h("div", { class: "caf-summaries" }, [
-        h("div", { class: "caf-summary-label", text: "State summaries (paraphrased, so not verbatim CAF text)" }),
+        h("div", { class: "caf-summary-label", text: "State summaries (a paraphrase of the CAF text)" }),
         h("div", { class: "caf-summary-grid" }, [
           h("div", { class: "caf-summary caf-summary-achieved" }, [h("span", { class: "caf-summary-tag", text: "Achieved" }), document.createTextNode(summaries.achieved || "")]),
           h("div", { class: "caf-summary caf-summary-partially" }, [h("span", { class: "caf-summary-tag", text: "Partially" }), document.createTextNode(summaries.partially || "")]),
@@ -7655,7 +7679,7 @@ window.App.UI = (function () {
     // "Added by overlay" badge: the profile overlay marks this control as one the
     // ICS overlay adds beyond the standard baseline (overlaySource === "added").
     var addedBadge = (ov && ov.overlaySource === "added")
-      ? h("span", { class: "pill exceeds", style: "margin-left:6px;", title: "Beyond the standard 800-53B baseline", text: "Added by overlay" })
+      ? h("span", { class: "pill exceeds", style: "margin-left:6px;", title: "The overlay adds this control to the standard 800-53B baseline.", text: "Added by overlay" })
       : null;
 
     // State buttons row.
@@ -8591,7 +8615,7 @@ window.App.UI = (function () {
   // Labels for the consultant-input fields, as each family's card names them.
   function narrativeFieldLabel(field) {
     var fam = E.state.scoringFamily;
-    if (field === "method") return "Method (how the assessment was run)";
+    if (field === "method") return "How the assessment was run (Method)";
     if (field === "regulatoryExposure") {
       if (fam === "risk-appetite-coherence") return "Context for the board";
       if (isCRA()) return "Regulatory and commercial exposure";
@@ -8653,7 +8677,7 @@ window.App.UI = (function () {
         text = "Basis of assessment: no interviews, documents or systems recorded yet.";
         go = function () { go2("engagement", null, '[data-check-anchor="basis"]'); };
       } else if (w.kind === "raVerdict") {
-        text = "Your verdict: the reasoning behind the verdict you set is not recorded.";
+        text = "Your verdict: the reasoning for it is not recorded yet.";
         go = function () { go2("ra-verdict", null, '[data-check-anchor="ra-rationale"]'); };
       } else if (w.kind === "incomplete") {
         text = "The assessment is not finished, so the executive summary is still a prompt.";
@@ -8800,7 +8824,7 @@ window.App.UI = (function () {
       openRemediationModal(itemId, {
         targetId: E.SHARED_TARGET_ID,
         title: "Action across " + window.App.Report.pluralLower(E.state.instrument.targetDimensionLabel || "zone", E.state.instrument),
-        note: "On the shared layer, so it applies to every " +
+        note: "This action sits on the shared layer, so it applies to every " +
           String(E.state.instrument.targetDimensionLabel || "zone").toLowerCase() + " that inherits this answer." });
       return;
     }
@@ -8854,7 +8878,7 @@ window.App.UI = (function () {
     card.appendChild(h("div", { class: "card-h" }, [h("h2", { text: "Issue check" }), pill]));
     var b = h("div", { class: "card-b" });
     if (state === "blocked") {
-      b.appendChild(h("p", { class: "issue-lead", text: "These print in red in the Word report and block Final. Fill them in here." }));
+      b.appendChild(h("p", { class: "issue-lead", text: "These print in red in the Word report and block Final. Fill them in here, because changes made in Word are not read back into the tool." }));
       b.appendChild(issueList("block", blockers));
     } else if (state === "ready") {
       b.appendChild(h("p", { class: "issue-lead", text: "Nothing in the Word report is left to write." }));
@@ -9139,7 +9163,7 @@ window.App.UI = (function () {
             targetId: E.SHARED_TARGET_ID,
             title: "Action across " + window.App.Report.pluralLower(
               E.state.instrument.targetDimensionLabel || "zone", E.state.instrument),
-            note: "On the shared layer, so it applies to every " +
+            note: "This action sits on the shared layer, so it applies to every " +
               String(E.state.instrument.targetDimensionLabel || "zone").toLowerCase() +
               " that inherits this answer." });
         }
@@ -9178,7 +9202,7 @@ window.App.UI = (function () {
       h("div", { class: "card-b" }, [
         h("label", { class: "check-row" }, [cb, h("span", null, [
           h("strong", { text: "Show what good looks like for each roadmap item" }),
-          h("span", { class: "muted small", text: "  Printed under each improvement in the Word roadmap, which makes the report longer." })
+          h("span", { class: "muted small", text: "  The description prints under each improvement in the Word roadmap and makes the report longer." })
         ])])
       ])
     ]);
@@ -9210,13 +9234,13 @@ window.App.UI = (function () {
     return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "Your two paragraphs for the executive summary. Blank ones print as placeholders." }),
+        h("p", { class: "muted", style: "margin-top:0;", text: "Write the two paragraphs for the executive summary here. A blank one prints as a placeholder." }),
         h("div", { class: "field", "data-check-anchor": "narrative-regulatoryExposure" }, [h("label", { text: "Context for the board" }), ctxTa]),
         h("div", { class: "field", "data-check-anchor": "narrative-topPriorities" }, [h("label", { text: "The decision for the board" }), decTa]),
         methodField(),
         h("label", { class: "check-row" }, [ctxCb, h("span", null, [
           h("strong", { text: "Include the general paragraph on this verdict" }),
-          h("span", { class: "muted small", text: "  Standard text on what this verdict usually means, the same for every client." })
+          h("span", { class: "muted small", text: "  This standard text explains what the verdict usually means and is the same for every client." })
         ])])
       ])
     ]);
@@ -9232,7 +9256,7 @@ window.App.UI = (function () {
     var rn = E.getReportNarrative();
     var d = craDisplay();
 
-    var priTa = h("textarea", { rows: "3", placeholder: "What must close first (e.g. the notified-body route), what CE marking for each " + d.noun + " depends on, and what can run in parallel." });
+    var priTa = h("textarea", { rows: "3", placeholder: "What must close first, such as the notified-body route, what CE marking for each " + d.noun + " depends on, and what can run in parallel." });
     priTa.value = rn.topPriorities || "";
     priTa.addEventListener("change", function () { E.setReportNarrative({ topPriorities: priTa.value }); });
 
@@ -9243,9 +9267,9 @@ window.App.UI = (function () {
     return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "Your two paragraphs for the executive summary. Blank ones print as placeholders." }),
-        h("div", { class: "field", "data-check-anchor": "narrative-topPriorities" }, [h("label", { text: "Top priorities / sequencing" }), priTa]),
-        h("div", { class: "field", "data-check-anchor": "narrative-regulatoryExposure" }, [h("label", { text: "Regulatory & commercial exposure" }), expoTa])
+        h("p", { class: "muted", style: "margin-top:0;", text: "Write the two paragraphs for the executive summary here. A blank one prints as a placeholder." }),
+        h("div", { class: "field", "data-check-anchor": "narrative-topPriorities" }, [h("label", { text: "Top priorities and sequencing" }), priTa]),
+        h("div", { class: "field", "data-check-anchor": "narrative-regulatoryExposure" }, [h("label", { text: "Regulatory and commercial exposure" }), expoTa])
       ])
     ]);
   }
@@ -9608,7 +9632,7 @@ window.App.UI = (function () {
     var editor = h("div", { class: "terms-editor" }, [
       h("h3", { text: "Other terms used in this report" }),
       h("p", { class: "muted", style: "margin:2px 0 8px;", text: terms.length
-        ? "Printed after the definitions above, in this order."
+        ? "These print after the definitions above, in this order."
         : "Nothing added yet." })
     ].concat(rows).concat([
       h("button", { class: "sl-btn", text: "+ Add a term",
@@ -9706,7 +9730,7 @@ window.App.UI = (function () {
     clsSel.value = rn.entityClassification || "";
     clsSel.addEventListener("change", function () { E.setReportNarrative({ entityClassification: clsSel.value }); });
 
-    var authIn = h("input", { type: "text", value: rn.competentAuthority || "", placeholder: "e.g. the relevant national competent authority / CSIRT" });
+    var authIn = h("input", { type: "text", value: rn.competentAuthority || "", placeholder: "For example, the national competent authority or CSIRT" });
     authIn.addEventListener("change", function () { E.setReportNarrative({ competentAuthority: authIn.value }); });
 
     var expoTa = h("textarea", { rows: "3", placeholder: "Regulatory exposure from the weakest areas, especially any Not Achieved incident-reporting duties." });
@@ -9762,7 +9786,7 @@ window.App.UI = (function () {
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Basis of assessment" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "Edit these on the engagement page." })
+        h("p", { class: "muted", style: "margin-top:0;", text: "Edit these on the Engagement details page." })
       ].concat(kids))
     ]);
   }
