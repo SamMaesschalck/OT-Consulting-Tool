@@ -472,8 +472,8 @@ risk context, completeness item and approval fingerprint is unchanged).
   or criteria with no tolerable risk per category, compares its band with the
   general tolerable risk as before. The engine's treatment state (required,
   current, planned, today, once the plan is done) and so every output read
-  it, as do the SL-T trace (every threat behind a requirement, not only the
-  worst band's), the heat maps (a cell holding threats is outlined when one
+  it, as do the SL-T trace (every threat behind a requirement, whatever its
+  band), the heat maps (a cell holding threats is outlined when one
   of them is above tolerable risk, an empty one by its band:
   `ViewModel.heatCells` and `heatAbove`, read by step 5 and the workbook's
   Summary) and the review pack (its expected value is each rated category's
@@ -1162,7 +1162,7 @@ of that layout code. It has:
   named only when it is not in the table above) and next steps, and who
   signed off (the scope of each approval is under Sign-off), with a red note
   for the consultant to tailor;
-- a "Risk at a glance" scorecard page: headline tiles, per-zone and per-conduit
+- a "Risk summary" scorecard page: headline tiles, per-zone and per-conduit
   risk-band bars, the worst-case SL-T strip and "where to focus first" cards
   (the threats still above tolerable risk today, ranked on today's rating);
 - the system under consideration and requirements, grouped as step 6 is

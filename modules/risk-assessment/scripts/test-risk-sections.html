@@ -120,7 +120,7 @@
         var jm = now.filter(function (t) { return /^Justification for /.test(t); }), jd = det.filter(function (t) { return /^Justification for /.test(t); });
         ok(jm.length > 0 && jm.join("|") === jd.join("|") && jm.every(function (t) { return det[det.indexOf(t) + 1] === now[now.indexOf(t) + 1]; }), "and so is each justification");
         // It stands alone: none of the reports' sections, and nothing points to them.
-        ["Executive summary", "Risk at a glance", "Basis of assessment", "High-level risk ranking", "Risk comparison", "Risk register", "Treatment plan", "Accepted risks", "Zones, conduits and the detailed risk assessment", "Driving scenarios"].forEach(function (hd) {
+        ["Executive summary", "Risk summary", "Basis of assessment", "High-level risk ranking", "Risk comparison", "Risk register", "Treatment plan", "Accepted risks", "Zones, conduits and the detailed risk assessment", "Driving scenarios"].forEach(function (hd) {
           ok(now.indexOf(hd) === -1, "the specification has no " + hd + " section");
         });
         var pointers = now.filter(function (t) { return /\b(this|the) report\b|risk register|see section|under Accepted risks|under Treatment plan/i.test(t); });
@@ -253,7 +253,7 @@
             return settled();
           }).then(function () {
             ok(card(c.hide).classList.contains("section-hidden"), tag + "a hidden section stays on the page, dimmed, so it can be put back");
-            ok(/Hidden: left out of the Word document/.test(card(c.hide).querySelector(".card-h").textContent), tag + "and says so");
+            ok(/Hidden from the Word document/.test(card(c.hide).querySelector(".card-h").textContent), tag + "and says so");
             ok(cardOwn(c.hide, ".sect-actions button").map(function (b) { return b.textContent; }).join("|") === "Hidden (click to show)|Back to the generated version", tag + "with the way back at the foot", cardOwn(c.hide, ".sect-actions button").map(function (b) { return b.textContent; }).join("|"));
             return wordXml(c.opts);
           }).then(function (xml) {
@@ -298,7 +298,7 @@
       }).then(function (bl) {
         var hs = bl.filter(function (b) { return b.type === "heading"; }).map(function (b) { return b.text; });
         ok(hs.indexOf("Summary for the board") === -1 && hs.indexOf("Our findings") === -1, "hiding the h1 takes its nested sections with it");
-        ok(hs.indexOf("Risk at a glance") !== -1 && hs[0] === "Document control", "and nothing outside it");
+        ok(hs.indexOf("Risk summary") !== -1 && hs[0] === "Document control", "and nothing outside it");
         reset();
         // What a rewrite leaves alone.
         RP.setSection("detailed", "system-under-consideration-and-requirements", { prose: "A new description." });
@@ -335,7 +335,7 @@
         return openReport(0);
       }).then(function () {
         // ---- a section with nothing to rewrite ---------------------------------------------
-        ["document-control", "sign-off", "risk-at-a-glance"].forEach(function (k) {
+        ["document-control", "sign-off", "risk-summary"].forEach(function (k) {
           var c = edit(k);
           ok(cardOwn(k, ".sect-title-input").length === 1 && cardOwn(k, ".sect-prose-input").length === 0, k + ": the title and Hide, no wording box");
           ok(/no opening wording to rewrite/.test(cardOwn(k, ".sect-note").map(function (x) { return x.textContent; }).join(" ")), k + ": saying why");
@@ -393,9 +393,9 @@
         var saved = P().zones[0].name;
         P().zones[0].name = "Risk";
         RT.touched();
-        RP.setSection("detailed", "risk-at-a-glance", { title: "Risk in brief" });
+        RP.setSection("detailed", "risk-summary", { title: "Risk in brief" });
         return wordBlocks({}).then(function (bl) {
-          ok(bl.some(function (b) { return b.type === "heading" && b.text === "Risk in brief" && b.sectionKey === "risk-at-a-glance"; }), "a zone called Risk does not move the key of Risk at a glance");
+          ok(bl.some(function (b) { return b.type === "heading" && b.text === "Risk in brief" && b.sectionKey === "risk-summary"; }), "a zone called Risk does not move the key of Risk summary");
           ok(bl.some(function (b) { return b.type === "heading" && b.text === "Z1: Risk" && b.sectionKey === ""; }), "and its own heading stays a name");
           P().zones[0].name = saved;
           reset();
@@ -493,9 +493,12 @@
         ok(RP.sectionOf("detailed", "executive-summary").title === "Saved detailed title" && RP.sectionOf("highLevel", "method-and-limitations").hidden === true, "and they come back, per report");
         // Wording fixes: "What we found" became "Findings". A file saved before the rename keeps
         // its customisation of that section under the old key, and it still applies.
+        // "Risk at a glance" became "Risk summary" the same way.
         var oldKeyed = JSON.parse(saved); oldKeyed.reportCustom.detailed["what-we-found"] = { title: "Saved findings title" };
+        oldKeyed.reportCustom.highLevel["risk-at-a-glance"] = { title: "Saved scorecard title" };
         ok(RT.loadProjectText(JSON.stringify(oldKeyed)), "a project saved with the old What we found key loads");
         ok(RP.sectionOf("detailed", "findings").title === "Saved findings title" && !P().reportCustom.detailed["what-we-found"], "and its customisation moves to the Findings key");
+        ok(RP.sectionOf("highLevel", "risk-summary").title === "Saved scorecard title" && !P().reportCustom.highLevel["risk-at-a-glance"], "and one saved under the old Risk at a glance key moves to Risk summary");
         return wordBlocks({}).then(function (bl0) {
           ok(bl0.some(function (b) { return b.type === "heading" && b.text === "Saved findings title" && b.sectionKey === "findings"; }) && !bl0.some(function (b) { return b.type === "heading" && b.text === "Findings"; }), "and still renames the section in Word");
           ok(RT.loadProjectText(saved), "back to the project with overrides");

@@ -120,7 +120,7 @@
       return poll(function () { return RP.idle(); }).then(function () { return reportPage(0); });
     }).then(function () {
       var r = row(KEY);
-      ok(!!r && r.getAttribute("data-reworded-state") === "rewritten" && /Does not apply: the opening of its section has since been rewritten as a whole\./.test(r.textContent), "the list says the replacement does not apply, as the opening was rewritten", r && r.textContent);
+      ok(!!r && r.getAttribute("data-reworded-state") === "rewritten" && /This does not apply because the opening of its section has been rewritten\./.test(r.textContent), "the list says the replacement does not apply, as the opening was rewritten", r && r.textContent);
       return docs();
     }).then(function (d) {
       ok(has(d[0], "A closing line the author added by hand.") && has(d[0], "Reworded before the author's own edit.") && lost().length === 0, "the rewrite prints, and as it was the author's own doing there is no warning");

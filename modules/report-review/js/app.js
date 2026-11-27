@@ -1109,9 +1109,9 @@
   // What each severity means, beside the buttons. review-core may carry the
   // wording (SEVERITIES[].help); this is the same wording, for an older copy.
   var SEV_HELP = {
-    "must-fix": "Wrong, misleading, or not fit to send to the client. The author's Issue check warns while any are open.",
-    "should-fix": "Weakens the report. The author should change it unless there is a good reason not to.",
-    suggestion: "An improvement the author can take or leave."
+    "must-fix": "The text is wrong or misleading, or not fit to send to the client. The author's Issue check warns while any are open.",
+    "should-fix": "The point weakens the report, and the author should change it unless there is a good reason not to.",
+    suggestion: "The author can take this improvement or leave it."
   };
   function sevHelp(s) { return s.help || SEV_HELP[s.id] || ""; }
   function composerNode() {

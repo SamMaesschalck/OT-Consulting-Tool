@@ -1838,7 +1838,7 @@ window.App.ExportXLSX = (function () {
     // Read me.
     var readmeLines = dpk.xlsxReadMe || [
       "The three layers (P1 product, P2 vulnerability handling and P3 conformity) are scored separately against the CRA and shown side by side. There is no combined CRA score.",
-      "Layers outside the scope are omitted. This is an indicative assessment and is not a conformity assessment or certification. No harmonised CRA standard is cited yet, so a 62443 certificate does not by itself show CRA conformity."
+      "Layers out of scope are left out. This is an indicative assessment. It is not a conformity assessment and does not certify the product. No harmonised CRA standard has yet been cited, so a 62443 certificate does not amount to CRA conformity."
     ];
     var readme = [
       [styledCell(((disp.shortName ? "EU " + disp.shortName.replace(/^EU /, "") + " Regulation" : "EU CRA")) + " gap assessment: how to read this workbook", { bold: true })],
@@ -2414,7 +2414,7 @@ window.App.ExportXLSX = (function () {
       ["A requirement not assessed at a " + noun.toLowerCase() + " is listed under 'Not assessed at' and is never treated as met. Unknown answers lower confidence in the same way."],
       ["This workbook compares the " + nounP.toLowerCase() + " only. Evidence, recommended actions and owners are recorded in each " + noun.toLowerCase() + "'s own workbook."],
       [""],
-      ["This is an indicative assessment. It is not a certification or a statement of conformance."]
+      ["This is an indicative assessment and does not certify conformance."]
     ];
     XLSX.utils.book_append_sheet(wb, aoaSheet(readme), "Read me");
     return wb;

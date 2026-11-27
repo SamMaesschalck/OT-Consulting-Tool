@@ -16,7 +16,7 @@ window.App.Data.instruments["iec-62443-2-1-2010"].instrument = {
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
     "status":  "active-skeleton",
-    "framing":  "ISA/IEC 62443-2-1:2010 defines the elements of a Cyber Security Management System (CSMS) for industrial automation and control systems. The elements sit in element groups within three categories: risk analysis, addressing risk with the CSMS, and monitoring and improving the CSMS. This is the older edition, and it is still used by organisations whose CSMS was built against it. The 2024 edition reorganises the content into a maturity-based security program. This assessment judges conformance for each element and does not rate maturity.",
+    "framing":  "ISA/IEC 62443-2-1:2010 defines the elements of a Cyber Security Management System (CSMS) for industrial automation and control systems. The elements sit in element groups within three categories: risk analysis, addressing risk with the CSMS, and monitoring and improving the CSMS. This is the older edition, and it is still used by organisations whose CSMS was built against it. The 2024 edition reorganises the content into a maturity-based security programme. This assessment judges conformance for each element and does not rate maturity.",
     "sourceNote":  "Category / element-group / element structure extracted and verified from BS IEC 62443-2-1:2011 held in the project. Element titles are verified; assessor framing is paraphrased; \u0027verbatimText\u0027 and \u0027otLens\u0027 slots are empty for the licence holder to populate. Source: BS IEC 62443-2-1:2011 (copyright IEC/BSI).",
     "categories":  [
                        {

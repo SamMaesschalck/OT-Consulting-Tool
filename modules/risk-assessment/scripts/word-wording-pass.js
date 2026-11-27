@@ -6,7 +6,7 @@
  * zone-depth step's own counts do not move. Every line not listed here, and not
  * listed by the earlier steps, is still v0.7.0's, in order. The wording fixes that
  * followed the pass's review (Nov 2026) are in the same lists: the Findings heading,
- * the summary's findings, the house likelihood definitions, and the demo's
+ * the summary's findings, the house likelihood definitions, the scorecard heading, and the demo's
  * policies and observation notes. */
 window.RiskTestWordingPass = {
   "was": [
@@ -69,7 +69,8 @@ window.RiskTestWordingPass = {
     "Rules match diagram; two stale vendor rules removed during review",
     "Known-exploited path, an exposed access point, or an actively targeted asset; expected without intervention.",
     "Plausible given the exposure and a capable adversary; occurrence would not be surprising over the system&apos;s life.",
-    "No known history; would require an unlikely combination of access, capability and intent."
+    "No known history; would require an unlikely combination of access, capability and intent.",
+    "Risk at a glance"
   ],
   "now": [
     "These threats are above tolerable risk today.",
@@ -151,6 +152,7 @@ window.RiskTestWordingPass = {
     "IEC 62443-3-2 high-level risk assessment, using the SolutionsPT default risk matrix (house method)",
     "This report is the first tier of an IEC 62443-3-2 risk assessment, carried out 2026-07-01 to 2026-07-04. It is the high-level cyber security risk assessment, which the standard calls the initial cyber security risk assessment. Each system in scope was ranked by the consequence and likelihood of its compromise, and the resulting risk band compared with the tolerable risk of Medium. The ranking is relative. It puts the systems in priority order but does not measure absolute risk or set security targets.",
     "6 systems were ranked: 4 High, 1 Medium, 1 Low. Under the house method, the systems above the tolerable risk of Medium are the candidates for a detailed assessment: Unit 300 BPCS (DCS servers, HMIs, unit PLCs); Safety Instrumented System (SIS); Plant DMZ &amp; process historian; Engineering workstations &amp; config management. Of the ranked systems, 4 are in zones taken to a detailed assessment.",
-    "It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The specification states the tolerable risk and the target security level (SL-T) of each zone and conduit, which is the protection that zone or conduit must be engineered and maintained to. It also lists the mandatory security countermeasures that come out of the risk assessment."
+    "It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The specification states the tolerable risk and the target security level (SL-T) of each zone and conduit, which is the protection that zone or conduit must be engineered and maintained to. It also lists the mandatory security countermeasures that come out of the risk assessment.",
+    "Risk summary"
   ]
 };

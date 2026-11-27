@@ -95,7 +95,7 @@
         var so = para(d0, "what-happens-next", /signed off/);
         p = RR.acceptPlan(thread(0, so, "The asset owner signed off everything."));
         ok(!p.can, "nor the sign-off statement in the summary", p.why);
-        var scoreBody = para(d0, "risk-at-a-glance");
+        var scoreBody = para(d0, "risk-summary");
         p = RR.acceptPlan(thread(0, scoreBody, "Other words"));
         ok(!p.can, "text after a table is not a section's opening", p.why);
         p = RR.acceptPlan({ comment: { id: "x", suggestion: "x", anchor: { kind: "item", documentIndex: 0, quote: "" } }, status: "open" });

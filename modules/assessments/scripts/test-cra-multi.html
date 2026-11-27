@@ -140,7 +140,8 @@ window.docx = (function () {
           check("organisation-wide gaps are de-duplicated (5 org gaps once each)", count(/Applies to: Organisation-wide/g) === 5);
           check("combined roadmap tags per-product gaps", allText.indexOf("Applies to: SentinelEdge IDS-4400") !== -1);
           check("scorecard shows per-product tile groups", allText.indexOf("Conformance profile by layer and product") !== -1);
-          check("readiness page present", allText.indexOf("CRA readiness at a glance") !== -1);
+          check("readiness page present", allText.indexOf("CRA readiness summary") !== -1);
+          check("says once that the layers are not combined into one score", count(/single CRA score|combined CRA score|combined into one CRA score/g) === 1);
         } catch (e) { check("doc assertions threw: " + e.message, false); }
         finish();
       });

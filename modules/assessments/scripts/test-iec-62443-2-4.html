@@ -139,7 +139,7 @@ H.test(function (ok, done) {
   ok(inst.edition === "2.0 (2023)" && inst.targetDimension === "service-provider" && inst.targetDimensionLabel === "Service provider",
      "edition and target dimension");
   ok(R.standardRef(inst) === "ISA/IEC 62443-2-4:2023", "standardRef");
-  ok(R.mlNoun(inst, "elementNoun") === "functional area" && R.mlNoun(inst, "programmeNoun") === "service provider security program", "display nouns");
+  ok(R.mlNoun(inst, "elementNoun") === "functional area" && R.mlNoun(inst, "programmeNoun") === "service provider security programme", "display nouns");
   var lv3 = (inst.maturityModel.levels || []).filter(function (l) { return l.id === "ML3"; })[0];
   ok(!!lv3 && /asset owner at least once/.test(lv3.anchor) && /asset owner at least once/.test(lv3.shortAnchor) && !/IACS/.test(lv3.anchor + lv3.shortAnchor),
      "ML3 means delivered to an asset owner at least once, not practised on the IACS");
@@ -317,7 +317,7 @@ H.test(function (ok, done) {
       ok(!err && !!window.__doc, "the Word report builds", err && (err.message || String(err)));
       if (window.__doc) {
         var txt = docText();
-        ok(txt.indexOf("It is not a certification or a statement of conformance") !== -1, "Word carries the not-a-certification caveat");
+        ok(txt.indexOf("It does not certify the provider or state conformance") !== -1, "Word carries the not-a-certification caveat");
         ok(txt.indexOf("ML1 included, so a requirement that is not met is the finding") !== -1, "Word carries the any-level-conforms caveat");
         ok(count(txt, "The functional area SP05 SIS") === 1 && txt.indexOf("was out of scope for this assessment") !== -1, "Word names SP05 out of scope once");
         ok(txt.indexOf("SP.05.") === -1, "no SP05 requirement appears in Word");

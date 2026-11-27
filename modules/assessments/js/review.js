@@ -32,9 +32,22 @@ window.App.Review = (function () {
   function UI() { return window.App.UI.__review; }
   function norm(s) { return RC().norm(s); }
 
+  // Every read of the store goes through here, so a comment made on a section
+  // whose heading has since been renamed (in the saved file, or in a review
+  // file imported later) finds that section under its new key.
+  function aliasKeys(s) {
+    var R = window.App.Report, alias = R && R.sectionKeyAlias;
+    if (!alias) return s;
+    (s.threads || []).forEach(function (t) {
+      var a = t && t.comment && t.comment.anchor, r = t && t.accepted && t.accepted.revert;
+      if (a && a.sectionKey) a.sectionKey = alias(a.sectionKey);
+      if (r && r.key) r.key = alias(r.key);
+    });
+    return s;
+  }
   function store() {
     var s = E().getReview();
-    return s ? RC().normaliseStore(s) : null;
+    return s ? aliasKeys(RC().normaliseStore(s)) : null;
   }
   // A store is only created when a review starts: until then an old file and a
   // new one look the same.
@@ -956,12 +969,12 @@ window.App.Review = (function () {
     { re: /^executive-summary$/, anchor: "consultant-input" },
     { re: /^document-control/, engagement: true },
     { re: /^(basis-of-assessment|people-interviewed|documents-reviewed|systems-observed)$/, basis: true },
-    { re: /^method-and-limitations$|^scope-and-method$/, anchor: "narrative-method", cards: [/^about-this-assessment$/, /^not-a-formal-assessment$/, /^about-the-/] },
+    { re: /^method-and-limitations$|^scope-and-method$/, anchor: "narrative-method", cards: [/^about-this-assessment$/, /^status-of-this-/, /^limits-of-this-/, /^about-the-/] },
     { re: /^(progress-since-previous-assessment|change-since-the-previous-assessment)$/, anchor: "progress" },
     { re: /^findings-by-|^results-by-|^results-across-|^closeness-to-target|-achieved$|^full-obligation-register$|^fr\d+-/,
-      cards: [/^results-by-/, /^fr-breakdown$/, /^domain-results$/, /^fr-achievement-vs-target$/, /^the-three-positions/] },
-    { re: /at-a-glance$|^(outcome|conformance)-profile-by-|^maturity-distribution-by-|^posture-by-|^achieved-security-level|^overall-posture/,
-      cards: [/headline/, /^posture-summary$/, /^the-three-positions/, /^achieved-security-level/, /^capability-security-level/, /^results-by-/] },
+      cards: [/^results-by-/, /^fr-breakdown$/, /^domain-results$/, /^fr-achievement-against-target$/] },
+    { re: /at-a-glance$|^(conformance|alignment)-summary$|readiness-summary$|^(outcome|conformance)-profile-by-|^maturity-distribution-by-|^posture-by-|^achieved-security-level|^overall-posture/,
+      cards: [/headline/, /^posture-summary$/, /^(conformance|alignment)-summary$/, /^achieved-security-level/, /^capability-security-level/, /^results-by-/] },
     { re: /roadmap|recommendations|^where-to-focus-first$/, cards: [/^where-to-focus-first$/, /roadmap/, /^priority-order$/, /^results-by-/] }
   ];
 
@@ -985,6 +998,8 @@ window.App.Review = (function () {
   // it is edited, else a card close to it. Returns where it went, or null.
   function placeSection(key, have, U) {
     if (!key) return null;
+    var R = window.App.Report;
+    if (R && R.sectionKeyAlias) key = R.sectionKeyAlias(key);
     if (have[key] && U.goToSection(key, null, true)) return "card:" + key;
     var keys = Object.keys(have);
     for (var i = 0; i < PLACES.length; i++) {

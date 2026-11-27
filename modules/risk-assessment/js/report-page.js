@@ -365,7 +365,7 @@ window.RiskReportPage = (function () {
       "data-section": key, "data-section-title": genTitle, "data-generated-prose": genProse }, [head, bodyEl]);
     if (s.repeat) card.setAttribute("data-repeat", "1");
     if (s.repeat) head.appendChild(h("span", { class: "sub", text: "One for each zone and conduit, with its name after this title" }));
-    if (cur.hidden) head.appendChild(h("span", { class: "section-hidden-tag", text: "Hidden: left out of the Word document" }));
+    if (cur.hidden) head.appendChild(h("span", { class: "section-hidden-tag", text: "Hidden from the Word document" }));
     head.appendChild(h("button", {
       class: "sect-edit" + (changed ? " changed" : "") + (editing ? " open" : ""),
       text: editing ? "Done" : (changed ? "Edited" : "Edit"),

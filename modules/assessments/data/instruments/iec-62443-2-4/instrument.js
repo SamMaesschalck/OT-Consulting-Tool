@@ -13,8 +13,8 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                     "elementNounTitle":  "Functional area",
                     "elementNounPlural":  "functional areas",
                     "requirementNoun":  "requirement",
-                    "programmeNoun":  "service provider security program",
-                    "programmeTitle":  "Service provider security program",
+                    "programmeNoun":  "service provider security programme",
+                    "programmeTitle":  "Service provider security programme",
                     "elementShort":  "functional area",
                     "elementShortPlural":  "functional areas",
                     "elementSheet":  "By area",
@@ -31,7 +31,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
     "targetDimensionLabelPlural":  "Service providers",
     "status":  "active",
     "elementScoping":  true,
-    "framing":  "ISA/IEC 62443-2-4:2023 sets out the security processes a service provider can offer an asset owner when it integrates or maintains the asset owner\u0027s automation solution. Together those processes make up the provider\u0027s security program. The requirements fall into twelve functional areas. Each requirement is either a base requirement or an enhancement of one, and each is rated on its own at one of four maturity levels, ML1 to ML4. The maturity model is the same as in 62443-2-1:2024 and 62443-4-1. The asset owner usually decides in the contract which requirements apply to the service, and a functional area the contract does not cover is left out of the assessment.",
+    "framing":  "ISA/IEC 62443-2-4:2023 sets out the security processes a service provider can offer an asset owner when it integrates or maintains the asset owner\u0027s automation solution. Together those processes make up the provider\u0027s security programme. The requirements fall into twelve functional areas. Each requirement is either a base requirement or an enhancement of one, and each is rated on its own at one of four maturity levels, ML1 to ML4. The maturity model is the same as in 62443-2-1:2024 and 62443-4-1. The asset owner usually decides in the contract which requirements apply to the service, and a functional area the contract does not cover is left out of the assessment.",
     "sourceNote":  "Functional area structure, requirement identifiers and the maturity model are taken from ISA/IEC 62443-2-4:2023 (Edition 2.0), held under licence. Titles, hints, rationales, evidence prompts and ML anchors are written in our own words, and no text from the standard is reproduced. The assessment gives a gap and maturity profile and does not certify conformity. Source: ISA/IEC 62443-2-4:2023 (copyright IEC).",
     "maturityNote":  "Reuses the program-maturity-ml scoring family. 62443-2-4 uses the same four maturity levels as 62443-2-1:2024, with one difference of meaning at ML3: a process counts as practised once the provider has delivered it to an asset owner at least once.",
     "maturityModel":  {
@@ -64,7 +64,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                                          {
                                              "id":  "ML4",
                                              "name":  "Improving",
-                                             "anchor":  "Process metrics show that the process is effective or that its performance is improving. The program improves the process through technical, procedural or management changes.",
+                                             "anchor":  "Process metrics show that the process is effective or that its performance is improving. The programme improves the process through technical, procedural or management changes.",
                                              "shortAnchor":  "Measured with metrics and improved over time.",
                                              "readAs":  "metrics-driven improvement",
                                              "glossary":  "The process is measured, and the measurements are used to improve it."
@@ -2475,5 +2475,5 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                       },
     "_contentNote":  "123 requirements (72 base requirements, 51 enhancements) across 12 functional areas, ids from the standard. Content is paraphrased from the licensed standard in our own words; verbatimText is empty by design. \u0027kind\u0027 (BR/RE), \u0027parentId\u0027 (an enhancement\u0027s base requirement) and \u0027deliverableDoc\u0027 (a document is delivered to the asset owner) are carried for the views; the scorer ignores them. Themes reuse the eight 62443-2-1:2024 themes.",
     "_scopingNote":  "elementScoping: a whole functional area can be set out of scope per target (target.elementScope). Its rows then score as N/A, and their answers are kept.",
-    "seriesContext":  "ISA/IEC 62443 is a series of standards divided according to who is responsible for what. This part, 62443-2-4, covers the service provider who integrates or maintains an automation solution for an asset owner. Its companions are 62443-2-1, which covers the asset owner\u0027s own security program, and 62443-4-1, which covers the product supplier\u0027s development process."
+    "seriesContext":  "ISA/IEC 62443 is a series of standards divided according to who is responsible for what. This part, 62443-2-4, covers the service provider who integrates or maintains an automation solution for an asset owner. Its companions are 62443-2-1, which covers the asset owner\u0027s own security programme, and 62443-4-1, which covers the product supplier\u0027s development process."
 };

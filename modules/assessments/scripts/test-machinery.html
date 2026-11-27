@@ -199,8 +199,9 @@ window.docx = (function () {
           var allText = docText();
           check("single doc: intro cites the Machinery Regulation", allText.indexOf("against the EU Machinery Regulation (Regulation (EU) 2023/1230)") !== -1);
           check("single doc: key-dates line is the 14 January 2027 transition", allText.indexOf("applies from 14 January 2027") !== -1);
-          check("single doc: glance page titled for the Machinery Regulation", allText.indexOf("Machinery Regulation readiness at a glance") !== -1);
+          check("single doc: glance page titled for the Machinery Regulation", allText.indexOf("Machinery Regulation readiness summary") !== -1);
           check("single doc: limitations say it is not a machinery-safety inspection", allText.indexOf("machinery-safety inspection") !== -1);
+          check("single doc: says once that the layers are not combined into one score", (allText.match(/single readiness score|combined readiness score|combined into one readiness score/g) || []).length === 1);
           check("single doc: cover subline present", allText.indexOf("EU Machinery Regulation: indicative gap assessment") !== -1);
           check("single doc: no CRA text leaks into the machinery report", allText.indexOf("Cyber Resilience") === -1 && allText.indexOf("CRA") === -1);
           // The in-tool consultant input replaced the exec-summary placeholders.

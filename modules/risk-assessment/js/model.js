@@ -79,7 +79,8 @@ window.RiskApp.Model = (function () {
     "high-level-risk-ranking-4-2": "high-level-risk-ranking",
     "mandatory-security-functions": "security-functions-that-must-be-kept",
     "known-or-presumed-threats": "threat-environment",
-    "what-we-found": "findings"
+    "what-we-found": "findings",
+    "risk-at-a-glance": "risk-summary"
   };
   function sectionKeyAlias(key) {
     return Object.prototype.hasOwnProperty.call(SECTION_KEY_ALIASES, key) ? SECTION_KEY_ALIASES[key] : key;

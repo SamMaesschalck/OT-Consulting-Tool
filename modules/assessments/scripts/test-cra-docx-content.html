@@ -110,13 +110,16 @@ window.docx = (function () {
       var consultantSlots = paras.filter(function (p) { return p.style === "PlaceholderText" && /Consultant:/.test(p.text); });
       check("no red to-be-completed placeholders remain in the demo report", consultantSlots.length === 0);
       check("closes with the not-a-determination statement", allText.indexOf("informs conformity but does not determine or certify it") !== -1);
+      // The executive summary says the layers are not combined; nothing else repeats it.
+      var noBlend = (allText.match(/single CRA score|combined CRA score|combined into one CRA score/g) || []).length;
+      check("says once that the layers are not combined into one score (" + noBlend + ")", noBlend === 1);
 
       section("Critical caveats as a shaded block");
       check("caveat block heading present", allText.indexOf("Critical caveats") !== -1);
       check("no-harmonised-standard caveat present", allText.indexOf("harmonised standard") !== -1);
 
       section("Scorecard page");
-      check("'CRA readiness at a glance' page present", allText.indexOf("CRA readiness at a glance") !== -1);
+      check("'CRA readiness summary' page present", allText.indexOf("CRA readiness summary") !== -1);
       check("per-layer stacked profile present", allText.indexOf("Conformance profile by layer") !== -1);
       check("'Where to focus first' cards present", allText.indexOf("Where to focus first") !== -1);
       check("top focus card is the top-ranked gap (CRA-C.3 notified body)", allText.indexOf("CRA-C.3") !== -1);

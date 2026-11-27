@@ -82,11 +82,20 @@ H.test(function (ok, done) {
     ["Finding: possible machine misclassification", "Possible machine misclassification"],
     ["Recommendations: conformance gap roadmap", "Recommendations and gap roadmap"],
     ["Recommendations: conformance gap roadmap (all products)", "Recommendations and gap roadmap (all products)"],
-    ["Sites side by side", "Results by site"]
+    ["Sites side by side", "Results by site"],
+    ["CRA readiness at a glance", "CRA readiness summary"],
+    ["Machinery Regulation readiness at a glance", "Machinery Regulation readiness summary"]
   ];
   pairs.forEach(function (p) {
     var from = R.sectionKey(p[0], {}), to = R.sectionKey(p[1], {});
     ok(R.sectionKeyAlias(from) === to, "old key " + from + " maps to " + to, R.sectionKeyAlias(from));
+  });
+  // The layered instruments take their readiness heading from the data
+  // (docx.glanceTitle), so the alias has to point at what the data says now.
+  [["eu-cra", "CRA readiness at a glance"], ["eu-machinery", "Machinery Regulation readiness at a glance"]].forEach(function (p) {
+    var inst = A.Data.instruments[p[0]].instrument, title = (inst.docx && inst.docx.glanceTitle) || "";
+    ok(title && !/at a glance$/i.test(title) && R.sectionKeyAlias(R.sectionKey(p[1], {})) === R.sectionKey(title, {}),
+       p[0] + ": the old readiness heading's key maps to the heading the data now gives", title);
   });
   ["status-of-this-assessment", "executive-summary", "terms-used-in-this-report", "results-by-layer", "how-to-read-this-report"].forEach(function (k) {
     ok(R.sectionKeyAlias(k) === k, "a current key is left alone: " + k);

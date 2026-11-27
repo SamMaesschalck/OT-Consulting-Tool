@@ -345,7 +345,7 @@ window.RiskExports = (function () {
     var RS = window.App.ReportSections;
     var custom = (p.reportCustom && p.reportCustom[docKey]) || {};
     // Only a heading tagged with a target's name has one stripped: a zone that
-    // happens to be called "Risk" must not move the key of "Risk at a glance".
+    // happens to be called "Risk" must not move the key of "Risk summary".
     function keyOf(n) { return RS.sectionKey(n.__headingText, n.__targetName ? [n.__targetName] : []); }
     function orderOf(title) { var c = custom[RS.sectionKey(title)]; return c ? c.order : null; }
     // What a ranked list printed, by id, for the preview's drag and arrows.
@@ -809,10 +809,10 @@ window.RiskExports = (function () {
     }
     function sbSpacer() { return new docx.Paragraph({ spacing: { before: 0, after: 0, line: 120, lineRule: "exact" }, children: [run("", { size: 2 })] }); }
 
-    // ---- "Risk at a glance" scorecard page ----
+    // ---- "Risk summary" scorecard page ----
     function scorecardPage() {
       var out = [];
-      out.push(heading("Risk at a glance", docx.HeadingLevel.HEADING_1, { before: 0 }));
+      out.push(heading("Risk summary", docx.HeadingLevel.HEADING_1, { before: 0 }));
       var exceed = S.threats.filter(function (x) { return x.exceeds; });
       var decided = exceed.filter(function (x) { return x.decided; }).length;
       if (opts.highLevelOnly) {

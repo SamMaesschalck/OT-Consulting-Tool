@@ -70,7 +70,7 @@
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-2-4:2023 Service Provider Security Program Assessment",
         "instrumentId": "iec-62443-2-4",
-        "detail": "Where the supplier also integrates, maintains or supports the customer's systems, assess its service provider security program in depth against 62443-2-4. That covers remote access, accounts and passwords, staffing and the other processes its people use on those systems. The screening relied on the supplier's own account of its access."
+        "detail": "Where the supplier also integrates, maintains or supports the customer's systems, assess its service provider security programme in depth against 62443-2-4. That covers remote access, accounts and passwords, staffing and the other processes its people use on those systems. The screening relied on the supplier's own account of its access."
       }
     ]
   },

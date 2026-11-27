@@ -126,7 +126,7 @@
       })(doc.sections[0].children);
       ok(imgs.length >= 2 && imgs.some(function (i) { return i.floating && i.floating.behindDocument; }), "cover section embeds the hero background (floating, behind text) and the logo card");
     })();
-    ok(text.indexOf("Risk at a glance") !== -1 && text.indexOf("threats registered") !== -1 && text.indexOf("above tolerable (Medium)") !== -1, "scorecard page: headline tiles present");
+    ok(text.indexOf("Risk summary") !== -1 && text.indexOf("threats registered") !== -1 && text.indexOf("above tolerable (Medium)") !== -1, "scorecard page: headline tiles present");
     ok(text.indexOf("Risk profile by zone and conduit") !== -1 && text.indexOf("Z2 Safety Instrumented System") !== -1, "scorecard page: per-zone/conduit risk bars");
     ok(text.indexOf("Target security levels: worst case per foundational requirement") !== -1, "scorecard page: SL-T tile strip");
     ok(text.indexOf("Where to focus first") !== -1, "scorecard page: focus cards");
@@ -144,7 +144,7 @@
     ok(text.indexOf("Repeat this assessment after a significant change") !== -1, "exec summary sets the revisit expectation");
     // Phase 4 review (wording 1): "What we found" no longer repeats how many are above tolerable risk, so the
     // tolerable risk is named where the summary compares with it (was: "exceed the tolerable risk of Medium").
-    var es0 = text.slice(text.indexOf("\nExecutive summary\n"), text.indexOf("\nRisk at a glance\n"));
+    var es0 = text.slice(text.indexOf("\nExecutive summary\n"), text.indexOf("\nRisk summary\n"));
     ok(/compared with the tolerable risk of Medium/.test(es0) && /\n9 threats were registered\. Z\d [^\n]* has the most threats above tolerable risk/.test(es0) && es0.indexOf("exceed the tolerable risk") < 0, "exec summary names the tolerable risk", (es0.match(/[^\n]*threats were registered[^\n]*/) || [""])[0]);
     ok(/ Z\d [^\n]* has the most threats above tolerable risk \(\d+\)\./.test(text) && text.indexOf("The highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
     // Phase 4b demo: one decision of each kind (was: 2 reduced, 4 being reduced, 1 accepted).
@@ -185,7 +185,7 @@
     var hl = RX.buildWordDoc(p, { highLevelOnly: true });
     var hlText = docText(hl);
     ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking") !== -1 && hlText.indexOf("the high-level cyber security risk assessment") !== -1, "high-level variant builds with the ranking");
-    ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
+    ok(hlText.indexOf("Risk summary") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
     // Phase 3a: the candidates are the systems above tolerable risk (was: ranked High or above), and the decision is per zone, not per system.
     ok(hlText.indexOf("Under the house method, the systems above the tolerable risk of Medium are the candidates for a detailed assessment: Unit 300 BPCS") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
     ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a detailed assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
@@ -635,7 +635,7 @@
       // Wording 1: the summary says each thing once. It was 881 words on the demo before the review and is 727 now
       // (the third the review aimed for would mean cutting the method or the stakes, which is the owner's call), and
       // this pins it there so repetition does not grow back.
-      var esW = text.slice(text.indexOf("\nExecutive summary\n"), text.indexOf("\nRisk at a glance\n")).split(/\s+/).filter(Boolean).length;
+      var esW = text.slice(text.indexOf("\nExecutive summary\n"), text.indexOf("\nRisk summary\n")).split(/\s+/).filter(Boolean).length;
       ok(esW > 600 && esW <= 735, "review: the executive summary is shorter than it was (881 words) and does not grow back", String(esW) + " words");
       // The screen report's zones table: the header says unmitigated to the rating that stands, and appears with an arrow.
       var keepStage = RT.state.stage;

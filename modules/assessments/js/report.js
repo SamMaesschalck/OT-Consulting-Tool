@@ -939,6 +939,8 @@ window.App.Report = (function () {
     "fr-achievement-vs-target": "fr-achievement-against-target",
     "alignment-at-a-glance": "alignment-summary",
     "conformance-at-a-glance": "conformance-summary",
+    "cra-readiness-at-a-glance": "cra-readiness-summary",
+    "machinery-regulation-readiness-at-a-glance": "machinery-regulation-readiness-summary",
     "scoring-methodology": "what-is-reported"
   };
   var SECTION_KEY_PATTERNS = [
@@ -1501,7 +1503,9 @@ window.App.Report = (function () {
       ["Conformance percentage", "A figure shown for context only. It is not a pass mark and does not replace the profile of states."]
     ];
     if (isLayered) {
-      structure.unshift(["Layer", "The assessment is split into layers that are judged separately and not combined, because each covers a different set of obligations: what the product must do, what the manufacturer's process must do, and what must be reported."]);
+      // Said once, in the executive summary (Word) or the banner (screen).
+      structure[0] = ["Category", "A grouping of requirements within a layer. Results are reported for each category."];
+      structure.unshift(["Layer", "One of the parts the assessment is split into. Each covers a different set of obligations: what the product must do, what the manufacturer's process must do, and what must be reported."]);
       structure.push(["Classification", "The product class determines which requirements and which conformity route apply. The consultant sets it at the start of the assessment."]);
     }
     return [
