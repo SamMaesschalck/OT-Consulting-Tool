@@ -21,7 +21,7 @@
                     "outcomesTitle":  "Controls",
                     "gettingStarted":  {
                                            "cardTitle":  "How the NIST SP 800-82 Rev 3 OT Overlay assessment works",
-                                           "intro":  "This assessment covers each control in the OT Overlay of NIST SP 800-82 Rev 3 (Appendix F), which tailors the NIST SP 800-53 Rev 5 controls for operational technology. You record each control as Satisfied or Other Than Satisfied, as in the NIST SP 800-53A assessment model. The result is a gap analysis. It is not a formal assessment or an authorization.",
+                                           "intro":  "This assessment covers each control in the OT Overlay of NIST SP 800-82 Rev 3 (Appendix F), which tailors the NIST SP 800-53 Rev 5 controls for operational technology. You record each control as Satisfied or Other Than Satisfied, as in the NIST SP 800-53A assessment model. This is a gap analysis. It is not a formal assessment or an authorisation decision.",
                                            "profileHeading":  "Baseline (sets which controls are expected)",
                                            "bullets":  [
                                                            "You assess the base controls in 19 families, from AC to SR, grouped as Technical, Operational and Management.",

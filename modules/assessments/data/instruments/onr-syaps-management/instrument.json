@@ -33,7 +33,7 @@
                                            "profileHeading":  "Dutyholder profile (sets how much demonstration is expected)",
                                            "bullets":  [
                                                            "Each Fundamental Security Principle (FSyP) contains Security Delivery Principles (SyDP), and you assess each SyDP through its regulatory expectations.",
-                                                           "Record each expectation as Achieved, Partially achieved or Not achieved. Use Unknown when you could not verify it, which lowers confidence, and Not applicable to leave it out.",
+                                                           "Record each expectation as Achieved, Partially achieved or Not achieved. Use Unknown when you could not verify it (this lowers confidence) and Not applicable to leave it out.",
                                                            "Under the Full dutyholder profile every expectation must be demonstrated. The Smaller dutyholder profile applies the same expectations proportionately to a low-category site.",
                                                            "The roadmap lists every in-scope expectation that is not yet achieved or could not be verified. Do not enter SNI or classified material."
                                                        ]
@@ -400,7 +400,7 @@
                      {
                          "id":  "1.3.2",
                          "principleId":  "1.3",
-                         "title":  "Conservative decisions that are not outsourced",
+                         "title":  "Conservative decisions under uncertainty that are not outsourced",
                          "controlText":  "Security-related decisions should cater for the potential for error, uncertainty and the unexpected and be appropriately and demonstrably conservative; they should not be out-sourced to a third party such as contractors, but should demonstrably incorporate diversity of view.\n\nOperational decisions may have to be made quickly with imprecise and incomplete information. Where civilian guard forces make operational decisions, their authority should be bounded and subject to appropriate oversight by SQEP personnel, and their decisions suitably prudent and conservative. Diversity of view can be achieved by involving individuals from other business units in the peer review process.",
                          "controlTextLabel":  "SyDP 1.3 expectation (CNS-TAST-GD-1.3)"
                      },

@@ -30,7 +30,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                          },
                     "homeSummary":  "This assessment rates the security capability (SL-C) of a product, device or application against a target security level.",
                     "requirementNoun":  "component requirement",
-                    "about":  "This assessment measures the security capability of a single component, such as a software application, embedded device, host device or network device, against the requirements of ISA/IEC 62443-4-2 at the target security level set for the engagement. It establishes the capability security level (SL-C) the component can support with evidence for each Foundational Requirement, and the shortfalls form a prioritised remediation roadmap. The assessment is an advisory gap analysis and does not certify the component."
+                    "about":  "This assessment measures the security capability of a single component, such as a software application, embedded device, host device or network device, against the requirements of ISA/IEC 62443-4-2 at the target security level set for the engagement. It establishes the capability security level (SL-C) that the evidence supports for each Foundational Requirement. The shortfalls form a prioritised remediation roadmap. The assessment is an advisory gap analysis and does not certify the component."
                 },
     "_slGuidanceNote":  "slGuidance is derived from Table B.1 of ANSI/ISA-62443-4-2-2018 Annex B (mapping of CRs and REs to FR SLs 1-4). components lists which parts are required at that SL: \u0027base\u0027 plus any requirement enhancements. Reference only - it does not affect scoring.",
     "_componentTypeNote":  "SAR / EDR / HDR / NDR requirements apply only to a specific component type (software application, embedded device, host device, network device). Each assessment target is one component, so mark the requirements for other component types Not applicable; N/A is excluded from the FR denominator.",
@@ -642,7 +642,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Without a limit on retries, a brute-force attack only takes patience. In OT the response needs care, because locking out an operator during an incident can do more harm than the attack, so the behaviour must be configurable."
+                             "rationale":  "Without a limit on retries, a brute-force attack only takes patience. In OT the response needs care, because locking out an operator during an incident can do more harm than the attack. The lockout behaviour must therefore be configurable."
                          },
                          {
                              "id":  "CR1.12",
@@ -814,7 +814,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                              "frId":  "FR2",
                              "code":  "CR 2.1",
                              "title":  "Authorization enforcement",
-                             "question":  "Does the component enforce authorizations so that each user can only do what their assigned privileges allow?",
+                             "question":  "Does the component enforce authorisations so that each user can only do what their assigned privileges allow?",
                              "applicableSLs":  [
                                                    1,
                                                    2,
@@ -830,7 +830,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Authorization enforcement",
-                                                          "hint":  "Enforce assigned authorizations for control of use on the component.",
+                                                          "hint":  "Enforce assigned authorisations for control of use on the component.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -877,7 +877,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                              "frId":  "FR2",
                              "code":  "CR 2.2",
                              "title":  "Wireless use control",
-                             "question":  "Where the component uses wireless, does it authorize, monitor and enforce restrictions on that use?",
+                             "question":  "Where the component uses wireless, does it authorise, monitor and enforce restrictions on that use?",
                              "applicableSLs":  [
                                                    1,
                                                    2,
@@ -893,7 +893,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Wireless use control",
-                                                          "hint":  "Authorize, monitor and enforce usage restrictions for wireless connectivity.",
+                                                          "hint":  "Authorise, monitor and enforce usage restrictions for wireless connectivity.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -1032,7 +1032,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so uncontrolled mobile code lets data that arrives at the component run as code. The component is the only place where that decision can be enforced."
+                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so if it is not controlled, data that reaches the component can run as code. Only the component itself can enforce which mobile code may run."
                          },
                          {
                              "id":  "EDR2.4",
@@ -1089,7 +1089,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so uncontrolled mobile code lets data that arrives at the component run as code. The component is the only place where that decision can be enforced."
+                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so if it is not controlled, data that reaches the component can run as code. Only the component itself can enforce which mobile code may run."
                          },
                          {
                              "id":  "HDR2.4",
@@ -1146,7 +1146,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so uncontrolled mobile code lets data that arrives at the component run as code. The component is the only place where that decision can be enforced."
+                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so if it is not controlled, data that reaches the component can run as code. Only the component itself can enforce which mobile code may run."
                          },
                          {
                              "id":  "NDR2.4",
@@ -1203,7 +1203,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so uncontrolled mobile code lets data that arrives at the component run as code. The component is the only place where that decision can be enforced."
+                             "rationale":  "Mobile code runs with the privileges of whatever loaded it, so if it is not controlled, data that reaches the component can run as code. Only the component itself can enforce which mobile code may run."
                          },
                          {
                              "id":  "CR2.5",
@@ -3311,7 +3311,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Information confidentiality",
-                                                          "hint":  "Protect the confidentiality of information at rest and in transit for which explicit read authorization is supported.",
+                                                          "hint":  "Protect the confidentiality of information at rest and in transit for which explicit read authorisation is supported.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -3453,7 +3453,7 @@ window.App.Data.instruments["iec-62443-4-2"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Home-grown or obsolete cryptography gives a false sense of protection, and it is often harder to retire than having no cryptography at all."
+                             "rationale":  "Home-grown or obsolete cryptography gives a false sense of protection, and once it is in the field it is often hard to retire."
                          },
                          {
                              "id":  "CR5.1",

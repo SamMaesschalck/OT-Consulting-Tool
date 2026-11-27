@@ -11,11 +11,11 @@
   "status": "active",
   "indicative": true,
   "interviewLed": true,
-  "framing": "This high-level assessment is led by interview. It sets an organisation's inherent risk exposure, meaning what it faces because of its sector, criticality, geopolitical position and threat context, against its apparent risk appetite, meaning how much cyber risk it appears willing to accept, and judges how well the two fit. The fit is the finding. An organisation that accepts materially more risk than its exposure warrants has usually drifted there without deciding to. The assessor leads throughout, starting from sector baselines and working through a structured interview. An optional technical review checks the stated appetite against the state of the systems. The assessment draws on NIST SP 800-82, the NIST CSF, the risk approach of IEC 62443-3-2 and the terms of ISO 31000, but it is not an assessment against any one standard.",
-  "sourceNote": "The structure and band definitions draw on the risk governance concepts in NIST SP 800-82 and the NIST CSF, the consequence-driven risk approach of IEC 62443-3-2, the risk appetite terms of ISO 31000, and practitioner judgement. The sector baselines and band definitions are SolutionsPT starting points and do not decide any result.",
+  "framing": "This high-level assessment is led by interview. It sets an organisation's inherent risk exposure, meaning what it faces because of its sector, criticality, geopolitical position and threat context, against its apparent risk appetite, meaning how much cyber risk it appears willing to accept. How well the two fit is the main finding. An organisation that accepts materially more risk than its exposure warrants has usually drifted there without deciding to. The assessor leads throughout, starting from sector baselines and working through a structured interview. An optional technical review checks the stated appetite against the state of the systems. The assessment draws on NIST SP 800-82, the NIST CSF, the risk approach of IEC 62443-3-2 and the terms of ISO 31000, but it is not an assessment against any one standard.",
+  "sourceNote": "The structure and band definitions draw on the risk governance concepts in NIST SP 800-82 and the NIST CSF, the consequence-driven risk approach of IEC 62443-3-2, the risk appetite terms of ISO 31000, and practitioner judgement. The sector baselines and band definitions are SolutionsPT starting points, and the assessor makes every judgement.",
   "criticalCaveats": [
-    "This is a characterisation based on expert judgement. It does not measure the organisation against a standard. Neither exposure nor appetite is scored objectively, and both are the assessor's professional judgement.",
-    "No risk appetite band is good or bad in itself, and the finding is the fit between exposure and appetite. A cautious appetite is better than a tolerant one only when it suits the exposure better.",
+    "This is a characterisation based on expert judgement. It does not measure the organisation against a standard. Neither exposure nor appetite is scored objectively. Both are the assessor's professional view.",
+    "No risk appetite band is good or bad in itself. The only finding is how well appetite fits exposure, so a cautious appetite is better than a tolerant one only when it matches the exposure more closely.",
     "The report gives the client's leadership a basis for deciding consciously which risks to accept. It does not determine whether their appetite is correct."
   ],
   "setup": [
@@ -39,13 +39,13 @@
       "id": "EXP",
       "name": "Inherent risk exposure",
       "axis": "exposure",
-      "summary": "This section rates what the organisation faces because of what it is and where it operates. Start from the sector baseline, then adjust for threat, geopolitics, consequence, regulation and connections to others to reach an exposure band from limited to severe."
+      "summary": "Exposure is what the organisation faces because of what it is and where it operates. Start from the sector baseline, then adjust for threat, geopolitics, consequence, regulation and connections to others to reach a band from limited to severe."
     },
     {
       "id": "APP",
       "name": "Apparent risk appetite",
       "axis": "appetite",
-      "summary": "This section rates how much cyber risk the organisation appears willing to accept. The interview covers governance, investment, remediation, risk acceptance, operational trade-offs, safety and past incidents, and gives an appetite band from averse to tolerant."
+      "summary": "Appetite is how much cyber risk the organisation appears willing to accept. The interview covers governance, investment, remediation, risk acceptance, operational trade-offs, safety and past incidents, and gives an appetite band from averse to tolerant."
     },
     {
       "id": "TECH",
@@ -62,7 +62,7 @@
       "sectionId": "EXP",
       "title": "Sector and criticality",
       "stateSummary": "How critical is the organisation's function? Its sector and criticality set the baseline exposure.",
-      "interviewPrompt": "Set the sector baseline, then adjust it for how essential or critical this organisation's function is.",
+      "interviewPrompt": "Which sector is the organisation in, and how essential or critical is its function?",
       "rationale": "Sector and criticality set the floor for every other reading. A safety-critical essential service is in a very different position from a discrete manufacturer, whatever either chooses to do. This is the largest single factor in inherent exposure, so it is the place to start.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -85,7 +85,7 @@
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
       "bandAnchors": {
         "limited": "Only untargeted, opportunistic threats are credible, with no sign of interest in the organisation or its sector.",
-        "moderate": "Exposed to commodity ransomware and fraud like most organisations, with no evidence of targeting beyond that.",
+        "moderate": "The threat is the commodity ransomware and fraud seen by most organisations, with no evidence of targeting beyond that.",
         "high": "The sector has seen targeted campaigns by capable criminal groups, and the organisation is a plausible target for them.",
         "severe": "State-aligned or similarly capable actors have shown credible interest in the sector or the organisation itself, including intrusions into operational systems."
       }
@@ -96,7 +96,7 @@
       "sectionId": "EXP",
       "title": "Geopolitical exposure",
       "stateSummary": "Do the organisation's location, ownership, markets or sector put it in a geopolitically exposed position?",
-      "interviewPrompt": "Consider where the organisation operates, whether its sector is contested, its ownership and supply ties, and any current geopolitical tension that affects it. Record your judgement and the reasons for it.",
+      "interviewPrompt": "Where does the organisation operate, and what are its ownership and supply ties? Is its sector contested, and does any current geopolitical tension affect it?",
       "rationale": "Geopolitical position changes exposure in ways the sector alone does not capture. Ownership ties, region of operation and tension around the sector can all raise targeting sharply. This reading depends on the assessor's own judgement more than any other, so the prompt raises the question and leaves the answer to the assessor.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -137,7 +137,7 @@
       "bandAnchors": {
         "limited": "No sector-specific cyber regulation applies, only general obligations such as data protection.",
         "moderate": "Some sector requirements or contractual obligations from customers apply, but they are lightly enforced.",
-        "high": "In scope of NIS, NIS2, the CAF or an equivalent regime, with a regulator who inspects and can impose penalties.",
+        "high": "The organisation is in scope of NIS, NIS2, the CAF or an equivalent regime, with a regulator who inspects and can impose penalties.",
         "severe": "Heavy, specific regulation applies, with licence or safety-case consequences, as in nuclear or major hazard regimes, so a cyber failure can halt operations."
       }
     },
@@ -147,7 +147,7 @@
       "sectionId": "EXP",
       "title": "Interconnection and supply-chain reach",
       "stateSummary": "How large and exposed are the organisation's attack surface and its web of dependencies?",
-      "interviewPrompt": "Consider how the organisation connects to others, what access third parties and vendors have, and how far the supply chain reaches in both directions.",
+      "interviewPrompt": "How does the organisation connect to others, what access do third parties and vendors have, and how far does the supply chain reach in both directions?",
       "rationale": "A large, interconnected attack surface with deep third-party access raises exposure whatever the sector, because it multiplies the ways in. Supply-chain reach matters in both directions, covering what can reach the organisation and what it can reach.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -164,7 +164,7 @@
       "sectionId": "APP",
       "title": "Board and governance attention",
       "stateSummary": "How seriously, and how actively, does senior governance treat cyber risk to operations?",
-      "interviewPrompt": "How does the board engage with OT cyber risk? Is it a standing agenda item, or does it come up only after incidents? Who owns it? Listen for whether it is governed as a business risk or delegated as an IT matter.",
+      "interviewPrompt": "How does the board engage with OT cyber risk? Is it a standing agenda item, or does it come up only after incidents? Who owns it, and is it governed as a business risk or left to IT?",
       "rationale": "The way senior governance treats cyber risk is the strongest single signal of the real appetite, because it decides whether everything below it is resourced and owned. Risk that never reaches the board is accepted by default, whatever the policy says.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -198,7 +198,7 @@
       "sectionId": "APP",
       "title": "Remediation urgency",
       "stateSummary": "How quickly does the organisation act on known risks and findings?",
-      "interviewPrompt": "When a serious finding or vulnerability is identified, what happens next, and how fast? Listen for any gap between policy and practice.",
+      "interviewPrompt": "When a serious finding or vulnerability is identified, what happens next, and how fast? Does what happens in practice match the policy?",
       "rationale": "Stated and real appetite most often part company over how fast known risks are dealt with. An organisation that finds problems but fixes them slowly is accepting the risk in practice, however cautious it says it is.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -215,7 +215,7 @@
       "sectionId": "APP",
       "title": "Conscious risk acceptance",
       "stateSummary": "Does the organisation accept risk deliberately and on the record, or does risk build up by default?",
-      "interviewPrompt": "What risk does the organisation knowingly accept? Is each acceptance documented and owned, or has risk built up without anyone deciding? The answer separates a considered appetite from an accidental one.",
+      "interviewPrompt": "What risk does the organisation knowingly accept? Is each acceptance documented and owned, or has risk built up without anyone deciding?",
       "rationale": "Appetite turns on whether risk is accepted deliberately or by drift. An organisation with a considered appetite documents and owns the risk it tolerates. One with an accidental appetite builds up unmanaged risk that nobody chose, and this is the finding the assessment most often makes.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -249,7 +249,7 @@
       "sectionId": "APP",
       "title": "Safety framing",
       "stateSummary": "Is cyber risk to OT understood as a safety issue, or purely as a business or IT one?",
-      "interviewPrompt": "Does the organisation connect OT cyber risk to physical safety, or treat it as a data or IT risk? In high-consequence sectors the answer says a lot about the real appetite.",
+      "interviewPrompt": "Does the organisation connect OT cyber risk to physical safety, or treat it as a data or IT risk?",
       "rationale": "Whether an organisation sees OT cyber risk as a safety matter or an IT one is a strong predictor of how seriously it treats it, especially in high-consequence sectors. Treating a safety-relevant system as a data risk is itself a sign that appetite has been misjudged.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
@@ -267,7 +267,7 @@
       "title": "Response to past incidents / near-misses",
       "stateSummary": "What does the organisation's history show about its real appetite?",
       "interviewPrompt": "How has the organisation responded to past incidents or near misses? Did they lead to lasting change, or did things go back to normal?",
-      "rationale": "How an organisation behaves after a real incident or near miss shows its appetite more honestly than any interview answer, because it shows what the organisation does under pressure. Lasting change means the appetite shifted. A return to normal means it never moved.",
+      "rationale": "How an organisation behaves after a real incident or near miss is a more honest guide to its appetite than any interview answer, because it shows what the organisation does under pressure. Lasting change means the appetite shifted, and a return to normal means it never moved.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
       "bandAnchors": {
@@ -318,7 +318,7 @@
       "title": "Monitoring and detection coverage",
       "stateSummary": "Could the organisation detect a compromise of the systems it says it cares about?",
       "interviewPrompt": "What monitoring and detection covers the OT systems in practice?",
-      "rationale": "Detection coverage tests whether the organisation would even know if a risk it claims to care about came about. Low coverage alongside a cautious stated appetite means the caution exists on paper only.",
+      "rationale": "Detection coverage tests whether the organisation would even know if a risk it claims to care about had materialised. Low coverage alongside a cautious stated appetite means the caution exists on paper only.",
       "evidenceNote": "",
       "assessorRecords": "characterisation (free text) + contribution to the section's band",
       "bandAnchors": {
@@ -333,7 +333,7 @@
       "code": "TECH.4",
       "sectionId": "TECH",
       "title": "Access and remote-access control",
-      "stateSummary": "This item looks at privileged and remote access into OT as it works in practice.",
+      "stateSummary": "Does privileged and remote access into OT work in practice the way the policy says it should?",
       "interviewPrompt": "How are remote, vendor and privileged access to OT controlled in practice?",
       "rationale": "Privileged and remote access into OT is a direct measure of tolerated exposure, because standing open access is among the highest-impact risks. Where policy claims control but practice allows standing access, the practice is the revealed appetite.",
       "evidenceNote": "",

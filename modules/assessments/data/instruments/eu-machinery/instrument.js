@@ -17,15 +17,15 @@ window.App.Data.instruments["eu-machinery"].instrument = {
     "targetDimensionLabel":  "Machine",
     "status":  "active",
     "indicative":  true,
-    "framing":  "This is a gap assessment against the EU Machinery Regulation (Regulation (EU) 2023/1230) for a manufacturer of machinery or related products. The Regulation applies from 14 January 2027 and repeals Directive 2006/42/EC. The assessment has three layers, each scored separately. The first covers the essential health and safety requirements for each machine and concentrates on the new digital and control-system content. The second covers the manufacturer\u0027s process obligations across the organisation. The third covers conformity and market placement for each machine, where the Annex I classification sets the conformity route. The general machine-safety areas are covered at summary level, because the assessment concentrates on digital content and conformity. It is not a machinery-safety inspection.",
-    "sourceNote":  "The assessment is built from Regulation (EU) 2023/1230 (Machinery Regulation), OJ L 165, 29.6.2023: the Annex III essential health and safety requirements, the economic operator obligations in Articles 10 to 25, and the documentation and conformity annexes. The requirement text is phrased by the assessor, because most items call for a judgement across several provisions. Where one provision maps to one item, the item carries its Official Journal wording. These are the digital and self-evolving control-system provisions of Annex III 1.2.1 and 1.2.6. The text is reproduced with attribution to the Official Journal of the European Union.",
+    "framing":  "This is a gap assessment against the EU Machinery Regulation (Regulation (EU) 2023/1230) for a manufacturer of machinery or related products. The Regulation applies from 14 January 2027 and repeals Directive 2006/42/EC. The assessment has three layers, each scored separately. The first covers the essential health and safety requirements for each machine and concentrates on the new digital and control-system content. The second covers the manufacturer\u0027s process obligations across the organisation. The third covers conformity and market placement for each machine, where the Annex I classification sets the conformity route. The general machine-safety areas are covered at summary level only, and the assessment is not a machinery-safety inspection.",
+    "sourceNote":  "The assessment is built from Regulation (EU) 2023/1230 (Machinery Regulation), OJ L 165, 29.6.2023: the Annex III essential health and safety requirements, the economic operator obligations in Articles 10 to 25, and the documentation and conformity annexes. The requirement text is phrased by the assessor, because most items call for a judgement across several provisions. Where one provision maps to one item, as with the digital and self-evolving control-system provisions of Annex III 1.2.1 and 1.2.6, the item carries its Official Journal wording. The text is reproduced with attribution to the Official Journal of the European Union.",
     "criticalCaveats":  [
                             "This gap assessment concentrates on digital content and conformity and is not a machinery-safety inspection. The general essential health and safety areas (guarding, mechanical risks, mobility, lifting, underground work and lifting of persons) are covered at summary level only, and their In place judgements rely on the manufacturer\u0027s own safety engineering evidence.",
                             "The Regulation applies from 14 January 2027. Directive 2006/42/EC governs machinery placed on the market before that date, and EC type-examination certificates issued under it remain valid until they expire. Each finding should be read against the placement date of the machine concerned.",
                             "Machinery whose safety functions rely on fully or partially self-evolving (machine-learning) systems falls under Annex I Part A. Third-party conformity assessment is mandatory for those systems, and internal control (Module A) is not available.",
                             "This assessment informs conformity but does not determine or certify it. The manufacturer, or a notified body where the Annex I classification requires one, remains responsible for the conformity decision."
                         ],
-    "scoringNote":  "Each of the three layers is scored separately on the conformance scale (In place, Partially in place, Not in place, Unknown, Not applicable). The three results are shown side by side and are not combined into one readiness score. Sound machine engineering does not make a machine ready for the market while the conformity work is unfinished, because missing conformity work blocks placing on the market outright.",
+    "scoringNote":  "Each of the three layers is scored separately on the conformance scale (In place, Partially in place, Not in place, Unknown, Not applicable). The three results are shown side by side and are not combined into one readiness score, because missing conformity work blocks placing on the market however sound the machine engineering is.",
     "display":  {
                     "shortName":  "Machinery",
                     "productNoun":  "machine",
@@ -34,17 +34,17 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                     "reportBannerTitle":  "EU Machinery Regulation gap assessment (indicative)",
                     "reportBannerBody":  "This is a gap assessment against the EU Machinery Regulation (Regulation (EU) 2023/1230). The three layers are scored separately and shown side by side, with no combined readiness score, because missing conformity work blocks placing on the market however good the machine engineering is. The assessment informs conformity but does not determine or certify it.",
                     "productsCardNote":  "Add, rename or remove machines here, and select one to set its classification below. M1 and most of M3 are answered for each machine. M2 and the organisation-level conformity obligations are answered once and shared by every machine, including new ones.",
-                    "wizardOrgNote":  "These organisation-wide obligations cover the manufacturer\u0027s processes and the organisation-level conformity items. Answer them once for every machine, then switch to By machine.",
+                    "wizardOrgNote":  "These organisation-wide obligations cover the manufacturer\u0027s processes and the organisation-level conformity items. They apply to every machine, so answer them once, before you switch to By machine.",
                     "wizardProductNote":  "These obligations cover each machine\u0027s essential health and safety requirements and its own conformity work. Pick a machine below, work through it, then pick the next one."
                 },
     "docx":  {
                  "regName":  "the EU Machinery Regulation (Regulation (EU) 2023/1230)",
                  "coverSubLine":  "EU Machinery Regulation: indicative gap assessment",
                  "docDescription":  "EU Machinery Regulation (2023/1230) indicative gap assessment",
-                 "layersSentence":  "Three layers were assessed separately and are reported side by side. They cover the essential health and safety requirements, assessed in most depth on the digital and control-system content, the manufacturer\u0027s process obligations, and conformity and market placement. They are not combined into a single readiness score, because a machine with sound engineering but unfinished conformity work is not ready for the market.",
+                 "layersSentence":  "Three layers were assessed separately and are reported side by side. They cover the essential health and safety requirements (assessed in most depth on the digital and control-system content), the manufacturer\u0027s process obligations, and conformity and market placement. They are not combined into a single readiness score, because a machine with sound engineering but unfinished conformity work is not ready for the market.",
                  "keyDatesNote":  "The Machinery Regulation applies from 14 January 2027, when Directive 2006/42/EC is repealed. Machinery placed on the market before that date remains governed by the Directive, and existing EC type-examination certificates remain valid until they expire. Readiness should be judged against the placement date that applies to each machine.",
                  "seqPlaceholder":  "Consultant: in one short paragraph, set out what must close before machines are placed on the market under the Regulation from 14 January 2027, what must be in place before each machine can be CE marked, and what can run in parallel.",
-                 "exposurePlaceholder":  "Consultant: in one paragraph, describe the commercial exposure: which machine sales and markets depend on CE marking under the Machinery Regulation, and what non-conformity would mean for them.",
+                 "exposurePlaceholder":  "Consultant: in one paragraph, describe which machine sales and markets depend on CE marking under the Machinery Regulation, and what non-conformity would mean for them.",
                  "glanceTitle":  "Machinery Regulation readiness at a glance",
                  "misclassFinding":  "Finding: possible machinery misclassification. The matched Annex I category indicates a stricter conformity route than the class set, which changes the required conformity assessment module. See the dedicated section below.",
                  "howToRead":  "Each requirement is judged In place, Partially in place or Not in place against the paraphrased Machinery Regulation requirement. Unknown reduces coverage and confidence, and Not applicable requirements are excluded. The three layers are scored separately and shown side by side. There is no single readiness score, because missing conformity work blocks placing on the market outright. The Recommendations section lists every open gap with its evidence, impact, recommended action and owner.",
@@ -52,16 +52,16 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                                      "The consultant sets the conformance state of each requirement on the three-point scale (Not in place, Partially in place, In place), based on the evidence gathered. Each layer is scored separately. The conformance index is shown for context only, and the three layers are not combined into a single readiness score. Unknown answers reduce coverage and confidence, and Not applicable requirements are excluded. A requirement that is Not in place is reported as a floor finding and is never averaged away.",
                                      "This is an indicative gap assessment against the EU Machinery Regulation. It is not a conformity assessment, certification or machinery-safety inspection. The requirement text is paraphrased, and the Regulation text governs. The general machine-safety areas are assessed at summary level on the manufacturer\u0027s own evidence. The manufacturer, or a notified body where the Annex I classification requires one, remains responsible for the conformity decision."
                                  ],
-                 "categoryRowLabel":  "Matched Annex I category (aid)",
+                 "categoryRowLabel":  "Matched Annex I category (classification aid)",
                  "defaultClassLabel":  "Not listed in Annex I (internal control)",
                  "noBlendPhrase":  "a single readiness score",
-                 "blockerTail":  " cannot yet be lawfully CE-marked or placed on the EU market, however complete its engineering. Closing these gaps is a matter of market access.",
-                 "blockerTailMulti":  " cannot yet be lawfully CE-marked or placed on the EU market, however complete their engineering. Closing those gaps is a matter of market access.",
+                 "blockerTail":  " cannot be lawfully CE-marked or placed on the EU market until those obligations are met, however complete its engineering.",
+                 "blockerTailMulti":  " cannot be lawfully CE-marked or placed on the EU market until those obligations are met, however complete their engineering.",
                  "multiOrgSentence":  "The organisation-wide obligations (the manufacturer\u0027s process obligations and the organisation-level conformity items covering sales-channel duties) were assessed once for the manufacturer and apply to every machine. The essential health and safety requirements and the remaining conformity obligations were assessed for each machine. The layers are reported side by side and are not combined into a single readiness score.",
                  "seqPlaceholderMulti":  "Consultant: in one short paragraph, set out what must close before machines are placed on the market under the Regulation from 14 January 2027, what must be in place before each machine can be CE marked, and what can run in parallel.",
                  "xlsxTitle":  "EU Machinery Regulation: indicative gap assessment",
                  "xlsxReadMe":  [
-                                    "The three layers are scored separately against the Machinery Regulation and shown side by side, with no combined readiness score. M1 covers the essential requirements, with most depth on digital and control content, M2 the manufacturer\u0027s process obligations, and M3 conformity and market placement.",
+                                    "The three layers are scored separately against the Machinery Regulation and shown side by side, with no combined readiness score. M1 covers the essential requirements, in most depth on the digital and control content. M2 covers the manufacturer\u0027s process obligations, and M3 covers conformity and market placement.",
                                     "Layers out of scope are left out. This is an indicative assessment and is not a conformity assessment, certification or machinery-safety inspection. The general machine-safety areas are covered at summary level only. The Regulation applies from 14 January 2027."
                                 ]
              },
@@ -98,7 +98,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "question":  "Classify the machine against Machinery Regulation Annex I",
                       "lookupRef":  "shared/machinery-classification.json",
                       "lookupKey":  "machineryClassification",
-                      "method":  "Pick the Annex I category that matches the machine or its safety components. Part A, which includes self-evolving safety systems, requires third-party assessment, Part B allows internal control only with full harmonised standard coverage, and unlisted machinery uses Module A.",
+                      "method":  "Pick the Annex I category that matches the machine or its safety components. Part A, which includes self-evolving safety systems, requires third-party assessment. Part B allows internal control only with full harmonised standard coverage. Unlisted machinery uses Module A.",
                       "deriveClass":  true,
                       "drives":  "The machine\u0027s class decides which conformity route the M3 layer expects: internal control or a notified-body module.",
                       "flagMisclassification":  "An Annex I category matches although the machine is set as unlisted. This changes the conformity route."
@@ -121,16 +121,16 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                        "id":  "M2",
                        "name":  "Manufacturer process obligations",
                        "scope":  "organisation",
-                       "summary":  "This layer covers the manufacturer\u0027s organisation-wide obligations under Article 10 and related Articles: series conformity, post-market monitoring, corrective action, documentation and instructions, traceability, governance of substantial modifications and the transition from Directive 2006/42/EC."
+                       "summary":  "These are the manufacturer\u0027s organisation-wide obligations under Article 10 and related Articles: series conformity, post-market monitoring, corrective action, documentation and instructions, traceability, governance of substantial modifications and the transition from Directive 2006/42/EC."
                    },
                    {
                        "id":  "M3",
                        "name":  "Conformity \u0026 market placement",
                        "scope":  "organisation-and-product",
-                       "summary":  "This layer covers the formal conformity work for each machine: Annex I classification and conformity route, technical documentation, standards strategy, EU declaration of conformity, CE marking, machine marking and instructions, and partly completed machinery where relevant. The route depends on the machine\u0027s Annex I class."
+                       "summary":  "Each machine needs the formal conformity work: Annex I classification and conformity route, technical documentation, standards strategy, EU declaration of conformity, CE marking, machine marking and instructions, and partly completed machinery where relevant. The route depends on the machine\u0027s Annex I class."
                    }
                ],
-    "layerInterlock":  "A conformity claim, through the declaration and CE marking, rests on the essential requirements and process obligations in M1 and M2. Assessed on its own, M3 checks the paperwork without showing that those requirements are met.",
+    "layerInterlock":  "The declaration and CE marking rest on the essential requirements and process obligations in M1 and M2. Assessed on its own, M3 checks the paperwork without showing that those requirements are met.",
     "interlockSpec":  {
                           "conformityLayer":  "M3",
                           "technicalLayers":  [
@@ -186,7 +186,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "layerId":  "M1",
                       "title":  "Protection against corruption: software and data",
                       "requirement":  "Software and data critical for compliance with the essential requirements are identified as such and protected against accidental or intentional corruption; the machine identifies the software installed on it that is necessary for safe operation and can present that information at all times; and it collects evidence of interventions in, or modification of, that software or its configuration (Annex III 1.1.9).",
-                      "rationale":  "The machine itself must list its safety-critical software, protect its integrity and record changes to it. Software identification and tamper evidence therefore have to be designed into the product, because adding them later is rarely credible, and market surveillance can ask for the evidence.",
+                      "rationale":  "The machine itself must list its safety-critical software, protect its integrity and record changes to it. Software identification and tamper evidence therefore have to be designed into the product, because adding them later is rarely credible. Market surveillance can ask for the evidence.",
                       "evidencePrompt":  "Safety-software inventory function on the machine, integrity protection (signing/secure boot or equivalent), intervention/modification evidence capture.",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -210,7 +210,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "layerId":  "M1",
                       "title":  "Safety-function limits and protected settings",
                       "requirement":  "The limits of the safety functions are established in the manufacturer\u0027s risk assessment, and modifications to settings or rules (whether generated by the machine or by operators, including during a learning phase) are prevented where they could lead to hazardous situations (Annex III 1.2.1(c)-(d)).",
-                      "rationale":  "Changes to parameters and rules are a common way for a machine to become dangerous, and with learning systems the machine itself can make such changes. The Regulation requires the design to prevent hazardous modification, and a procedure that discourages it is not enough.",
+                      "rationale":  "Changes to parameters and rules are a common way for a machine to become dangerous, and with learning systems the machine itself can make such changes. The Regulation requires the design to prevent hazardous modification. A procedure that only discourages it does not meet that requirement.",
                       "evidencePrompt":  "Safety-function limit definitions in the risk assessment; access control / interlocks on safety-relevant settings; learning-phase constraints where applicable.",
                       "verbatimText":  "the parameters of the machinery or related product shall not change in an uncontrolled way, where such change could lead to hazardous situations;",
                       "allowNA":  true,
@@ -270,7 +270,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "layerId":  "M1",
                       "title":  "Autonomous mobile machinery: supervision and detection",
                       "requirement":  "Autonomous mobile machinery has a supervisory function where relevant: remote receipt of information, alerts on dangerous situations, and remote actions limited to stop/start/move-to-safe-state, permitted only with visibility of the movement and working area and operational protective devices; without the active supervisory function the machinery cannot operate. It moves in a protected enclosed zone and/or detects persons, animals and obstacles in its vicinity (Annex III 3.2.4, 3.3.2, 3.3.3).",
-                      "rationale":  "The autonomy provisions define what remote supervision must involve before an AMR, AGV or other autonomous machine can lawfully be placed on the market: limited remote authority, situational awareness and protective detection. These are conformity requirements and are not optional.",
+                      "rationale":  "The autonomy provisions define what remote supervision must involve before an AMR, AGV or other autonomous machine can lawfully be placed on the market: limited remote authority, situational awareness and protective detection.",
                       "evidencePrompt":  "Supervisory-function specification and limits, detection-system coverage, enclosed-zone/peripheral protection design. N/A if the machine is not autonomous mobile machinery.",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -354,7 +354,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "layerId":  "M2",
                       "title":  "Documentation retention: technical file, declarations, source code",
                       "requirement":  "Technical documentation and the EU declaration of conformity are kept at the disposal of market surveillance authorities for at least 10 years after placing on the market or putting into service; where relevant, the source code or programming logic in the technical documentation is made available to competent national authorities on reasoned request where necessary to check compliance with the essential requirements (Art 10(3)).",
-                      "rationale":  "Ten years is longer than most products, teams and repositories last, and under this Regulation the retained material can include source code for safety software. Retention needs an owner and a defined arrangement, with escrow-level handling for source code. A project file share is not enough.",
+                      "rationale":  "Ten years is longer than most products, teams and repositories last, and under this Regulation the retained material can include source code for safety software. Retention needs a named owner and a defined arrangement, with escrow-level handling for source code, which a project file share does not provide.",
                       "evidencePrompt":  "Retention regime (what, where, 10-year clock per machine), source-code/programming-logic availability arrangement and its access controls.",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -402,7 +402,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "layerId":  "M2",
                       "title":  "Transition planning from Directive 2006/42/EC",
                       "requirement":  "The organisation has a transition plan for 14 January 2027. It sets out which machine models will be placed on the market under the Directive before that date and which under the Regulation after it, and how long existing EC type-examination certificates and approvals remain valid (until expiry). It also tracks harmonised standards and common specifications as they are cited under the Regulation, and plans re-assessment for models that continue beyond the date (Art 51-54).",
-                      "rationale":  "There is no grace period for machines placed on the market after the date, when the Regulation applies in full. A transition plan for each model costs little now and much more if it has to be improvised in 2027.",
+                      "rationale":  "The Regulation applies in full from 14 January 2027, with no grace period for machines placed on the market after that date. A transition plan for each model costs little now and much more if it has to be improvised in 2027.",
                       "evidencePrompt":  "Transition register by machine model (placement plans, certificate expiry dates, standards watch, re-assessment schedule).",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -474,7 +474,7 @@ window.App.Data.instruments["eu-machinery"].instrument = {
                       "layerId":  "M3",
                       "title":  "Instructions for use: content for this machine",
                       "requirement":  "The instructions for use for this machine contain the Annex III 1.7.4 content: intended use and reasonably foreseeable misuse, assembly/installation/connection, putting into service and operator training needs, residual-risk information and protective measures, maintenance and adjustment with safety measures, spare-part specifications affecting health and safety, noise (and where relevant vibration) emission values with uncertainties, and the declaration of conformity or where to access it.",
-                      "rationale":  "The content of the instructions is assessed. Misuse warnings, emission data and residual risks are mandatory elements with case law behind them. For connected machinery the instructions should also cover operating states introduced by software, such as degraded modes, update behaviour and remote operation.",
+                      "rationale":  "Misuse warnings, emission data and residual risks are mandatory content of the instructions, with case law behind them. For connected machinery the instructions should also cover operating states introduced by software, such as degraded modes, update behaviour and remote operation.",
                       "evidencePrompt":  "Instructions for this machine checked against the 1.7.4.2 content list; noise/vibration data provenance.",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -532,6 +532,6 @@ window.App.Data.instruments["eu-machinery"].instrument = {
               ],
     "_relatedWork":  "Sibling of the eu-cra layered instrument; both share the layered conformance machinery (scoring-cra.js). MR 1.1.9/1.2.1 overlaps CRA Annex I Part I and 62443-4-1/-4-2 - candidate cross-references. Art 20(9) bridges EU cybersecurity certification (2019/881) into machinery CE marking.",
     "_classificationNote":  "Machine classification uses the Annex I lookup (shared/machinery-classification.json): Part A (third party mandatory, incl. ML safety systems), Part B (Module A only with full harmonised-standard coverage), unlisted (Module A). The lookup derives class -\u003e conformity route. Annex I is a classification input, not assessable items.",
-    "seriesContext":  "The Machinery Regulation (EU) 2023/1230 is an EU Regulation and not a standard, so it applies directly, and it replaces the Machinery Directive. Alongside long-standing safety requirements it introduces digital ones, because software and connectivity can now defeat a protective function. This assessment works from the essential health and safety requirements that bear on that. It is a gap analysis to support preparation. It is not a conformity assessment and confers no presumption of conformity.",
+    "seriesContext":  "The Machinery Regulation (EU) 2023/1230 is an EU Regulation, so unlike a standard it applies directly. It replaces the Machinery Directive. Alongside long-standing safety requirements it introduces digital ones, because software and connectivity can now defeat a protective function. This assessment works from the essential health and safety requirements that deal with those digital risks. It is a gap analysis to support preparation. It is not a conformity assessment and confers no presumption of conformity.",
     "_contentNote":  "13 + 8 + 10 items across three independently-scored layers, with depth on the provisions that make this a cyber-relevant regulation: Annex III 1.1.9 (protection against corruption), 1.2.1 (safety and reliability of control systems, including the learning-phase and wireless-control provisions) and 1.2.6 (loss of power supply or network connection). Items citing a whole chapter are summary judgements by design."
 };

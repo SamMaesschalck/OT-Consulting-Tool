@@ -696,8 +696,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "access.2",
                           "prompt":  "Is access limited to what each role needs (least privilege)?",
                           "shortTitle":  "Least privilege",
-                          "rationale":  "With broad access, one compromised account can change logic, settings or safety parameters. OT roles are usually narrow, so least privilege is achievable and worth a lot.",
-                          "goodLooksLike":  "Each role has only the access it needs, so an operator account cannot change logic or configuration, and access rights are reviewed periodically. Separate administrator accounts are covered by their own question.",
+                          "rationale":  "With broad access, one compromised account can change logic, settings or safety parameters. OT roles are usually narrow, so least privilege is practical to apply and limits the damage a compromised account can do.",
+                          "goodLooksLike":  "Each role has only the access it needs, so an operator account cannot change logic or configuration. Access rights are reviewed periodically.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR2 (Use Control)",
                                              "NCSC CAF B2",
@@ -1166,7 +1166,7 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "monitor.4",
                           "prompt":  "Does anyone review OT security events, or are the logs opened only after something goes wrong?",
                           "shortTitle":  "Review of collected events",
-                          "rationale":  "Logs that are collected and never reviewed do not detect anything. Many sites hold OT logs that nobody read until an investigation required it.",
+                          "rationale":  "Logs that are collected and never reviewed do not detect anything. Many sites hold OT logs that nobody looks at until an investigation needs them.",
                           "goodLooksLike":  "OT events are reviewed on a set schedule and a named team triages alerts. Staff have an easy way to report anything that looks wrong.",
                           "references":  [
                                              "NCSC CAF C2 (Proactive security event discovery)",
@@ -1280,7 +1280,7 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.3",
                           "prompt":  "Can critical OT systems be recovered to a known good state, and how quickly?",
                           "shortTitle":  "Recovery to a known good state",
-                          "rationale":  "For OT, the question that matters most is how quickly critical systems can be returned to a known good state. Slow or uncertain recovery means a longer outage and pressure to take unsafe shortcuts.",
+                          "rationale":  "How quickly critical systems can be returned to a known good state largely sets how long an OT outage lasts. Slow or uncertain recovery also adds pressure to take unsafe shortcuts.",
                           "goodLooksLike":  "Critical OT systems can be restored to a known good state from protected backups within a known and acceptable time, and the site has shown this in a test.",
                           "references":  [
                                              "NCSC CAF D1",
@@ -1335,7 +1335,7 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.5",
                           "prompt":  "Could the plant keep running, or come down safely, with the control system unavailable?",
                           "shortTitle":  "Operating without the control system",
-                          "rationale":  "Recovery covers how the system is rebuilt, and this question covers how the plant runs in the meantime. A site that can fall back to manual operation or a safe shutdown has hours or days to recover properly. A site that cannot is forced into hurried decisions.",
+                          "rationale":  "A site that can fall back to manual operation or a safe shutdown while the control system is rebuilt has hours or days to recover properly. A site that cannot is forced into hurried decisions.",
                           "goodLooksLike":  "Degraded and manual modes of operation are identified and documented, and operators have practised them. The fallback does not depend on the systems that would be unavailable.",
                           "references":  [
                                              "NCSC CAF D1 (Response and recovery planning)",

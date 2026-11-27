@@ -177,7 +177,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                         "gotchas":  ""
                                     },
                          "allowNA":  true,
-                         "rationale":  "Without board ownership, the security of critical systems competes with other priorities for attention and funding, and usually loses. In aviation, cyber risk can affect safety, so ownership needs to sit with the board. The CAA looks for evidence that the board governs cyber risk and keeps it under review after delegating the work."
+                         "rationale":  "Without board ownership, the security of critical systems competes with other priorities for attention and funding, and usually loses. In aviation, cyber risk can affect safety, so ownership needs to sit with the board. The CAA looks for evidence that the board continues to govern cyber risk after it delegates the day-to-day work."
                      },
                      {
                          "id":  "A1.b",
@@ -202,7 +202,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                         "gotchas":  ""
                                     },
                          "allowNA":  true,
-                         "rationale":  "Security often falls into the gap between functions, and CAP1753 requires named accountable roles. With clear responsibilities, a named person owns the security of each critical system."
+                         "rationale":  "Security often falls into the gap between functions, and CAP1753 requires named accountable roles. With clear responsibilities, a named person is accountable for the security of critical systems."
                      },
                      {
                          "id":  "A1.c",
@@ -271,7 +271,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                                       ]
                                   },
                          "verify":  "",
-                         "stateSummary":  "The organisation obtains independent assurance that its view of security risk is accurate and has been challenged.",
+                         "stateSummary":  "The organisation obtains independent assurance that its view of security risk is accurate.",
                          "otLens":  {
                                         "framing":  "",
                                         "gotchas":  ""
@@ -321,7 +321,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                                       ]
                                   },
                          "verify":  "",
-                         "stateSummary":  "Security risks arising from external suppliers and third-party services to critical systems are understood and managed, with cyber requirements placed on critical suppliers.",
+                         "stateSummary":  "Security risks to critical systems from external suppliers and third-party services are understood and managed, and critical suppliers have cyber requirements placed on them.",
                          "otLens":  {
                                         "framing":  "",
                                         "gotchas":  ""
@@ -352,7 +352,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                         "gotchas":  ""
                                     },
                          "allowNA":  true,
-                         "rationale":  "Policy sets out in advance how the organisation will secure critical systems. Without it, protection depends on individual memory and varies by person and shift, and the organisation cannot demonstrate it to a regulator."
+                         "rationale":  "Policy sets out in advance how the organisation will secure critical systems. Without it, protection depends on individual memory and varies by person and shift, and it cannot be demonstrated to a regulator."
                      },
                      {
                          "id":  "B1.b",
@@ -452,7 +452,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                         "gotchas":  ""
                                     },
                          "allowNA":  true,
-                         "rationale":  "Privileged accounts can change critical systems directly, so their compromise is among the most serious outcomes. Tight control of elevated access limits what an external attacker can do and the damage from a single mistake."
+                         "rationale":  "Privileged accounts can change critical systems directly, so their compromise is among the most serious incidents. Tight control of elevated access limits what an external attacker can do and the damage from a single mistake."
                      },
                      {
                          "id":  "B2.d",
@@ -502,7 +502,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                         "gotchas":  ""
                                     },
                          "allowNA":  true,
-                         "rationale":  "Data can only be protected in proportion once the organisation knows what it holds and why it matters. That includes information that would help an attacker map critical systems."
+                         "rationale":  "Data can only be protected proportionately once the organisation knows what it holds and why it matters. That includes information that would help an attacker map critical systems."
                      },
                      {
                          "id":  "B3.b",
@@ -527,7 +527,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                         "gotchas":  ""
                                     },
                          "allowNA":  true,
-                         "rationale":  "Data crossing networks that support critical systems can be intercepted or altered. Altered data reaching an operational system has physical consequences, so protection in transit covers integrity as well as confidentiality."
+                         "rationale":  "Data crossing networks that support critical systems can be intercepted or altered. Altered data reaching an operational system has real-world consequences, so protection in transit covers integrity as well as confidentiality."
                      },
                      {
                          "id":  "B3.c",
@@ -846,7 +846,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                                       ]
                                   },
                          "verify":  "",
-                         "stateSummary":  "Security monitoring covers the networks and systems supporting critical systems sufficiently to detect potential security problems.",
+                         "stateSummary":  "Security monitoring covers critical systems and the networks that support them well enough to detect potential security problems.",
                          "otLens":  {
                                         "framing":  "",
                                         "gotchas":  ""
@@ -1121,7 +1121,7 @@ window.App.Data.instruments["ncsc-caf-aviation"].instrument = {
                                                       ]
                                   },
                          "verify":  "",
-                         "stateSummary":  "Lessons from incidents are fed back into controls and the response capability, driving continual improvement.",
+                         "stateSummary":  "Lessons from incidents are fed back into controls and the response capability so that both keep improving.",
                          "otLens":  {
                                         "framing":  "",
                                         "gotchas":  ""

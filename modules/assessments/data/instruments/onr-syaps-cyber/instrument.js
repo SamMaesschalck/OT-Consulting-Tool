@@ -39,7 +39,7 @@ window.App.Data.instruments["onr-syaps-cyber"].instrument = {
                                            "profileHeading":  "Dutyholder profile (sets how much demonstration is expected)",
                                            "bullets":  [
                                                            "Each Fundamental Security Principle (FSyP) contains Security Delivery Principles (SyDP), and you assess each SyDP through its regulatory expectations.",
-                                                           "Record each expectation as Achieved, Partially achieved or Not achieved. Use Unknown when you could not verify it, which lowers confidence, and Not applicable to leave it out.",
+                                                           "Record each expectation as Achieved, Partially achieved or Not achieved. Use Unknown when you could not verify it (this lowers confidence) and Not applicable to leave it out.",
                                                            "Under the Full dutyholder profile every expectation must be demonstrated. The Smaller dutyholder profile applies the same expectations proportionately to a low-category site.",
                                                            "The roadmap lists every in-scope expectation that is not yet achieved or could not be verified. Do not enter SNI or classified material."
                                                        ]

@@ -100,7 +100,7 @@ H.test(function (ok, done) {
     ok(zoneSecs.length === zones.length && zoneSecs.every(function (x) { return x.img === 1 && x.h2.indexOf("FR achievement vs target") >= 0; }),
        "each zone's own section carries its radar", zoneSecs.map(function (x) { return x.title + ":" + x.img; }).join(" | "));
 
-    var caveatRow = Array.prototype.filter.call(s.doc.getElementsByTagNameNS(W, "tr"), function (tr) { return /not a certification/.test(textOf(tr)); })[0];
+    var caveatRow = Array.prototype.filter.call(s.doc.getElementsByTagNameNS(W, "tr"), function (tr) { return /does not certify the system/.test(textOf(tr)); })[0];
     ok(caveatRow && caveatRow.getElementsByTagNameNS(W, "cantSplit").length === 1, "the caveat box is kept on one page");
 
     // Control: the single-zone report still carries exactly one radar.

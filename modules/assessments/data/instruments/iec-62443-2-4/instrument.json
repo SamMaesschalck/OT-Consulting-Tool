@@ -25,8 +25,8 @@
     "targetDimensionLabelPlural":  "Service providers",
     "status":  "active",
     "elementScoping":  true,
-    "framing":  "ISA/IEC 62443-2-4:2023 sets out the security processes a service provider can offer an asset owner when it integrates or maintains the asset owner\u0027s automation solution. Together those processes make up the provider\u0027s security program. The requirements fall into twelve functional areas. Each is a base requirement or an enhancement of one, and each is placed at its own maturity level, ML1 to ML4, on the same maturity model as 62443-2-1:2024 and 62443-4-1. The asset owner usually decides in the contract which requirements apply to the service, and a functional area the contract does not cover is left out of the assessment.",
-    "sourceNote":  "Functional area structure, requirement identifiers and the maturity model are taken from ISA/IEC 62443-2-4:2023 (Edition 2.0), held under licence. Titles, hints, rationales, evidence prompts and ML anchors are written in our own words, and no text from the standard is reproduced. IEC does not certify conformity, so the result is a gap and maturity profile, not a certification. Source: ISA/IEC 62443-2-4:2023 (copyright IEC).",
+    "framing":  "ISA/IEC 62443-2-4:2023 sets out the security processes a service provider can offer an asset owner when it integrates or maintains the asset owner\u0027s automation solution. Together those processes make up the provider\u0027s security program. The requirements fall into twelve functional areas. Each requirement is either a base requirement or an enhancement of one, and each is rated on its own at one of four maturity levels, ML1 to ML4. The maturity model is the same as in 62443-2-1:2024 and 62443-4-1. The asset owner usually decides in the contract which requirements apply to the service, and a functional area the contract does not cover is left out of the assessment.",
+    "sourceNote":  "Functional area structure, requirement identifiers and the maturity model are taken from ISA/IEC 62443-2-4:2023 (Edition 2.0), held under licence. Titles, hints, rationales, evidence prompts and ML anchors are written in our own words, and no text from the standard is reproduced. The assessment gives a gap and maturity profile and does not certify conformity. Source: ISA/IEC 62443-2-4:2023 (copyright IEC).",
     "maturityNote":  "Reuses the program-maturity-ml scoring family. 62443-2-4 uses the same four maturity levels as 62443-2-1:2024, with one difference of meaning at ML3: a process counts as practised once the provider has delivered it to an asset owner at least once.",
     "maturityModel":  {
                           "basis":  "CMMI-SVC; MLs apply independently per base requirement and per enhancement; documentation required from ML2 upward",
@@ -90,7 +90,7 @@
                      {
                          "id":  "SP03",
                          "name":  "Architecture",
-                         "summary":  "The provider designs, hardens and protects the solution, from risk assessment and network segmentation to device administration and the protection of sensitive data."
+                         "summary":  "The provider designs, hardens and protects the solution. The area covers risk assessment, network segmentation, device administration and the protection of sensitive data."
                      },
                      {
                          "id":  "SP04",
@@ -125,7 +125,7 @@
                      {
                          "id":  "SP10",
                          "name":  "Malware protection",
-                         "summary":  "The provider installs and maintains anti-malware protection and can show that it works, and keeps the equipment and portable media it supplies free of malware."
+                         "summary":  "The provider installs and maintains anti-malware protection, shows that it works and keeps the equipment and portable media it supplies free of malware."
                      },
                      {
                          "id":  "SP11",
@@ -313,7 +313,7 @@
                              "theme":  "ORG",
                              "title":  "Qualified security lead assigned",
                              "hint":  "The provider can show documented minimum security qualifications for its security lead role, and that the lead assigned to this automation solution meets them.",
-                             "rationale":  "Weak security decisions, or poor delivery of sound ones, leave the system exposed. A lead with proven OT security experience lowers that chance.",
+                             "rationale":  "Weak security decisions, or poor delivery of sound ones, leave the system exposed. A lead with proven OT security experience makes both less likely.",
                              "evidencePrompt":  "Ask for the qualification criteria for the role (experience, training, certifications), the assigned lead\u0027s CV or records against them, and whether the owner agreed the criteria.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -442,7 +442,7 @@
                              "theme":  "COMP",
                              "title":  "Hardening guide for the solution",
                              "hint":  "The provider can give the asset owner a guide describing how to harden the automation solution, covering architecture, configuration settings and the addition of new components.",
-                             "rationale":  "The owner needs to know which settings and design choices protect the system, so it can govern it and connect it to other networks without undoing them.",
+                             "rationale":  "The owner needs to know which settings and design choices protect the system, so that it can operate the system and connect it to other networks without undoing them.",
                              "evidencePrompt":  "This is a deliverable. Ask for the hardening guide for the automation solution. It should cover, for example, firewall placement and rules, security settings, verification steps and the installation of new components, and refer to any supplier guides.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
@@ -664,7 +664,7 @@
                              "parentId":  "SP.03.05-BR",
                              "theme":  "COMP",
                              "title":  "Only authorised CA certificates installed",
-                             "hint":  "The provider can check that only needed, documented CA certificates approved by the asset owner, self-signing ones included, are installed, and remove the rest.",
+                             "hint":  "The provider can check that the only CA certificates installed, self-signed ones included, are those that are needed, documented and approved by the asset owner, and remove the rest.",
                              "rationale":  "Operating systems install a broad set of default CA certificates. Leaving them in place lets software the asset owner never wanted be trusted on control system hosts.",
                              "evidencePrompt":  "Ask for the approved certificate list, a certificate store export from a sample host compared against it, and the procedure for removing default CA certificates after installs and upgrades.",
                              "deliverableDoc":  false,
@@ -830,7 +830,7 @@
                              "kind":  "BR",
                              "theme":  "DATA",
                              "title":  "Identify data that needs protecting",
-                             "hint":  "The provider can identify and record where data needing protection is stored and how it flows in the automation solution, with what it needs in terms of confidentiality, integrity and availability.",
+                             "hint":  "The provider can identify and record where data needing protection is stored and how it flows in the automation solution, and what confidentiality, integrity and availability each item needs.",
                              "rationale":  "Passwords, certificates, recipes, logs and backups can only be protected once someone knows where they are. The asset owner sets or approves the criteria, so the provider works from those.",
                              "evidencePrompt":  "This is a deliverable. Ask for the register of places where sensitive data is stored and the data flows, with their protection requirements, and check that the asset owner set or approved the criteria used.",
                              "deliverableDoc":  true,
@@ -1163,7 +1163,7 @@
                              "theme":  "COMP",
                              "title":  "SIS functions isolated from other station software",
                              "hint":  "The provider can protect the SIS functions carried out from SIS engineering workstations against interference by any other software installed on those workstations.",
-                             "rationale":  "Unvetted tools on a safety engineering station could, by accident or design, corrupt safety-related software. Limiting and separating what runs there lowers that chance.",
+                             "rationale":  "Unvetted tools on a safety engineering station could, by accident or design, corrupt safety-related software. Limiting what runs there, and keeping it apart from the safety software, makes that less likely.",
                              "evidencePrompt":  "Ask for the installed software list and hardening baseline for SIS engineering workstations, with the provider\u0027s rule for what may be installed and how safety software is kept apart.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -1418,7 +1418,7 @@
                              "kind":  "BR",
                              "theme":  "EVENT",
                              "title":  "Incident detection, reporting and response",
-                             "hint":  "The provider can set up the automation solution to decide which compromises and incidents are detected, which are reported to the asset owner, and which need a response, including support to an incident team.",
+                             "hint":  "The provider can define, for the automation solution, which compromises and incidents are detected, which are reported to the asset owner and which need a response, and can support an incident team.",
                              "rationale":  "Without agreed rules on what counts as an incident and who is told, attacks on the system can go unnoticed or unanswered, and the asset owner loses sight of its security risk.",
                              "evidencePrompt":  "Ask for the incident handling procedure for this automation solution, covering the detection criteria and the reporting triggers and contacts agreed with the asset owner, and for records of a recent incident or exercise taken through to closure.",
                              "deliverableDoc":  false,
@@ -1475,7 +1475,7 @@
                              "theme":  "EVENT",
                              "title":  "Security events available over standard interfaces",
                              "hint":  "The provider can set up the automation solution so that security data and events can be collected over standard interfaces, such as SNMP, syslog or CEF, that both IT and OT tools understand.",
-                             "rationale":  "Standard interfaces let the asset owner feed events into off-the-shelf monitoring and analysis tools without bespoke integration, so that security data is collected and used.",
+                             "rationale":  "Standard interfaces let the asset owner feed events into off-the-shelf monitoring and analysis tools without bespoke integration.",
                              "evidencePrompt":  "Ask which interfaces the provider configures for security event collection, how they are set up on each platform type, and evidence of events arriving at the asset owner\u0027s collector.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -2213,7 +2213,7 @@
                              "theme":  "COMP",
                              "title":  "Network updates checked as genuine and intact",
                              "hint":  "For devices updated over the network, the provider can show the update process confirms software and firmware images are genuine and unaltered, and that only authorised people can push updates.",
-                             "rationale":  "A tampered or corrupted image loaded into a controller can do as much harm as an attack. Checking origin and integrity guards against counterfeit or damaged updates.",
+                             "rationale":  "A tampered image loaded into a controller is an attack in itself, and a corrupted one can do as much harm. Checking origin and integrity guards against both.",
                              "evidencePrompt":  "Ask for a description of the update mechanism, the use of signed images or hash checks, who is authorised to push updates, and how images are protected in transit and at rest.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",

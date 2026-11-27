@@ -19,7 +19,7 @@
     "targetDimensionLabel":  "Site",
     "status":  "active",
     "framing":  "ISA/IEC 62443-2-1:2024 sets out Security Program Requirements (SPRs) for IACS asset owners, grouped into Security Program Elements (SPEs). Each requirement is assessed at a maturity level from ML1 to ML4, and the level required for each one is chosen according to risk. The 2024 edition replaces the CSMS structure of the 2010 edition with a maturity-based security programme.",
-    "sourceNote":  "SPE structure and the ML maturity model are extracted and verified from the 62443-2-1:2024 document held in the project. The full per-requirement list (codes, titles, requirement text) is to be populated in a verified extraction pass; theme groups are known but individual requirements are not yet complete. ML anchors are paraphrased (single-user licensed source); not verbatim IEC text. Source: ISA/IEC 62443-2-1:2024 (copyright IEC).",
+    "sourceNote":  "The Security Program Element structure, the requirement codes and the maturity model follow ISA/IEC 62443-2-1:2024, which is held under a single-user licence. Hints, rationales, evidence prompts and ML anchors are paraphrased and do not reproduce the text of the standard. Source: ISA/IEC 62443-2-1:2024 (copyright IEC).",
     "maturityModel":  {
                           "basis":  "CMMI-SVC; MLs apply independently per requirement; documentation required from ML2 upward",
                           "levels":  [
@@ -42,10 +42,10 @@
                                          {
                                              "id":  "ML3",
                                              "name":  "Defined / Practiced",
-                                             "anchor":  "The ML2 process is actively practised on the IACS, and its performance is shown to repeat over time.",
+                                             "anchor":  "The ML2 process is actively practised on the IACS, and there is evidence that it is performed consistently over time.",
                                              "shortAnchor":  "Documented process actively practised on the IACS, repeatable over time.",
                                              "readAs":  "actively practised on the IACS",
-                                             "glossary":  "The documented process is practised on the industrial automation and control system and is shown to repeat over time."
+                                             "glossary":  "The documented process is practised on the industrial automation and control system, with evidence that it is performed consistently over time."
                                          },
                                          {
                                              "id":  "ML4",
@@ -65,7 +65,7 @@
                          "themes":  [
                                         "ORG"
                                     ],
-                         "summary":  "This element covers the organisational side of the security programme, including governance, roles, risk handling, personnel security, training, the supply chain and physical access. These processes give security named owners and keep it going."
+                         "summary":  "Organisational processes give security named owners and keep the programme running. They include governance, roles, risk handling, personnel security, training, the supply chain and physical access."
                      },
                      {
                          "id":  "SPE2",
@@ -73,7 +73,7 @@
                          "themes":  [
                                         "CM"
                                     ],
-                         "summary":  "This element covers knowing and controlling the IACS configuration through an accurate asset inventory, current infrastructure documentation, defined configuration settings and change control."
+                         "summary":  "Knowing and controlling the IACS configuration depends on an accurate asset inventory, current infrastructure documentation, defined configuration settings and change control."
                      },
                      {
                          "id":  "SPE3",
@@ -81,7 +81,7 @@
                          "themes":  [
                                         "NET"
                                     ],
-                         "summary":  "This element covers segmentation of the IACS network and protection of its communications, including separation from non-IACS and safety networks, zone documentation, external connections, accessible services, wireless and remote access."
+                         "summary":  "The requirements here deal with segmenting the IACS network and protecting its communications, including separation from non-IACS and safety networks, zone documentation, external connections, accessible services, wireless and remote access."
                      },
                      {
                          "id":  "SPE4",
@@ -89,7 +89,7 @@
                          "themes":  [
                                         "COMP"
                                     ],
-                         "summary":  "This element covers securing the components themselves through hardening, control of portable media, malware protection and security patching that works in an OT environment."
+                         "summary":  "Securing the components themselves takes hardening, control of portable media, malware protection and security patching that works in an OT environment."
                      },
                      {
                          "id":  "SPE5",
@@ -97,7 +97,7 @@
                          "themes":  [
                                         "DATA"
                                     ],
-                         "summary":  "This element covers protection of the data important to the IACS, including classification, confidentiality, integrity, safety-related configuration data, retention and the use of cryptography."
+                         "summary":  "Data important to the IACS needs protecting. The requirements cover classification, confidentiality, integrity, safety-related configuration data, retention and the use of cryptography."
                      },
                      {
                          "id":  "SPE6",
@@ -105,7 +105,7 @@
                          "themes":  [
                                         "USER"
                                     ],
-                         "summary":  "This element covers control of access to the IACS by people and systems, including identities and their lifecycle, authentication with MFA, least privilege, sessions and authorisation with separation of duties."
+                         "summary":  "Controlling access to the IACS by people and systems involves identities and their lifecycle, authentication with MFA, least privilege, sessions, and authorisation with separation of duties."
                      },
                      {
                          "id":  "SPE7",
@@ -113,7 +113,7 @@
                          "themes":  [
                                         "EVENT"
                                     ],
-                         "summary":  "This element covers detecting, recording and acting on events, including event reporting, logging and log access, event analysis, incident response and vulnerability handling."
+                         "summary":  "This element deals with detecting, recording and acting on events, through event reporting, logging and log access, event analysis, incident response and vulnerability handling."
                      },
                      {
                          "id":  "SPE8",
@@ -121,7 +121,7 @@
                          "themes":  [
                                         "AVAIL"
                                     ],
-                         "summary":  "This element covers keeping the IACS running and recoverable through continuity planning, resource availability, safe failure states and backups that are verified and can be restored."
+                         "summary":  "The IACS has to keep running and be recoverable. That rests on continuity planning, resource availability, safe failure states and backups that are verified and can be restored."
                      }
                  ],
     "themeNames":  {
@@ -213,7 +213,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "People receive training for the IACS security duties of their role, or training they already hold is formally accepted. This is in addition to general awareness training.",
-                             "rationale":  "An operator, an engineer and a vendor technician each need different security skills, and general awareness training does not provide them. Role-specific training gives people the skills to carry out the responsibilities assigned to them."
+                             "rationale":  "An operator, an engineer and a vendor technician each need different security skills, and general awareness training does not provide them."
                          },
                          {
                              "id":  "ORG1.6",
@@ -285,7 +285,7 @@
                              "theme":  "ORG",
                              "code":  "ORG 2.4",
                              "title":  "SP reviews",
-                             "evidencePrompt":  "Record how often the programme is reviewed, what the review covers and the improvements made as a result. Base the ML on whether reviews are regular, cover substance and lead to closed actions.",
+                             "evidencePrompt":  "Record how often the programme is reviewed, what the review covers and the improvements made as a result. Base the ML on whether reviews are regular and thorough and whether their actions are closed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
@@ -317,14 +317,14 @@
                              "theme":  "CM",
                              "code":  "CM 1.1",
                              "title":  "Asset inventory baseline",
-                             "evidencePrompt":  "Record the inventory and how it is maintained, and test its completeness against what is on the network. Base the ML on accuracy, coverage and whether change keeps the baseline current after it is first built.",
+                             "evidencePrompt":  "Record the inventory and how it is maintained, and test its completeness against what is on the network. Base the ML on accuracy, coverage and whether the baseline is kept current as the system changes.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "An inventory baseline of every IACS device and hardware and software component, protocol and open port is built and maintained for the whole lifecycle. It records ownership, make, model, versions, serial numbers and network details.",
+                             "hint":  "An inventory baseline of every IACS device, hardware and software component, protocol and open port is built and maintained for the whole lifecycle. It records ownership, make, model, versions, serial numbers and network details.",
                              "rationale":  "Patching, segmentation, incident response and most other parts of the programme depend on the asset inventory. In OT it is also the hardest thing to get right, because legacy equipment, undocumented additions and passive-only visibility all get in the way of a complete record."
                          },
                          {
@@ -437,7 +437,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The IACS keeps operating as designed when cut off from external networks, whether that means normal running, restricted operation, safe shutdown or a fail-safe state.",
-                             "rationale":  "If removing the external connection stops the process, disconnection cannot be used as a defence, and that is one of the most effective responses to an active attack. Building autonomy into the design keeps the option open."
+                             "rationale":  "Disconnection is one of the most effective responses to an active attack, but it is only available if the process keeps running without the external connection. Building autonomy into the design keeps that option open."
                          },
                          {
                              "id":  "NET1.5",
@@ -469,7 +469,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Risks from communication between internal IACS segments are identified, documented and treated against a tolerable level, in the same way as risks at the external boundary.",
-                             "rationale":  "Once an attacker is inside, internal segmentation stops one compromised device leading to the whole plant. Managing internal flows as risks, with no implicit trust, limits lateral movement."
+                             "rationale":  "Once an attacker is inside, internal segmentation stops one compromised device giving access to the whole plant. Managing internal flows as risks, with no implicit trust, limits lateral movement."
                          },
                          {
                              "id":  "NET1.7",
@@ -485,7 +485,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Network-accessible services are known and protected from unauthorised network access.",
-                             "rationale":  "Every exposed service is a possible way in, and OT systems collect listening services that nobody remembers enabling. Restricting access to them reduces the attack surface directly."
+                             "rationale":  "Every exposed service is a possible way in, and OT systems collect listening services that nobody remembers enabling."
                          },
                          {
                              "id":  "NET1.8",
@@ -517,7 +517,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Trusted time is distributed and synchronised across the IACS, so logs can be correlated and time-dependent security functions work.",
-                             "rationale":  "Without synchronised time, logs from different systems cannot be pieced together into an account of an incident, and time-dependent security functions fail. Detection and response both depend on a trusted time source."
+                             "rationale":  "Without synchronised time, logs from different systems cannot be pieced together into an account of an incident, and time-dependent security functions fail."
                          },
                          {
                              "id":  "NET2.1",
@@ -565,7 +565,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Where wireless is authorised, its properties and network addresses are set to give attackers as little useful information as possible.",
-                             "rationale":  "Wireless networks broadcast, so default names, revealing addresses and verbose configurations help anyone in range plan an attack. Limiting that information makes the network harder to target."
+                             "rationale":  "Wireless networks broadcast, so default names, revealing addresses and verbose configurations help anyone in range plan an attack."
                          },
                          {
                              "id":  "NET3.1",
@@ -645,7 +645,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The asset owner defines which uses and functions of portable media are approved or prohibited in the IACS.",
-                             "rationale":  "USB sticks and other removable media have carried some of the most damaging OT infections because they cross air gaps that networks cannot. A clear decision on what is allowed is the control for that route."
+                             "rationale":  "USB sticks and other removable media have carried some of the most damaging OT infections because they cross air gaps that networks cannot. A clear policy on which media are allowed controls that route."
                          },
                          {
                              "id":  "COMP2.1",
@@ -677,7 +677,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Malware protection is installed, running and maintained wherever it is feasible. Where a device cannot host it, other measures compensate.",
-                             "rationale":  "Anti-malware software is standard in IT but only partly usable in OT, where controllers and legacy hosts often cannot run it. The requirement is to protect what can be protected and to record the gaps honestly."
+                             "rationale":  "Anti-malware software is standard in IT but only partly usable in OT, where controllers and legacy hosts often cannot run it, so the aim is to protect what can be protected and record the gaps honestly."
                          },
                          {
                              "id":  "COMP2.3",
@@ -709,7 +709,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Patches are checked for authenticity and integrity before installation, confirming their source and that they have not been altered in transit.",
-                             "rationale":  "A patch is code with deep access, so a forged or altered patch leads directly to compromise. Checking authenticity and integrity first stops the update process being used for an attack."
+                             "rationale":  "A patch is code with deep access, so a forged or altered patch leads directly to compromise."
                          },
                          {
                              "id":  "COMP3.2",
@@ -725,7 +725,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security patches are tested for compatibility, approved and installed in good time after release, scheduled around operational windows.",
-                             "rationale":  "Patching a running plant can disrupt it, so patches have to be tested and scheduled. Leaving known vulnerable components unpatched indefinitely is also a hazard. The requirement is for a disciplined, timely process."
+                             "rationale":  "Patching a running plant can disrupt it, so patches have to be tested and scheduled. Leaving known vulnerable components unpatched indefinitely is also a hazard, so the patching process has to be both disciplined and timely."
                          },
                          {
                              "id":  "COMP3.3",
@@ -805,7 +805,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The confidentiality of IACS data is protected in line with its classification and the risk of disclosure.",
-                             "rationale":  "Some OT data, such as network diagrams, control logic and credentials, is exactly what an attacker needs to plan an attack. Protecting it in line with its classification denies the attacker that information."
+                             "rationale":  "Some OT data, such as network diagrams, control logic and credentials, is exactly what an attacker needs to plan an attack."
                          },
                          {
                              "id":  "DATA1.3",
@@ -853,7 +853,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Commonly accepted cryptographic mechanisms are used in the IACS where they are warranted, chosen with the performance and compatibility limits of OT devices in mind.",
-                             "rationale":  "Cryptography protects data and authenticates the parties to a connection. OT devices vary widely in what they can support, and forcing cryptography onto them can disrupt real-time behaviour. The requirement is for accepted mechanisms used where they fit."
+                             "rationale":  "Cryptography protects data and authenticates the parties to a connection. OT devices vary widely in what they can support, and forcing cryptography onto them can disrupt real-time behaviour. Accepted mechanisms should therefore be used where the device can support them and the risk calls for them."
                          },
                          {
                              "id":  "DATA1.6",
@@ -869,7 +869,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Where keyed cryptography is approved, the keys are managed through their use, protection and enforced lifetime, following practices accepted in both the industrial and security communities.",
-                             "rationale":  "Encryption is only as strong as its keys, and badly stored or never-rotated keys are a common failure that often goes unnoticed. Without sound key management, the cryptographic controls give little protection."
+                             "rationale":  "Encryption is only as strong as its keys, and badly stored or never-rotated keys are a common failure that often goes unnoticed."
                          },
                          {
                              "id":  "DATA1.7",
@@ -917,7 +917,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Identifiers, authenticators, roles and access rights are removed or disabled promptly for any user, service or device that no longer needs access.",
-                             "rationale":  "Orphaned accounts are a common way in, and OT environments often leave old operator, contractor and vendor accounts active long after they are needed. Removing them promptly reduces that standing exposure."
+                             "rationale":  "Orphaned accounts are a common way in, and OT environments often leave old operator, contractor and vendor accounts active long after they are needed."
                          },
                          {
                              "id":  "USER1.3",
@@ -965,7 +965,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Users, including services and devices, hold only the access rights they need for their assigned tasks.",
-                             "rationale":  "Excess access makes any compromise worse, and OT accounts often hold far more privilege than their tasks require. Limiting rights to what is needed reduces the harm that mistakes and attacks can do."
+                             "rationale":  "Excess access makes any compromise worse, and OT accounts often hold far more privilege than their tasks require."
                          },
                          {
                              "id":  "USER1.6",
@@ -981,7 +981,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Software services are identified and authenticated before they run.",
-                             "rationale":  "An unauthenticated service lets malicious code pass itself off as a legitimate function. Authenticating services before they run removes that route."
+                             "rationale":  "An unauthenticated service lets malicious code pass itself off as a legitimate function."
                          },
                          {
                              "id":  "USER1.7",
@@ -997,7 +997,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Software services cannot log in interactively, so a service account cannot be used to open a session for a person.",
-                             "rationale":  "Service accounts with interactive login rights are a well-known way for attackers to gain a foothold under a trusted identity. Removing those rights closes it."
+                             "rationale":  "Service accounts with interactive login rights are a well-known way for attackers to gain a foothold under a trusted identity. Removing those rights closes that route."
                          },
                          {
                              "id":  "USER1.8",
@@ -1045,7 +1045,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Access to server applications hosted on IACS devices, including web servers, uses mutual authentication, so the server proves its identity as well as the client.",
-                             "rationale":  "With one-way authentication, a client can be fooled by an impostor server, which opens the way to interception and spoofing. Mutual authentication stops clients connecting to a fake service."
+                             "rationale":  "With one-way authentication, a client can be fooled by an impostor server, which opens the way to interception and spoofing."
                          },
                          {
                              "id":  "USER1.11",
@@ -1125,7 +1125,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Accounts are locked after a set number of consecutive failed logins, for a defined period or until an administrator unlocks them, with the threshold weighed against operational risk.",
-                             "rationale":  "Unlimited login attempts allow brute-force guessing, while aggressive lockout can deny an operator access when it is needed. The requirement is for a threshold chosen with the operational context in mind."
+                             "rationale":  "Unlimited login attempts allow brute-force guessing, while aggressive lockout can deny an operator access when it is needed, so the threshold has to be set with the operational context in mind."
                          },
                          {
                              "id":  "USER1.16",
@@ -1141,7 +1141,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "User sessions are protected from hijacking and unauthorised modification once established.",
-                             "rationale":  "An authenticated session is a trusted channel. If it can be hijacked or altered, the authentication that opened it counts for little. Protecting session integrity keeps the session trustworthy until it ends."
+                             "rationale":  "An authenticated session is a trusted channel. If it can be hijacked or altered, the authentication that opened it counts for little, so the session has to stay protected until it ends."
                          },
                          {
                              "id":  "USER1.17",
@@ -1157,7 +1157,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The number of concurrent sessions any single user, service or device can hold on each interface is limited.",
-                             "rationale":  "Without a limit, a stolen identity can be used in many places at once, which also makes detection harder. Limiting concurrent sessions restricts misuse and makes anomalies easier to spot."
+                             "rationale":  "Without a limit, a stolen identity can be used in many places at once, which also makes detection harder."
                          },
                          {
                              "id":  "USER1.18",
@@ -1173,7 +1173,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Screens lock on request or after a set idle period and need re-authentication to unlock, except where locking would create greater risk to the IACS, such as an operator who needs immediate control.",
-                             "rationale":  "An unattended, unlocked HMI is easy to misuse, but a screen that locks at the wrong moment can block an urgent operator action. The requirement allows exceptions where locking would increase risk, a judgement specific to OT."
+                             "rationale":  "An unattended, unlocked HMI is easy to misuse, but a screen that locks at the wrong moment can block an urgent operator action. The requirement therefore allows an exception where locking would increase the risk to the process."
                          },
                          {
                              "id":  "USER1.19",
@@ -1189,7 +1189,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "All components connected to the IACS are identified and authenticated before they are trusted on the network.",
-                             "rationale":  "Without component authentication, rogue or spoofed devices can join the network and be trusted, which gives direct access to control networks. Authenticating components keeps unknown equipment out."
+                             "rationale":  "Without component authentication, rogue or spoofed devices can join the network and be trusted, which gives direct access to control networks."
                          },
                          {
                              "id":  "USER2.1",
@@ -1197,7 +1197,7 @@
                              "theme":  "USER",
                              "code":  "USER 2.1",
                              "title":  "Authorization",
-                             "evidencePrompt":  "Record how systems enforce the access rights that have been assigned, beyond recording them. Base the ML on how consistently authorisation is enforced.",
+                             "evidencePrompt":  "Record how the systems enforce the assigned access rights, with evidence from the running systems. Base the ML on how consistently authorisation is enforced.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
@@ -1237,7 +1237,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Actions that could seriously affect the industrial process need approval from two or more users, except where not acting could cause greater harm.",
-                             "rationale":  "For actions that could damage the process or hurt people, a second approver guards against both error and coercion. Under the safety exception, an approval step never stops a necessary protective action."
+                             "rationale":  "For actions that could damage the process or hurt people, a second approver guards against both error and coercion. The safety exception means an approval step must never stop a necessary protective action."
                          },
                          {
                              "id":  "USER2.4",
@@ -1285,7 +1285,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "IACS security events reach the people and systems that need them quickly enough for them to act.",
-                             "rationale":  "A detected event that is never reported might as well have gone undetected, and in OT a delay can let an incident spread. Timely reporting makes the rest of the response possible."
+                             "rationale":  "A detected event that is never reported might as well have gone undetected, and in OT a delay can let an incident spread."
                          },
                          {
                              "id":  "EVENT1.3",
@@ -1301,7 +1301,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security events are reported through interfaces commonly accepted in the industrial and security communities.",
-                             "rationale":  "Common interfaces let OT events feed into wider monitoring and IT security operations without fragile custom integration. Standard interfaces allow detection to extend beyond a single system."
+                             "rationale":  "Common interfaces let OT events feed into wider monitoring and IT security operations without fragile custom integration, so detection can extend beyond a single system."
                          },
                          {
                              "id":  "EVENT1.4",
@@ -1317,7 +1317,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "IACS security events are written to one or more event or audit logs that are protected from tampering and kept for an adequate period.",
-                             "rationale":  "Logs are the raw material for detection and investigation. Logs that are unprotected or kept only briefly are missing when an incident has to be reconstructed. Protected, retained logs make later analysis possible."
+                             "rationale":  "Logs are the raw material for detection and investigation. Logs that are unprotected or kept only briefly may be altered or gone by the time an incident has to be reconstructed."
                          },
                          {
                              "id":  "EVENT1.5",
@@ -1333,7 +1333,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Log entries hold enough information to support non-repudiation and analysis across systems by time, recording who or what did what, and when.",
-                             "rationale":  "Log entries with too little detail cannot be tied to the people or systems involved or placed in sequence across systems, which makes investigation very difficult. Detailed, time-stamped entries let investigators reconstruct an attack."
+                             "rationale":  "Log entries with too little detail cannot be tied to the people or systems involved or placed in sequence across systems, which makes investigation very difficult."
                          },
                          {
                              "id":  "EVENT1.6",
@@ -1412,7 +1412,7 @@
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "A current disaster recovery plan, business continuity plan or both cover disaster scenarios, the handling of failures and how the required level of operational continuity is maintained, with cyber incidents among the scenarios.",
+                             "hint":  "A current disaster recovery plan, business continuity plan or both are in place. They cover disaster scenarios, the handling of failures and how the required level of operational continuity is maintained, and they treat a cyber incident as one of the scenarios.",
                              "rationale":  "A cyber attack can stop a plant as surely as a fire or flood, and continuity plans written before that was widely recognised often leave it out. A current plan returns the process to a safe, running state after serious disruption."
                          },
                          {
@@ -1477,7 +1477,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The backup process does not disturb normal IACS operation.",
-                             "rationale":  "A backup job that uses too many resources or touches live systems at the wrong time can cause the outage it is meant to help recover from. Confirming that backups do not interfere stops a safeguard becoming a hazard."
+                             "rationale":  "A backup job that uses too many resources or touches live systems at the wrong time can cause the outage it is meant to help recover from."
                          },
                          {
                              "id":  "AVAIL2.3",
@@ -1493,7 +1493,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The integrity of backup data is checked when the backup completes and periodically afterwards, to confirm the backup can be used.",
-                             "rationale":  "Corrupted or incomplete backups are often discovered only at the moment of recovery, when it is too late. Verification gives confidence that a backup can be relied on."
+                             "rationale":  "Corrupted or incomplete backups are often discovered only at the moment of recovery, when it is too late."
                          },
                          {
                              "id":  "AVAIL2.4",

@@ -18,13 +18,13 @@ window.App.Data.instruments["eu-cra"].instrument = {
     "status":  "active",
     "indicative":  true,
     "framing":  "This is a gap assessment against the EU Cyber Resilience Act for a manufacturer of products with digital elements. It has three layers, each scored separately. The Annex I Part I product requirements are assessed for each product, and the Annex I Part II vulnerability handling requirements once for the organisation. The third layer covers conformity and obligations: the declaration, CE marking, conformity route and reporting. Each layer can be included or left out for an engagement. The assessment informs conformity but is not a conformity assessment or certification.",
-    "sourceNote":  "The requirements are transcribed from Regulation (EU) 2024/2847 (Cyber Resilience Act), OJ L, 20.11.2024. Layers P1 and P2 cover Annex I Part I points (2)(a) to (m) and Part II points (1) to (8), and each of those items carries the Official Journal wording next to the requirement as the assessor phrased it. The conformity layer draws on Articles 13, 14, 28, 29, 30 and 32 and Annexes II, V, VII and VIII. Its items cite the Article without quoting it, because each spans several provisions. The text is reproduced with attribution to the Official Journal of the European Union.",
+    "sourceNote":  "The requirements are transcribed from Regulation (EU) 2024/2847 (Cyber Resilience Act), OJ L, 20.11.2024. Layers P1 and P2 cover Annex I Part I points (2)(a) to (m) and Part II points (1) to (8), and each of those items carries the Official Journal wording next to the requirement as the assessor phrased it. The conformity layer draws on Articles 13, 14, 28, 29, 30 and 32 and Annexes II, V, VII and VIII. These items cite the relevant Article or Annex without quoting it, because each spans several provisions. The text is reproduced with attribution to the Official Journal of the European Union.",
     "criticalCaveats":  [
                             "No harmonised standard has yet been cited in the Official Journal under the CRA, so presumption of conformity through a standard is not formally available. A 62443 certificate, or any other, does not amount to CRA conformity.",
                             "This assessment informs conformity but does not determine or certify it. The manufacturer, or a notified body where the product class requires one, remains responsible for the conformity decision.",
                             "Article 14 reporting under the CRA applies from 11 September 2026, and the full obligations apply from 11 December 2027. Readiness should be judged against the date that applies."
                         ],
-    "scoringNote":  "Each of the three layers is scored separately on the conformance scale (In place, Partially in place, Not in place, Unknown, Not applicable). The three results are shown side by side and are not combined into one CRA score. Strong product security does not make a product ready for the market when the conformity work is missing, because missing conformity work blocks market placement outright.",
+    "scoringNote":  "Each of the three layers is scored separately on the conformance scale (In place, Partially in place, Not in place, Unknown, Not applicable). The three results are shown side by side and are not combined into one CRA score, because missing conformity work blocks market placement however strong the product security is.",
     "setup":  [
                   {
                       "id":  "setup.layers",
@@ -74,13 +74,13 @@ window.App.Data.instruments["eu-cra"].instrument = {
                        "id":  "P1",
                        "name":  "Annex I Part I: Product requirements",
                        "scope":  "per-product",
-                       "summary":  "This layer covers the essential cybersecurity properties of the product itself."
+                       "summary":  "These are the essential cybersecurity properties the product itself must have."
                    },
                    {
                        "id":  "P2",
                        "name":  "Annex I Part II: Vulnerability handling",
                        "scope":  "organisation",
-                       "summary":  "This layer covers the manufacturer\u0027s vulnerability handling processes, which apply across all products."
+                       "summary":  "The manufacturer\u0027s vulnerability handling processes apply across all its products."
                    },
                    {
                        "id":  "P3",
@@ -89,7 +89,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                        "summary":  "This layer covers the formal conformity work: risk assessment, technical documentation, conformity route, declaration, CE marking and reporting readiness. The route depends on the product class."
                    }
                ],
-    "layerInterlock":  "A conformity claim, through the declaration and CE marking, rests on the technical and process requirements in P1 and P2. Assessed on its own, P3 checks the paperwork without showing that those requirements are met.",
+    "layerInterlock":  "The declaration and CE marking rest on the technical and process requirements in P1 and P2. Assessed on its own, P3 checks the paperwork without showing that those requirements are met.",
     "states":  [
                    {
                        "value":  "in-place",
@@ -210,7 +210,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "layerId":  "P1",
                       "title":  "Minimise impact on other systems",
                       "requirement":  "The product minimises its own or connected devices\u0027 negative impact on the availability of services provided by other devices or networks.",
-                      "rationale":  "A product that degrades other devices or networks, through excessive traffic or poor behaviour, spreads its problems across the environment. Limiting that impact keeps one weak component from undermining the systems around it.",
+                      "rationale":  "A product that floods the network or misbehaves on it can degrade the services of other devices and networks. Limiting that impact stops one weak component affecting the systems around it.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "minimise the negative impact by the products themselves or connected devices on the availability of services provided by other devices or networks;",
                       "allowNA":  true,
@@ -234,7 +234,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "layerId":  "P1",
                       "title":  "Incident impact mitigation",
                       "requirement":  "The product reduces the impact of an incident using appropriate exploitation mitigation mechanisms and techniques.",
-                      "rationale":  "Exploitation mitigation techniques limit what an attacker gains even when a vulnerability is present, including flaws nobody has found yet. This matters for OT products, which stay in service for many years.",
+                      "rationale":  "Exploitation mitigation techniques limit what an attacker gains even when a vulnerability is present, including flaws nobody has found yet. That is especially useful in OT products, which stay in service for many years.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "be designed, developed and produced to reduce the impact of an incident using appropriate exploitation mitigation mechanisms and techniques;",
                       "allowNA":  true,
@@ -294,7 +294,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "layerId":  "P2",
                       "title":  "Regular security testing",
                       "requirement":  "The manufacturer applies effective and regular tests and reviews of the security of the product.",
-                      "rationale":  "Vulnerabilities that the manufacturer\u0027s testing misses can be found by an attacker in the field. Regular security testing finds weaknesses before release, before anyone can exploit them.",
+                      "rationale":  "Vulnerabilities that the manufacturer\u0027s testing misses can be found by an attacker in the field. Regular security testing finds those weaknesses before the product is released.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "apply effective and regular tests and reviews of the security of the product with digital elements;",
                       "allowNA":  true,
@@ -330,7 +330,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "layerId":  "P2",
                       "title":  "Facilitate vulnerability reporting",
                       "requirement":  "The manufacturer takes measures to facilitate sharing of information about potential vulnerabilities, including a contact address for reporting, covering third-party components.",
-                      "rationale":  "Making it easy to report vulnerabilities, including in third-party components, widens the manufacturer\u0027s view of its real exposure. A missing or hidden reporting channel means issues go unreported until they are exploited.",
+                      "rationale":  "Making it easy to report vulnerabilities, including in third-party components, gives the manufacturer a fuller picture of its exposure. A missing or hidden reporting channel means issues go unreported until they are exploited.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "take measures to facilitate the sharing of information about potential vulnerabilities in their product with digital elements as well as in third-party components contained in that product, including by providing a contact address for the reporting of the vulnerabilities discovered in the product with digital elements;",
                       "allowNA":  true,
@@ -341,7 +341,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "code":  "CRA-P2.7",
                       "layerId":  "P2",
                       "title":  "Secure update distribution",
-                      "requirement":  "The manufacturer provides mechanisms to securely distribute updates to ensure timely fixing or mitigation, automatically where applicable.",
+                      "requirement":  "The manufacturer provides mechanisms to distribute updates securely, so that fixes and mitigations reach users promptly, automatically where applicable.",
                       "rationale":  "A fix that cannot be delivered securely and reliably protects nobody, and a compromised update channel is itself a supply-chain attack. Secure distribution gets the fix to the deployed product intact.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "provide for mechanisms to securely distribute updates for products with digital elements to ensure that vulnerabilities are fixed or mitigated in a timely manner and, where applicable for security updates, in an automatic manner;",
@@ -426,7 +426,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "layerId":  "P3",
                       "title":  "Support and update period",
                       "requirement":  "A support period is determined and communicated, during which vulnerabilities are handled, reflecting the expected product use.",
-                      "rationale":  "The support period sets how long the manufacturer will handle vulnerabilities. OT products stay in service for decades, which makes this obligation demanding, and an unclear or short period leaves operators exposed once support ends.",
+                      "rationale":  "The support period sets how long the manufacturer will handle vulnerabilities. OT products stay in service for decades, so this obligation is demanding. An unclear or short period leaves operators exposed once support ends.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -451,7 +451,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
                       "layerId":  "P3",
                       "title":  "User information and instructions",
                       "requirement":  "The product is accompanied by the information and instructions to users required by Annex II (secure use, support period, reporting contact).",
-                      "rationale":  "Users can only operate a product securely if they are told how, including its support period and reporting contact. The required user information helps a secure product to be deployed securely.",
+                      "rationale":  "Users can only operate a product securely if they are told how, including its support period and reporting contact. Without that information, a secure product can still be deployed insecurely.",
                       "evidencePrompt":  "Record the evidence and the basis for the conformance state.",
                       "verbatimText":  "",
                       "allowNA":  true,
@@ -473,7 +473,7 @@ window.App.Data.instruments["eu-cra"].instrument = {
               ],
     "_relatedWork":  "The deep CRA assessment the supplier screener\u0027s regulatory section routes into. Part II overlaps 62443-4-1 (secure development / vulnerability handling) - candidate cross-references, sourced from both requirement texts.",
     "_classificationNote":  "Product classification uses the verified Annex III/IV lookup (shared/cra-product-classification.json), not a free choice. The lookup derives class -\u003e conformity route. Annex III/IV are classification inputs, not assessable items; only Annex I content is scored.",
-    "seriesContext":  "The Cyber Resilience Act is an EU Regulation and not a standard, so it applies directly and conformity is a legal obligation for products with digital elements placed on the EU market. It sets essential requirements for the product itself and for the manufacturer\u0027s vulnerability handling process, and it requires certain incidents to be reported. Harmonised standards that would give presumption of conformity are still being developed, so this assessment works from the Regulation\u0027s own requirements. It is a gap analysis to support preparation. It is not a conformity assessment and confers no presumption of conformity.",
+    "seriesContext":  "The Cyber Resilience Act is an EU Regulation, so unlike a standard it applies directly, and conformity is a legal obligation for products with digital elements placed on the EU market. It sets essential requirements for the product itself and for the manufacturer\u0027s vulnerability handling process, and it requires certain incidents to be reported. Harmonised standards that would give presumption of conformity are still being developed, so this assessment works from the Regulation\u0027s own requirements. It is a gap analysis to support preparation. It is not a conformity assessment and confers no presumption of conformity.",
     "_contentNote":  "13 + 8 + 9 items across three independently-scored layers. Coverage verified against Annex I: Part I has exactly 13 lettered requirements and Part II exactly 8 numbered ones. Selectable layers; product classification drives the conformity route.",
     "docx":  {
                  "noun":  "product",
@@ -489,15 +489,15 @@ window.App.Data.instruments["eu-cra"].instrument = {
                                      "The consultant sets the conformance state of each requirement on the three-point scale (Not in place, Partially in place, In place), based on the evidence gathered. Each layer is scored separately. The conformance index is shown for context only, and the three layers are not combined into a single CRA score. Unknown answers reduce coverage and confidence, and Not applicable requirements are excluded. A requirement that is Not in place is reported as a floor finding and is never averaged away.",
                                      "This is an indicative gap assessment against the EU CRA. It is not a conformity assessment or certification. The Annex I essential requirements are reproduced from Regulation (EU) 2024/2847 as published in the Official Journal of the European Union, and the Regulation text governs. No harmonised standard has yet been cited in the Official Journal under the CRA, so presumption of conformity through a standard is not formally available. A 62443 certificate, or any other, does not amount to CRA conformity. The manufacturer, or a notified body where the product class requires one, remains responsible for the conformity decision."
                                  ],
-                 "categoryRowLabel":  "Matched Annex III/IV category (aid)",
+                 "categoryRowLabel":  "Matched Annex III/IV category (classification aid)",
                  "defaultClassLabel":  "Default (self-assessment / internal control)",
                  "noBlendPhrase":  "a single CRA score",
-                 "blockerTail":  " cannot yet be lawfully CE-marked or placed on the EU market, however strong its technical security. Closing these gaps is a matter of market access and needs conformity work, which better security engineering will not provide.",
-                 "blockerTailMulti":  " cannot yet be lawfully CE-marked or placed on the EU market, however strong their technical security. Closing those gaps is a matter of market access and needs conformity work, which better security engineering will not provide.",
+                 "blockerTail":  " cannot be lawfully CE-marked or placed on the EU market until those obligations are met, however strong its technical security.",
+                 "blockerTailMulti":  " cannot be lawfully CE-marked or placed on the EU market until those obligations are met, however strong their technical security.",
                  "multiOrgSentence":  "The organisation-wide obligations (the Annex I Part II vulnerability handling process, Article 14 reporting readiness and component due diligence) were assessed once for the manufacturer and apply to every product. The Annex I Part I product requirements and the remaining conformity obligations were assessed for each product. The layers are reported side by side and are not combined into a single CRA score.",
                  "seqPlaceholder":  "Consultant: in one short paragraph, set out what must close before the Article 14 date, what must be in place before CE marking, and what can run in parallel.",
                  "seqPlaceholderMulti":  "Consultant: in one short paragraph, set out what must close before the Article 14 date, what must be in place before each product can be CE marked, and what can run in parallel.",
-                 "exposurePlaceholder":  "Consultant: in one paragraph, describe the commercial exposure: which markets and revenue depend on CE marking under the CRA, and what non-conformity would mean for them.",
+                 "exposurePlaceholder":  "Consultant: in one paragraph, describe which markets and revenue depend on CE marking under the CRA, and what non-conformity would mean for them.",
                  "xlsxTitle":  "EU Cyber Resilience Act: indicative gap assessment",
                  "xlsxReadMe":  [
                                     "The three layers (P1 product, P2 vulnerability handling and P3 conformity) are scored separately against the CRA and shown side by side. There is no combined CRA score.",

@@ -8,7 +8,7 @@ window.App.Data.instruments["general-ot-posture"].narrative = {
     "_note":  "Narrative for the General OT Security Posture report. Boilerplate and domain text inserted VERBATIM; data lines composed ONLY from templates. The generator must not free-write prose.",
     "boilerplate":  {
                         "report_intro":  "This report gives management a high-level view of the operational technology security posture of {clientName}, as an early indication of strengths, weaknesses and priorities. It is based on a structured interview covering seven domains, and the question-by-question detail is in the companion workbook.",
-                        "about_instrument":  "Each question is scored on the consultant's judgement of the answer given, so the grade reflects what could be established in conversation and has not been technically verified. The result is indicative. It is not a conformance assessment against a standard such as ISA/IEC 62443, and it is not a regulatory assessment.",
+                        "about_instrument":  "Each question is scored on the consultant's judgement of the answer given, so the grade reflects what could be established in conversation and has not been technically verified. The grade is indicative. It is not a conformance assessment against a standard such as ISA/IEC 62443 or a regulatory assessment.",
                         "how_to_read":  "Each question is scored on a four-point scale, from not in place to fully in place and managed, using the consultant's judgement of the answer. Questions are grouped into seven domains, and each domain receives a grade. The overall grade starts from the average across the domains and is then held down so that it can never sit more than two grades above the weakest domain, and the top grade is given only when every domain reaches it. An area in poor shape therefore pulls the headline down sharply, and stronger areas cannot average it away. A coverage figure shows how many questions could be answered. Where coverage is low, the grade is shown as indicative only and should be confirmed. An Unknown answer reduces coverage and does not count as a failure. Questions that do not apply are excluded.",
                         "method":  "The assessment was carried out as a structured interview with site, engineering and security staff, supported by any documents and observations available at the time. Each scored answer reflects the consultant's judgement of the response given. [Consultant to confirm or adjust this description so it matches how the session was run.]",
                         "limitations":  "This is a point-in-time, interview-based assessment of what could be established in the time available and from the evidence offered. It does not verify controls in technical depth, which is the role of the detailed assessments. Where coverage was low or answers were uncertain, the grade should be treated as provisional.",
@@ -19,13 +19,13 @@ window.App.Data.instruments["general-ot-posture"].narrative = {
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only; boilerplate inserted VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. Posture aim: an indicative capped-average headline grade to show quickly where to look first - NOT a conformance or regulatory determination. Order: verdict, scope, gap_shape, weakest-domain method + indicative, path_forward + confidence.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment gives {clientName} an indicative OT security posture grade of {headlineGrade}, with the weakest ground in {weakestDomainName}. The priorities in this report focus on the lower-scoring domains.",
+                                               "exec_verdict":  "This assessment gives {clientName} an indicative OT security posture grade of {headlineGrade}. The weakest domain is {weakestDomainName}. The priorities in this report focus on the lower-scoring domains.",
                                                "exec_verdict_nogaps":  "This assessment gives {clientName} an indicative OT security posture grade of {headlineGrade}, with no domain falling into the lower bands.",
                                                "exec_scope":  "The read is based on a structured interview covering {assessedDomainCount} OT security domains, with {answeredCount} of {scorableCount} applicable questions answered.",
                                                "exec_profile":  "Each domain is graded on the consultant's judgement of the answers given, and those grades roll up into the single headline above.",
                                                "exec_gap_shape":  "Grades vary across the domains. {gapConcentrationSentence}{capClause}",
-                                               "exec_path_forward":  "The priorities in this report, drawn up with OT operations in mind, show where to act first on the lower-scoring areas.",
-                                               "exec_confidence":  "This read is based on {coveragePct} of applicable questions being answered ({confidenceLabel}).",
+                                               "exec_path_forward":  "The priorities in this report take account of OT operating constraints and show where to start on the lower-scoring areas.",
+                                               "exec_confidence":  "This grade is based on answers to {coveragePct} of the applicable questions ({confidenceLabel}).",
                                                "capClause":  " The headline has been held down to {headlineGrade}, because it may not sit more than two grades above the weakest domain and the stronger domains cannot average it up.",
                                                "capClauseCeiling":  " With {weakestDomainName} graded {weakestGrade}, the headline could not have been higher than {headlineGrade}.",
                                                "capClauseUnanimous":  " The top grade is reserved for an assessment where every domain reaches it, so the headline is held at {headlineGrade}.",
@@ -40,7 +40,7 @@ window.App.Data.instruments["general-ot-posture"].narrative = {
                                                  "not_determination":  "This is not a conformance assessment against ISA/IEC 62443 or any other standard, and it is not a regulatory determination. It is a structured interview carried out at a point in time, and the grade should be confirmed by the more detailed assessments it points to."
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_lowcov_clause":  " Coverage in one or more domains was below the threshold, so part of this picture is provisional and should be confirmed.",
+                                                      "consultant_exposure_lowcov_clause":  " Coverage in one or more domains was below the threshold, so some of these findings are provisional and should be confirmed.",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note: the operational or safety consequence of the weakest domains for this organisation, and any context behind the grade.]",
                                                       "consultant_top_priorities_seed":  "The most pressing areas are likely to be {autoTopPriorityHint}.",
                                                       "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this organisation.]"
@@ -52,34 +52,34 @@ window.App.Data.instruments["general-ot-posture"].narrative = {
                                          "why_it_matters":  "Without clear ownership and an accurate picture of the risk, OT security tends to be no one's job and gets attention only after an incident. Governance turns scattered good intentions into sustained effort and funding."
                                      },
                              "assets":  {
-                                            "purpose":  "This domain looks at whether the organisation knows what is in its OT environment and what is connected to it.",
+                                            "purpose":  "Asset visibility is about whether the organisation knows what is in its OT environment and what is connected to it.",
                                             "why_it_matters":  "An organisation cannot protect or monitor what it does not know is there. Incomplete asset and connectivity knowledge is one of the most common and most limiting gaps in OT, because every other control depends on it."
                                         },
                              "arch":  {
-                                          "purpose":  "This domain looks at how the OT environment is separated from other networks and divided internally, and how access and data crossing those boundaries are controlled.",
+                                          "purpose":  "The questions in this domain deal with how the OT environment is separated from other networks and divided internally, and how access and data crossing those boundaries are controlled.",
                                           "why_it_matters":  "Segmentation is the control that most limits how far a compromise can spread and keeps critical systems away from the routes attackers use. The architecture decisions made here shape how contained or how exposed an incident will be."
                                       },
                              "access":  {
-                                            "purpose":  "This domain looks at how identities and privileges are managed for the people and vendors who can reach OT systems.",
+                                            "purpose":  "Access control here means how identities and privileges are managed for the people and vendors who can reach OT systems.",
                                             "why_it_matters":  "Shared logins, default passwords and standing broad access are common in OT, and they are what allows a minor foothold to become control of a process. Disciplined access control limits both accidents and attackers."
                                         },
                              "protect":  {
-                                             "purpose":  "This domain looks at the protective controls on OT systems, namely patching, malware protection, removable media control, hardening and backups.",
+                                             "purpose":  "Five protective controls are assessed on OT systems: patching, malware protection, removable media control, hardening and backups.",
                                              "why_it_matters":  "These are the day-to-day defences, and in OT they have to be applied with care for availability and for legacy systems that cannot always be patched. What is applied on the systems counts for more than what the policy says."
                                          },
                              "monitor":  {
-                                             "purpose":  "This domain looks at whether the organisation can see what is happening in its OT environment and would notice a problem.",
+                                             "purpose":  "The question here is whether the organisation can see what is happening in its OT environment and would notice a problem.",
                                              "why_it_matters":  "Many OT incidents run undetected because no one is watching the right signals. Without visibility a compromise persists and grows, and any later investigation becomes guesswork."
                                          },
                              "respond":  {
-                                             "purpose":  "This domain looks at whether the organisation can respond to and recover from an incident affecting OT.",
+                                             "purpose":  "These questions ask whether the organisation could respond to an incident affecting OT and recover from it.",
                                              "why_it_matters":  "When prevention fails, the priority is to bring operations back quickly and safely. That depends on a response plan written for OT, engineering and security teams who already work together, and recovery that has been tested."
                                          }
                          },
     "templates":  {
                       "headline":  "The overall indicative posture grade is {headlineGrade}. It starts from the average across the seven domains and is held to no more than two grades above the weakest of them.",
-                      "coverage_overall":  "This grade is based on {overallCoveragePct} of applicable questions being answered.",
-                      "low_confidence_flag":  "Overall coverage is below {coverageThresholdPct}. It should be treated as a low-confidence initial read and confirmed.",
+                      "coverage_overall":  "This grade is based on answers to {overallCoveragePct} of the applicable questions.",
+                      "low_confidence_flag":  "Overall coverage is below {coverageThresholdPct}, so the grade should be treated as a low-confidence initial read and confirmed.",
                       "domain_result":  "{domainName}: graded {domainGrade} (based on {answered} of {scorable} questions answered).",
                       "domain_low_coverage":  "{domainName}: insufficient evidence to grade with confidence ({answered} of {scorable} answered). Indicative grade {domainGrade}, to be confirmed.",
                       "all_top_band":  "Every question in this domain was answered at the top band, so there are no lower-scoring points to note.",

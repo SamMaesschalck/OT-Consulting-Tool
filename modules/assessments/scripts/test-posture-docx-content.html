@@ -194,7 +194,7 @@ window.docx = (function () {
     // With the cap at two grades, this fixture's mean (D) already sits at the
     // ceiling the F imposes, so the headline is D and the cap does not bite.
     check("exec verdict states the headline grade and the weakest domain",
-      /indicative OT security posture grade of D, with the weakest ground in Monitoring and detection/.test(allText));
+      /indicative OT security posture grade of D\. The weakest domain is Monitoring and detection/.test(allText));
     // The weakest domain and its grade must still be stated - but once. It used
     // to be named in the verdict, again in the low-grade list, and again in a
     // sentence of its own, all within four paragraphs.
@@ -223,7 +223,7 @@ window.docx = (function () {
     check("exec summary does not claim a cap that did not bite",
       !/has been held down|headline is held at|The grade is held down by|The top grade is held back/.test(allText));
     check("exec summary states overall coverage",
-      /based on \d+% of applicable questions being answered/.test(allText));
+      /based on answers to \d+% of the applicable questions/.test(allText));
     // low_confidence_flag should NOT appear here (overall coverage is not below threshold given this seed)
     // - but it should appear if the overall coverage IS low. Let's check the protect domain shows low coverage:
     check("domain_low_coverage composed for the protect domain",
@@ -293,7 +293,7 @@ window.docx = (function () {
         check("fallback: no cap note, because the cap did not bite here",
           flatText.indexOf("The grade has been held down relative to the weakest domain") === -1);
         check("fallback: coverage_overall composed",
-          /This grade is based on \d+% of applicable questions being answered\./.test(flatText));
+          /This grade is based on answers to \d+% of the applicable questions\./.test(flatText));
       } else {
         check("fallback: document builds without an executiveSummary block", false);
       }

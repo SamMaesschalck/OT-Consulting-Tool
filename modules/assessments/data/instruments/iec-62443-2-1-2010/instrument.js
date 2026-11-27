@@ -16,23 +16,23 @@ window.App.Data.instruments["iec-62443-2-1-2010"].instrument = {
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
     "status":  "active-skeleton",
-    "framing":  "ISA/IEC 62443-2-1:2010 defines the elements of a Cyber Security Management System (CSMS) for industrial automation and control systems. The elements sit in element groups within three categories: risk analysis, addressing risk with the CSMS, and monitoring and improving the CSMS. This is the older edition, and it is still used where existing programmes were built against it. The 2024 edition reorganises the content into a maturity-based security program. This assessment judges conformance for each element and does not rate maturity.",
+    "framing":  "ISA/IEC 62443-2-1:2010 defines the elements of a Cyber Security Management System (CSMS) for industrial automation and control systems. The elements sit in element groups within three categories: risk analysis, addressing risk with the CSMS, and monitoring and improving the CSMS. This is the older edition, and it is still used by organisations whose CSMS was built against it. The 2024 edition reorganises the content into a maturity-based security program. This assessment judges conformance for each element and does not rate maturity.",
     "sourceNote":  "Category / element-group / element structure extracted and verified from BS IEC 62443-2-1:2011 held in the project. Element titles are verified; assessor framing is paraphrased; \u0027verbatimText\u0027 and \u0027otLens\u0027 slots are empty for the licence holder to populate. Source: BS IEC 62443-2-1:2011 (copyright IEC/BSI).",
     "categories":  [
                        {
                            "id":  "CAT-RA",
                            "name":  "Risk analysis",
-                           "summary":  "This category covers the business case for security and the identification, classification and assessment of risks to the IACS, which together justify and shape the CSMS."
+                           "summary":  "The business case for security, and the identification, classification and assessment of risks to the IACS, together justify and shape the CSMS."
                        },
                        {
                            "id":  "CAT-ADDR",
                            "name":  "Addressing risk with the CSMS",
-                           "summary":  "This category covers the main body of the CSMS, including the security policy and organisation, the selected security countermeasures and their implementation."
+                           "summary":  "This category is the main body of the CSMS. It includes the security policy and organisation, the selected security countermeasures and their implementation."
                        },
                        {
                            "id":  "CAT-MON",
                            "name":  "Monitoring and improving the CSMS",
-                           "summary":  "This category covers keeping the CSMS effective over time through conformance checks and periodic review, improvement and maintenance."
+                           "summary":  "Conformance checks and periodic review, improvement and maintenance keep the CSMS effective over time."
                        }
                    ],
     "elementGroups":  [
@@ -40,19 +40,19 @@ window.App.Data.instruments["iec-62443-2-1-2010"].instrument = {
                               "id":  "EG-POL",
                               "categoryId":  "CAT-ADDR",
                               "name":  "Security policy, organization and awareness",
-                              "summary":  "This group covers the organisational basis of the CSMS, including its scope, how security is organised, training and awareness, business continuity, and the policies and procedures."
+                              "summary":  "The organisational basis of the CSMS includes its scope, how security is organised, training and awareness, business continuity, and the policies and procedures."
                           },
                           {
                               "id":  "EG-CM",
                               "categoryId":  "CAT-ADDR",
                               "name":  "Selected security countermeasures",
-                              "summary":  "This group covers the protective controls, including personnel security, physical and environmental security, network segmentation, and access control through account administration, authentication and authorisation."
+                              "summary":  "This group holds the protective controls, including personnel security, physical and environmental security, network segmentation, and access control through account administration, authentication and authorisation."
                           },
                           {
                               "id":  "EG-IMPL",
                               "categoryId":  "CAT-ADDR",
                               "name":  "Implementation",
-                              "summary":  "This group covers putting the CSMS into practice through risk management and implementation, system development and maintenance, information and document management, and incident planning and response."
+                              "summary":  "Putting the CSMS into practice involves risk management and implementation, system development and maintenance, information and document management, and incident planning and response."
                           }
                       ],
     "requirements":  [
@@ -118,7 +118,7 @@ window.App.Data.instruments["iec-62443-2-1-2010"].instrument = {
                                         },
                              "allowNA":  true,
                              "hint":  "Roles, responsibilities and accountability for the CSMS are assigned.",
-                             "rationale":  "When nobody is organised to own security, it falls into the gap between IT and engineering, which is the most common weakness in OT. Assigning named owners means the tasks of the CSMS get done."
+                             "rationale":  "When nobody owns security, it falls into the gap between IT and engineering, which is the most common weakness in OT. With named owners, the tasks of the CSMS get done."
                          },
                          {
                              "id":  "E4324",
@@ -214,7 +214,7 @@ window.App.Data.instruments["iec-62443-2-1-2010"].instrument = {
                                         },
                              "allowNA":  true,
                              "hint":  "The network is segmented to separate the IACS from other networks and limit how far a compromise can spread.",
-                             "rationale":  "Segmentation limits how far a compromise can spread from the routes attackers usually use, and it is one of the most effective controls in OT. On a flat network, a single foothold can reach the whole environment."
+                             "rationale":  "Segmentation limits how far a compromise can spread from the points where attackers usually get in, and it is one of the most effective controls in OT. On a flat network, a single foothold can reach the whole environment."
                          },
                          {
                              "id":  "E4335",
@@ -230,7 +230,7 @@ window.App.Data.instruments["iec-62443-2-1-2010"].instrument = {
                                         },
                              "allowNA":  true,
                              "hint":  "Accounts are administered through their lifecycle, from creation through change to removal.",
-                             "rationale":  "Accounts that are created and never managed build up into a standing risk, with dormant logins and those of former staff left active for years. Disciplined account administration keeps the list of people who can log in in line with the people who should."
+                             "rationale":  "Accounts that are created and never managed build up into a standing risk, with dormant logins and those of former staff left active for years. Disciplined account administration means that only the people who should be able to log in can do so."
                          },
                          {
                              "id":  "E4336",

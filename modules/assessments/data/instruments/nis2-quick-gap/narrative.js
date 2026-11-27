@@ -26,7 +26,7 @@ window.App.Data.instruments["nis2-quick-gap"].narrative = {
       "exec_exposure_authority": "The relevant competent authority is {competentAuthority}.",
       "verdictMaturityPhrases": {
         "foundations": "sound cybersecurity foundations in place",
-        "recognised": "cybersecurity foundations that are recognised but not yet fully in place",
+        "recognised": "partial cybersecurity foundations in place",
         "substantial": "substantial gaps in the measures required"
       },
       "gapConcentrationFragments": {
@@ -35,7 +35,7 @@ window.App.Data.instruments["nis2-quick-gap"].narrative = {
       }
     },
     "boilerplate": {
-      "exec_partial_vs_absent": "\"Partially Achieved\" means an obligation is recognised and some controls are in place but fall short of full conformance, so the remaining work is improvement and evidence. \"Not Achieved\" means the obligation is not yet met and the measures have to be established. Closing a Not Achieved gap usually takes more effort and cost, because the work starts from the beginning.",
+      "exec_partial_vs_absent": "\"Partially Achieved\" means an obligation is recognised and some controls are in place but fall short of full conformance, so the remaining work is improvement and evidence. \"Not Achieved\" means the obligation is not yet met and the measures have to be established. Closing a Not Achieved gap usually takes more effort and cost, because there is nothing in place to build on.",
       "regulatory_stakes": "NIS2 obligations are legally binding, and for essential entities non-compliance has direct consequences. Members of the management body can be held responsible for the entity's compliance with the cybersecurity risk-management measures, and competent authorities can enforce compliance and impose financial penalties. After a significant incident, the reporting duties set fixed deadlines: an early warning within 24 hours, an incident notification within 72 hours and a final report within one month. Gaps in these areas are a regulatory exposure as well as a security weakness.",
       "not_determination": "This gap assessment is intended to support improvement and to prepare for engagement with the regulator. It is not a formal determination of NIS2 compliance, which only the relevant competent authority can make. The judgements are the consultant's, made against the obligations of the Directive."
     },

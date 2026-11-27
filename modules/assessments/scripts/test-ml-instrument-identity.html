@@ -147,7 +147,7 @@ window.docx = (function () {
           var gl = (R.glossarySections(inst, E.state.taxonomy, narr) || []).map(function (s) { return JSON.stringify(s.rows || []); }).join(" ");
           var lv3 = R.mlLevels(inst).filter(function (l) { return l.id === "ML3"; })[0];
           ok(!!lv3 && gl.indexOf(lv3.glossary) !== -1, tag + ": the glossary's ML3 row is the instrument's own", lv3 && lv3.glossary);
-          ok(c.id === "iec-62443-2-1-2024" || gl.indexOf("practised on the industrial automation and control system and is shown to repeat over time") === -1,
+          ok(c.id === "iec-62443-2-1-2024" || gl.indexOf("practised on the industrial automation and control system, with evidence that it is performed consistently over time") === -1,
              tag + ": and never 2-1:2024's");
           // The composed summary, not the bullet fallback.
           var start = -1;

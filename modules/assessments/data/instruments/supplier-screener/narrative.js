@@ -40,7 +40,7 @@ window.App.Data.instruments["supplier-screener"].narrative = {
                                                  "not_determination":  "This screening was carried out on the supplier's answers at a point in time. It is not a conformance assessment against a standard or a regulatory determination, and the grade should be confirmed by the more detailed assessments it recommends."
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_lowcov_clause":  " Coverage in one or more domains was below the threshold, so part of this picture is provisional and should be confirmed.",
+                                                      "consultant_exposure_lowcov_clause":  " Coverage in one or more domains was below the threshold, so some of these findings are provisional and should be confirmed.",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note: what this supplier provides, how dependent operations are on it, and the operational or regulatory consequence of the weakest domains for this relationship.]",
                                                       "consultant_top_priorities_seed":  "The most pressing areas are likely to be {autoTopPriorityHint}.",
                                                       "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this supplier relationship, including which deep-dive assessment to commission first and what to fix through contract.]"
@@ -49,10 +49,10 @@ window.App.Data.instruments["supplier-screener"].narrative = {
     "domain_narrative":  {
                              "corp":  {
                                           "purpose":  "The questions in this domain test whether the supplier's own security has an owner, whether its certificates have a meaningful scope, and whether it backs its security with contractual commitments and openness.",
-                                          "why_it_matters":  "A supplier that names a security owner, evidences its certificates and signs security commitments is likely to behave the same way for the life of the relationship, including during an incident. A supplier that is evasive on these points is rarely evasive only about paperwork."
+                                          "why_it_matters":  "A supplier that names a security owner, evidences its certificates and signs security commitments is likely to behave the same way for the life of the relationship, including during an incident. A supplier that is evasive on these points is usually evasive elsewhere too."
                                       },
                              "dev":  {
-                                         "purpose":  "The screening checks that the products the customer buys are developed under a working secure development lifecycle, tested for security, and built and delivered with integrity.",
+                                         "purpose":  "This domain asks whether the products the customer buys are developed under a working secure development lifecycle, tested for security, and built and delivered with integrity.",
                                          "why_it_matters":  "Product security has to be built in during development, because it cannot be added afterwards. A compromise of the supplier's build and delivery chain reaches every customer at once. An ISA/IEC 62443-4-1 assessment examines this domain in depth."
                                      },
                              "prod":  {
@@ -60,7 +60,7 @@ window.App.Data.instruments["supplier-screener"].narrative = {
                                           "why_it_matters":  "Policy cannot add a capability the product lacks, so shared logins, devices that log nothing and units that cannot be patched set the customer's exposure for the equipment's whole service life. The EU CRA also makes these capabilities essential requirements and a legal condition of market access."
                                       },
                              "vuln":  {
-                                          "purpose":  "This domain tests whether the supplier can receive, fix and communicate vulnerabilities for the whole service life of the equipment.",
+                                          "purpose":  "The supplier has to be able to receive, fix and communicate vulnerabilities for the whole service life of the equipment, and these questions test whether it can.",
                                           "why_it_matters":  "Every product has vulnerabilities, and the supplier's handling of them decides whether the customer receives advisories and patches or hears nothing. Measured against OT lifespans, support periods are among the most important terms in the relationship, and among the most negotiable."
                                       },
                              "reg":  {
@@ -68,13 +68,13 @@ window.App.Data.instruments["supplier-screener"].narrative = {
                                          "why_it_matters":  "From 2027 non-conforming products cannot lawfully be supplied. If a supplier misses a CRA or Machinery Regulation deadline, the procurement and continuity problem passes to the customer partway through the contract. This domain shows whether a full gap assessment is needed urgently, and that assessment establishes the actual position."
                                      },
                              "chain":  {
-                                           "purpose":  "Here the concern is the exposure carried through the relationship itself: what is inside the products, what access the supplier holds into the customer's estate, and what happens if the supplier fails or withdraws.",
+                                           "purpose":  "Some exposure comes through the relationship itself: what is inside the products, what access the supplier holds into the customer's estate, and what happens if the supplier fails or withdraws.",
                                            "why_it_matters":  "Supplier remote access is one of the most common unrecorded paths into OT estates. The next Log4j will appear in components nobody has listed, and continuity terms cannot be obtained once a supplier is already failing. In this domain the customer has the most direct control over supplier risk, largely through the contract."
                                        }
                          },
     "templates":  {
                       "headline":  "The overall indicative supplier exposure grade is {headlineGrade}. It starts from the average across the six domains and is held to no more than two grades above the weakest of them.",
-                      "coverage_overall":  "This grade is based on {overallCoveragePct} of applicable questions being answered.",
+                      "coverage_overall":  "This grade is based on answers to {overallCoveragePct} of the applicable questions.",
                       "low_confidence_flag":  "Overall coverage is below {coverageThresholdPct}, so this is a low-confidence first view that needs to be confirmed.",
                       "domain_result":  "{domainName}: graded {domainGrade} (based on {answered} of {scorable} questions answered).",
                       "domain_low_coverage":  "{domainName}: insufficient evidence to grade with confidence ({answered} of {scorable} answered). Indicative grade {domainGrade}, to be confirmed.",

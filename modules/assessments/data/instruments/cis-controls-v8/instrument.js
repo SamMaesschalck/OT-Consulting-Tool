@@ -16,7 +16,7 @@ window.App.Data.instruments["cis-controls-v8"].instrument = {
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
     "framing":  "This assessment measures the organisation against the CIS Critical Security Controls Version 8.1.2, published by the Center for Internet Security. Each of the 153 Safeguards in the 18 Controls is assessed as Implemented, Partially Implemented or Not Implemented. The selected Implementation Group (IG1, IG2 or IG3) sets which Safeguards are expected.",
-    "sourceNote":  "Control and Safeguard identifiers, titles, descriptions, Asset Class, Security Function and Implementation Group (IG1/IG2/IG3) membership are transcribed from the CIS Critical Security Controls Version 8.1.2 (March 2025) reference spreadsheet published by the Center for Internet Security. The Safeguard description is shown in the \u0027What this safeguard requires\u0027 expander on every Safeguard. This is an alignment and gap tool, not a certified CIS assessment.",
+    "sourceNote":  "Control and Safeguard identifiers, titles, descriptions, Asset Class, Security Function and Implementation Group (IG1/IG2/IG3) membership are transcribed from the CIS Critical Security Controls Version 8.1.2 (March 2025) reference spreadsheet published by the Center for Internet Security. The Safeguard description is shown in the 'What this safeguard requires' expander on every Safeguard. The tool supports an alignment and gap analysis and does not give a certified CIS assessment.",
     "attribution":  "The CIS Critical Security Controls are published by the Center for Internet Security, Inc. (CIS(R)) and are used here under the CIS Controls terms of use (attribution, non-commercial internal use; no derivative endorsement implied). (C) 2024 Center for Internet Security, Inc. CIS Controls Version 8.1.2.",
     "display":  {
                     "subtitle":  "This is a gap assessment against the Safeguards of the CIS Critical Security Controls v8.1.2. Enter the engagement details, choose an Implementation Group below, then work through the 18 Controls in the sidebar.",
@@ -29,7 +29,7 @@ window.App.Data.instruments["cis-controls-v8"].instrument = {
                     "outcomesTitle":  "Safeguards",
                     "gettingStarted":  {
                                            "cardTitle":  "How the CIS Critical Security Controls v8.1.2 assessment works",
-                                           "intro":  "This assessment covers each Safeguard in the CIS Critical Security Controls Version 8.1.2. You record each Safeguard as Implemented, Partially Implemented or Not Implemented. The result is a gap analysis and is not a certified CIS assessment.",
+                                           "intro":  "This assessment covers each Safeguard in the CIS Critical Security Controls Version 8.1.2. You record each Safeguard as Implemented, Partially Implemented or Not Implemented. This is a gap analysis. It is not a certified CIS assessment.",
                                            "profileHeading":  "Implementation Group (sets which Safeguards are expected)",
                                            "bullets":  [
                                                            "You assess 153 Safeguards across the 18 CIS Controls.",

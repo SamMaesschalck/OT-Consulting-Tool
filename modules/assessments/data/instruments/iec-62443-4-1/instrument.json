@@ -71,42 +71,42 @@
                      {
                          "id":  "SM",
                          "name":  "Practice 1: Security management",
-                         "summary":  "This practice covers how the supplier manages secure product development overall, including ownership, scope, expertise, the security of the development environment and continuous improvement."
+                         "summary":  "This practice covers how the supplier manages secure product development as a whole, including ownership, scope, expertise, the security of the development environment and continuous improvement."
                      },
                      {
                          "id":  "SR",
                          "name":  "Practice 2: Specification of security requirements",
-                         "summary":  "This practice covers capturing the product\u0027s security context and threat model and turning them into documented, reviewed security requirements."
+                         "summary":  "The supplier is expected to capture the product\u0027s security context and threat model and turn them into documented, reviewed security requirements."
                      },
                      {
                          "id":  "SD",
                          "name":  "Practice 3: Secure by design",
-                         "summary":  "This practice covers secure design principles, defence in depth and design review, so that security is part of the product from the start."
+                         "summary":  "Secure design principles, defence in depth and design review make security part of the product from the start."
                      },
                      {
                          "id":  "SI",
                          "name":  "Practice 4: Secure implementation",
-                         "summary":  "This practice covers implementing the design securely, with secure coding standards and implementation review to catch weaknesses as the code is written."
+                         "summary":  "Secure coding standards and implementation reviews catch weaknesses as the design is turned into code."
                      },
                      {
                          "id":  "SVV",
                          "name":  "Practice 5: Security verification and validation testing",
-                         "summary":  "This practice covers testing that security requirements are met and threats are mitigated, including vulnerability and penetration testing by suitably independent testers."
+                         "summary":  "Testing confirms that the security requirements are met and the threats mitigated. It includes vulnerability and penetration testing by suitably independent testers."
                      },
                      {
                          "id":  "DM",
                          "name":  "Practice 6: Management of security-related issues",
-                         "summary":  "This practice covers receiving, reviewing, assessing, fixing and disclosing security issues found in the product after development."
+                         "summary":  "Security issues found in the product after development have to be received, reviewed, assessed, fixed and disclosed."
                      },
                      {
                          "id":  "SUM",
                          "name":  "Practice 7: Security update management",
-                         "summary":  "This practice covers qualifying, documenting and delivering security updates and patches in good time and reliably."
+                         "summary":  "Security updates and patches need to be qualified, documented and delivered reliably and in good time."
                      },
                      {
                          "id":  "SG",
                          "name":  "Practice 8: Security guidelines",
-                         "summary":  "This practice covers the documentation users need to deploy, harden, operate and dispose of the product securely."
+                         "summary":  "Users need documentation that lets them deploy, harden, operate and dispose of the product securely."
                      }
                  ],
     "requirements":  [
@@ -156,7 +156,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The supplier has decided which parts of the process apply to which products and components.",
-                             "rationale":  "Applying the full process to everything wastes effort, and applying it to nothing leaves products exposed. Defining applicability puts the effort where the product risk calls for it."
+                             "rationale":  "Not every product or component needs every part of the process. Deciding where each part applies puts the effort where the product risk calls for it."
                          },
                          {
                              "id":  "SM4",
@@ -172,7 +172,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The people doing the work have the security expertise the process needs, through training or recruitment.",
-                             "rationale":  "A secure development process run by people without security skills looks rigorous on paper and finds little. Staff with the right expertise find real weaknesses."
+                             "rationale":  "A secure development process run by people without security skills can look rigorous on paper and still find few real weaknesses."
                          },
                          {
                              "id":  "SM5",
@@ -188,7 +188,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The scope of the development process is defined, including which products, versions and components it covers.",
-                             "rationale":  "Where scope is undefined, parts of a product end up treated as someone else\u0027s problem. Explicit scoping brings the whole product inside the process."
+                             "rationale":  "Where scope is undefined, parts of a product end up treated as someone else\u0027s problem."
                          },
                          {
                              "id":  "SM6",
@@ -204,7 +204,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Files and artefacts in development are protected so that tampering would be detected.",
-                             "rationale":  "If development artefacts can be altered without anyone noticing, an attacker can plant weaknesses before any later control applies. Protecting file integrity guards the supply chain at the point where tampering is hardest to spot afterwards."
+                             "rationale":  "If development artefacts can be altered without anyone noticing, an attacker can plant weaknesses before any later control applies, and the tampering is hard to spot afterwards."
                          },
                          {
                              "id":  "SM7",
@@ -220,7 +220,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The development environment, including tools, build systems and repositories, is protected against compromise.",
-                             "rationale":  "A compromised build system or repository can poison every product that passes through it, which makes it one of the most damaging forms of supply chain attack. Securing the development environment protects everything built in it."
+                             "rationale":  "A compromised build system or repository can poison every product that passes through it, which makes it one of the most damaging forms of supply chain attack."
                          },
                          {
                              "id":  "SM8",
@@ -236,7 +236,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Private keys used for signing and protection are controlled so they cannot be misused or stolen.",
-                             "rationale":  "Signing keys let users trust that a product or update is genuine. A stolen key lets an attacker sign malware so that it passes as legitimate, so the whole update mechanism depends on these keys being controlled."
+                             "rationale":  "Signing keys let users trust that a product or update is genuine. With a stolen key, an attacker can sign malware that passes as legitimate, which undermines trust in every update the supplier issues."
                          },
                          {
                              "id":  "SM9",
@@ -252,7 +252,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security requirements apply to externally provided components as well as to code developed in house.",
-                             "rationale":  "Third-party and open source components bring their own vulnerabilities into the product. Applying security requirements to them stops weaknesses in code the supplier did not write from undoing its own good practice."
+                             "rationale":  "Third-party and open source components bring their own vulnerabilities into the product. Unless security requirements also apply to them, weaknesses in code the supplier did not write can undo the supplier\u0027s own good practice."
                          },
                          {
                              "id":  "SM10",
@@ -300,7 +300,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The supplier checks that the development process is followed in practice.",
-                             "rationale":  "A process that is written down and not followed gives false assurance. Checking that it is applied shows whether the documentation reflects real practice."
+                             "rationale":  "A process that is written down and not followed gives false assurance."
                          },
                          {
                              "id":  "SM13",
@@ -316,7 +316,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The development process is improved over time using lessons learned.",
-                             "rationale":  "Threats and attack techniques change, and a development process that stays the same falls behind them. Regular improvement keeps the process in step with the risks the product will face."
+                             "rationale":  "Threats and attack techniques change, and a development process that is never improved falls behind the risks the product will face."
                          },
                          {
                              "id":  "SR1",
@@ -332,7 +332,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The product\u0027s security context is established, covering how and where the product will be used and the assumptions that follow from that.",
-                             "rationale":  "The same product needs different protection in different settings, so security requirements depend on how and where it will be used. The security context is the basis for the requirements."
+                             "rationale":  "The same product needs different protection in different settings, so its security requirements depend on how and where it will be used."
                          },
                          {
                              "id":  "SR2",
@@ -364,7 +364,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Documented product security requirements are derived from the security context and the threat model.",
-                             "rationale":  "Security expectations that are not written down cannot be designed or tested against. Deriving explicit requirements from the threat model gives the design and test teams something to work to."
+                             "rationale":  "Security expectations that are not written down cannot be designed or tested against."
                          },
                          {
                              "id":  "SR4",
@@ -380,7 +380,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The security requirements are detailed enough to be implemented and tested.",
-                             "rationale":  "A requirement too vague to implement or test has little effect, and designers and testers may read it differently. Requirements with enough detail can be built to and verified."
+                             "rationale":  "A requirement too vague to implement or test has little effect, and designers and testers may each read it differently."
                          },
                          {
                              "id":  "SR5",
@@ -412,7 +412,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The product is designed using established secure design principles.",
-                             "rationale":  "Building security into the design costs far less than adding it later, and works better. Design is the stage where the product\u0027s resilience is easiest to influence."
+                             "rationale":  "Security built into the design costs far less and works better than security added later, because design is the stage where the product\u0027s resilience is easiest to influence."
                          },
                          {
                              "id":  "SD2",
@@ -428,7 +428,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The product\u0027s design uses defence in depth, so it does not depend on a single protective measure.",
-                             "rationale":  "A product that relies on one protective measure is fully exposed once that measure is defeated. With defence in depth, bypassing one control does not compromise the whole product."
+                             "rationale":  "A product that relies on one protective measure is fully exposed once that measure is defeated."
                          },
                          {
                              "id":  "SD3",
@@ -444,7 +444,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The design is reviewed for security before implementation, so flaws are caught early.",
-                             "rationale":  "Design flaws found after implementation are expensive to fix and are often shipped anyway. A security review of the design finds structural weaknesses when they are cheapest to correct."
+                             "rationale":  "Design flaws found after implementation are expensive to fix and are often shipped anyway."
                          },
                          {
                              "id":  "SD4",
@@ -460,7 +460,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The supplier follows secure design practices suited to the product and its technologies.",
-                             "rationale":  "Established design practices capture lessons from other people\u0027s failures. Following them avoids repeating well-known design mistakes in a new product."
+                             "rationale":  "Established design practices capture lessons from other people\u0027s failures."
                          },
                          {
                              "id":  "SI1",
@@ -476,7 +476,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The implementation is reviewed for security to check that the code matches the secure design.",
-                             "rationale":  "Insecure implementation can undo a secure design. Reviewing the code confirms that it does what the design intended for security."
+                             "rationale":  "Insecure implementation can undo a secure design, so the code has to be checked against what the design intended."
                          },
                          {
                              "id":  "SI2",
@@ -508,7 +508,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The product is tested to show that its security requirements are met.",
-                             "rationale":  "An untested security requirement may not be met. Testing against the requirements shows that the intended security is present in the product."
+                             "rationale":  "A security requirement that is never tested may not be met, and nobody would know until the product is in service."
                          },
                          {
                              "id":  "SVV2",
@@ -524,7 +524,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The product is tested to show that the threats in the threat model are mitigated.",
-                             "rationale":  "The threat model protects the product only if the finished product mitigates the threats it lists. Threat mitigation testing confirms the defences work against the attacks they were designed for."
+                             "rationale":  "The threat model protects the product only if the finished product mitigates the threats it lists."
                          },
                          {
                              "id":  "SVV3",
@@ -540,7 +540,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The product is tested for vulnerabilities, including with automated tools.",
-                             "rationale":  "Vulnerabilities the supplier misses are left for an attacker to find. Vulnerability testing, including automated scanning, finds weaknesses before release."
+                             "rationale":  "Vulnerabilities the supplier misses before release are left for an attacker to find."
                          },
                          {
                              "id":  "SVV4",
@@ -555,8 +555,8 @@
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "The product undergoes penetration testing.",
-                             "rationale":  "Penetration testing probes the product as an attacker would and finds problems that testing against each requirement misses. It shows whether the product holds up under attack."
+                             "hint":  "The product is penetration tested.",
+                             "rationale":  "Penetration testing probes the product as an attacker would and finds problems that testing against each requirement misses."
                          },
                          {
                              "id":  "SVV5",
@@ -636,7 +636,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security issues are dealt with through fixes or mitigations.",
-                             "rationale":  "An assessed issue left unfixed is a known vulnerability shipped to every user. Fixing or mitigating issues is the purpose of the defect management practice."
+                             "rationale":  "An assessed issue left unfixed is a known vulnerability shipped to every user."
                          },
                          {
                              "id":  "DM5",
@@ -668,7 +668,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The defect management practice is reviewed periodically to keep it effective.",
-                             "rationale":  "A defect management practice that is never reviewed drifts over time like any other process. Periodic review keeps it effective as the product and the threats change."
+                             "rationale":  "A defect management practice that is never reviewed drifts over time like any other process."
                          },
                          {
                              "id":  "SUM1",
@@ -684,7 +684,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security updates are qualified so they are known to work and do not introduce new problems.",
-                             "rationale":  "An update that breaks the product or brings in new flaws can do more harm than the vulnerability it fixes. Qualification shows the fix is safe to apply, which matters most in OT, where stability comes first."
+                             "rationale":  "An update that breaks the product or brings in new flaws can do more harm than the vulnerability it fixes. Qualification shows the fix is safe to apply, which matters especially in OT, where stability comes first."
                          },
                          {
                              "id":  "SUM2",
@@ -716,7 +716,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Updates to dependent components and operating systems are handled as well as updates to the product\u0027s own code.",
-                             "rationale":  "A product inherits the vulnerabilities of its dependencies and operating system. Handling their updates stops the product being exposed through components the supplier did not write."
+                             "rationale":  "A product inherits the vulnerabilities of its dependencies and operating system, so their updates have to be handled as well."
                          },
                          {
                              "id":  "SUM4",
@@ -732,7 +732,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security updates reach users through a dependable delivery mechanism.",
-                             "rationale":  "A fix that cannot be delivered reliably protects no one. A dependable delivery mechanism gets the patch from the supplier to the installed product."
+                             "rationale":  "A fix protects users only once it reaches the installed product, so the supplier needs a dependable way to deliver it."
                          },
                          {
                              "id":  "SUM5",
@@ -748,7 +748,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "Security patches are delivered in a time that reflects the risk they address.",
-                             "rationale":  "A patch that arrives long after a risk becomes known leaves attackers a window to exploit it. Delivery timed to severity keeps protection ahead of the threat, balanced against the need in OT to test before applying."
+                             "rationale":  "A patch that arrives long after a risk becomes known leaves attackers a window to exploit it. Timing delivery to the severity of the issue narrows that window, although OT users still need time to test a patch before they apply it."
                          },
                          {
                              "id":  "SG1",
@@ -764,7 +764,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The supplier provides guidance on the product\u0027s own defence in depth features.",
-                             "rationale":  "Users cannot use protective features they do not know about. Documenting the product\u0027s defence in depth features helps operators use the security that was built in."
+                             "rationale":  "Users cannot use protective features they do not know about."
                          },
                          {
                              "id":  "SG2",
@@ -812,7 +812,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The supplier provides guidance on disposing of the product securely, so that retiring it does not leak sensitive data.",
-                             "rationale":  "Equipment retired without proper disposal still holds configuration, credentials and data useful to an attacker. Disposal guidance stops decommissioned products becoming a source of leaks."
+                             "rationale":  "Equipment retired without proper disposal still holds configuration, credentials and data useful to an attacker."
                          },
                          {
                              "id":  "SG5",
@@ -860,7 +860,7 @@
                                         },
                              "allowNA":  true,
                              "hint":  "The user documentation is reviewed to confirm that its security guidance is accurate and complete.",
-                             "rationale":  "Wrong or incomplete security guidance misleads the users who are trying to follow it. Reviewing the documentation confirms that operators can rely on it."
+                             "rationale":  "Wrong or incomplete security guidance misleads the users who are trying to follow it."
                          }
                      ],
     "achievedScale":  {

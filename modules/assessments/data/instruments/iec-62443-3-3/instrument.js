@@ -125,7 +125,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "RE1"
                                                                          ],
                                                           "reTitle":  "Unique identification and authentication",
-                                                          "hint":  "As SL2, plus unique identification and authentication of them.",
+                                                          "hint":  "As SL2, plus unique identification and authentication of each software process and device.",
                                                           "verbatimText":  ""
                                                       },
                                                 "4":  {
@@ -195,7 +195,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Accounts that are created and then left unmanaged build up into dormant logins, accounts for staff who have left and shared credentials. A defined account process keeps the list of people who can log in in line with those who should, and closes a route attackers often use."
+                             "rationale":  "Accounts that are created and then left unmanaged build up into dormant logins, accounts for staff who have left and shared credentials. A defined account process means only the people who should be able to log in can do so, and it closes a route attackers often use."
                          },
                          {
                              "id":  "SR1.4",
@@ -338,7 +338,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "RE1"
                                                                          ],
                                                           "reTitle":  "Unique identification and authentication",
-                                                          "hint":  "As SL1, plus unique identification and authentication of them.",
+                                                          "hint":  "As SL1, plus unique identification and authentication of each wireless user and device.",
                                                           "verbatimText":  ""
                                                       },
                                                 "3":  {
@@ -419,7 +419,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Where passwords are used, their strength sets how easily authentication can be defeated by guessing or cracking. In OT the password rules have to fit the way the plant is operated, but weak rules make authentication easy to defeat."
+                             "rationale":  "Where passwords are used, their strength sets how easily authentication can be defeated by guessing or cracking. In OT the rules have to fit the way the plant is operated, but they still have to be strong enough to resist guessing."
                          },
                          {
                              "id":  "SR1.8",
@@ -1530,7 +1530,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Malicious code is one of the most common ways control systems are compromised. In OT the protection is often application allow-listing or a similar approach, with conventional antivirus less common, and the aim is still to stop hostile code from running."
+                             "rationale":  "Malicious code is one of the most common ways control systems are compromised. In OT this is often done with application allow-listing or a similar method, and less often with conventional antivirus. The aim is to stop hostile code from running."
                          },
                          {
                              "id":  "SR3.3",
@@ -1587,7 +1587,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Verifying that security functions work confirms that the protection is in place. Controls can fail or be disabled without any sign, and without verification an organisation may believe it is protected until an incident shows otherwise."
+                             "rationale":  "Controls can fail or be disabled without any sign, and without verification an organisation may believe it is protected until an incident shows otherwise."
                          },
                          {
                              "id":  "SR3.4",
@@ -1643,7 +1643,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Software and information integrity decides whether the system is running what it should. Detecting unauthorised changes to firmware, logic or configuration catches tampering that could change how the process behaves."
+                             "rationale":  "Integrity checks show whether the system is running the software and configuration it should. Detecting unauthorised changes to firmware, logic or configuration catches tampering that could change how the process behaves."
                          },
                          {
                              "id":  "SR3.5",

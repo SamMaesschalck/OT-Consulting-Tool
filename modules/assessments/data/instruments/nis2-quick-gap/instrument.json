@@ -63,7 +63,7 @@
                       "code":  "GOV",
                       "title":  "Governance and accountability",
                       "requirement":  "The management body approves and oversees the cybersecurity risk-management measures, is accountable for compliance, and management and staff receive cybersecurity training.",
-                      "rationale":  "When the management body approves and oversees the measures, is accountable for them and is trained, cybersecurity is governed as a business risk with the authority and funding to be enforced. NIS2 places this responsibility on management explicitly.",
+                      "rationale":  "When the management body approves and oversees the measures, is accountable for them and is trained, cybersecurity is governed as a business risk, and the measures have the authority and funding to be enforced. NIS2 places this responsibility on management explicitly.",
                       "evidencePrompt":  "Record evidence of management approval, oversight, accountability and training.",
                       "articleRef":  "Art 20",
                       "allowNA":  true
@@ -191,5 +191,5 @@
                   }
               ],
     "_contentNote":  "Quick triage: one item per NIS2 area (Art 20, each Art 21(2) measure, Art 23). Paraphrased, not verbatim. The full NIS2 Assessment breaks each into obligation-level items.",
-    "seriesContext":  "The NIS2 Directive (EU) 2022/2555 is European law, but it does not apply directly. Each member state transposes it into national law, so the detail an entity must meet is set nationally and can differ between states. This short screening of the Directive\u0027s obligations is used to decide where a full assessment is needed. It is a gap analysis. It is not a legal opinion and is not a determination by a competent authority."
+    "seriesContext":  "The NIS2 Directive (EU) 2022/2555 is European law, but it does not apply directly. Each Member State transposes it into national law, so the detail an entity must meet is set nationally and can differ between states. This short screening of the Directive\u0027s obligations is used to decide where a full assessment is needed. It is a gap analysis, and it is neither a legal opinion nor a determination by a competent authority."
 }

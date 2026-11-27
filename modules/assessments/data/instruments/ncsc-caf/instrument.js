@@ -14,8 +14,8 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
     "scoringProfileRef":  "caf-achieved",
-    "framing":  "This assessment checks alignment with the NCSC CAF 4.0 indicators of good practice and identifies the gaps, with a focus on operational technology. The consultant judges each contributing outcome as Achieved, Partially Achieved or Not Achieved against the indicators. The assessment is not a formal CAF assessment or a regulatory submission.",
-    "sourceNote":  "Structure and the verbatim Indicators of Good Practice (Achieved / Partially Achieved / Not Achieved) are transcribed from the NCSC Cyber Assessment Framework version 4.0. Contains public sector information licensed under the Open Government Licence v3.0. NCSC CAF material is Crown copyright. The IGP statements are reproduced verbatim as the authoritative reference the consultant judges against; the OT lens, state summaries and rationale are SolutionsPT commentary and are not part of the CAF.",
+    "framing":  "This assessment checks alignment with the NCSC CAF 4.0 indicators of good practice and identifies the gaps, with a focus on operational technology. The consultant judges each contributing outcome as Achieved, Partially Achieved or Not Achieved against the indicators. It is not a formal CAF assessment or a regulatory submission.",
+    "sourceNote":  "Structure and the verbatim Indicators of Good Practice (Achieved / Partially Achieved / Not Achieved) are transcribed from the NCSC Cyber Assessment Framework version 4.0. Contains public sector information licensed under the Open Government Licence v3.0. NCSC CAF material is Crown copyright. The IGP statements are reproduced verbatim as the authoritative reference the consultant judges against; the OT context notes, state summaries and rationale are SolutionsPT commentary and are not part of the CAF.",
     "attribution":  "Contains public sector information licensed under the Open Government Licence v3.0. Cyber Assessment Framework (CAF) v4.0, National Cyber Security Centre (Crown copyright).",
     "states":  [
                    {
@@ -178,9 +178,9 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "The board sets and owns the approach to cyber security and resilience. The board discusses it, and it drives board decisions.",
+                                              "achieved":  "The board sets and owns the approach to cyber security and resilience, discusses it and bases its decisions on it.",
                                               "partially":  "The board has some awareness and ownership of cyber risk, but this is inconsistent or does not carry through into decisions.",
-                                              "notAchieved":  "The board has little or no ownership of cyber risk to the essential function and rarely discusses it.",
+                                              "notAchieved":  "The board takes little or no ownership of cyber risk to the essential function and seldom if ever discusses it.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
                          "rationale":  "Board ownership gives cyber and resilience work its mandate, funding and priority. Without direction from the board, OT security tends to lose out to other demands. In many organisations OT risk never reaches the board, so nobody at that level owns it."
@@ -308,7 +308,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Risk assessment must judge consequence in OT terms, chiefly safety and availability, and should not reuse the IT ordering of confidentiality, integrity and availability.",
+                                        "framing":  "Risk assessment must judge consequence in OT terms, where safety and availability come before confidentiality.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -1374,7 +1374,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               "notAchieved":  "The organisation has not prepared for resilience.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Resilience depends on preparation before a disruption. Knowing in advance what the essential function needs to keep running, and what to do when it cannot, helps keep an event contained so that it does not become a crisis."
+                         "rationale":  "Resilience depends on preparation before a disruption. Knowing in advance what the essential function needs to keep running, and what to do when it cannot, can stop a contained event from growing into a crisis."
                      },
                      {
                          "id":  "B5.b",
@@ -1604,7 +1604,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Monitoring needs to understand OT. An IT SIEM on its own rarely sees OT protocols.",
+                                        "framing":  "Monitoring must be able to read OT protocols, which an IT SIEM on its own rarely does.",
                                         "relatedSRs":  [
                                                            "SR6.2"
                                                        ],
@@ -1621,7 +1621,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Monitoring covers the systems supporting the essential function.",
-                                              "partially":  "Monitoring covers only some of these systems.",
+                                              "partially":  "Monitoring covers only some of the systems supporting the essential function.",
                                               "notAchieved":  "Monitoring coverage is inadequate.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
@@ -1675,7 +1675,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               "notAchieved":  "Logs are not secured.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Logs are useful only if they are complete and trustworthy, and attackers often alter or delete them early on. Securing logs preserves the evidence needed for an investigation and the integrity that makes the logs trustworthy."
+                         "rationale":  "Logs are useful only if they are complete and trustworthy, and attackers often alter or delete them early on. Securing logs keeps the evidence intact for an investigation."
                      },
                      {
                          "id":  "C1.c",
@@ -1772,7 +1772,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "IR-4"
                                                          ],
-                                        "gotchas":  "IT analysts without OT context misjudge OT alerts. Pair them with people who know the engineering."
+                                        "gotchas":  "IT analysts without OT context misjudge OT alerts. Pair them with engineers who know the process."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1882,7 +1882,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "SI-4"
                                                          ],
-                                        "gotchas":  "OT behaviour is predictable, which makes baselining effective."
+                                        "gotchas":  "OT behaviour is predictable, so baselining normal behaviour works well and is worth using."
                                     },
                          "response":  {
                                           "state":  null,
@@ -2079,7 +2079,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Response and recovery are tested and exercised.",
-                                              "partially":  "Exercising is partial or limited.",
+                                              "partially":  "Response and recovery are exercised only in part.",
                                               "notAchieved":  "Response and recovery are not tested.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },

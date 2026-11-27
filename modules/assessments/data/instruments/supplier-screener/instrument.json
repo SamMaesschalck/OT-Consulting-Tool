@@ -42,14 +42,14 @@
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-4-1 Secure Product Development Lifecycle Assessment",
         "instrumentId": "iec-62443-4-1",
-        "detail": "Assess the supplier's development practice in depth against 62443-4-1, covering security requirements, secure design and implementation, verification testing and defect management. The screening judged its SDL on its answers alone."
+        "detail": "Assess the supplier's development practice in depth against 62443-4-1, covering security requirements, secure design and implementation, verification testing and defect management. The screening relied on the supplier's own account of its SDL."
       },
       {
         "domainId": "vuln",
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-4-1 (defect & update management), and the EU CRA Gap Assessment Part II layer for CRA-scoped products",
         "instrumentId": "iec-62443-4-1",
-        "detail": "Weak vulnerability handling is the point where supplier risk becomes operational risk. Verify the supplier's disclosure, remediation and update practices in depth, and for products in CRA scope assess the Annex I Part II obligations directly."
+        "detail": "Weak vulnerability handling turns supplier risk into operational risk. Verify the supplier's disclosure, remediation and update practices in depth, and for products in CRA scope assess the Annex I Part II obligations directly."
       },
       {
         "domainId": "prod",
@@ -63,14 +63,14 @@
         "grades": ["C", "D", "E", "F"],
         "title": "EU CRA Gap Assessment / EU Machinery Regulation Gap Assessment",
         "instrumentId": "eu-cra",
-        "detail": "Establish the supplier's regulatory position with the gap assessment that matches its products. That is the CRA assessment for products with digital elements and the Machinery Regulation assessment for machinery with digital control. Classification and the conformity route decide market access, which is too important to judge from a screening alone."
+        "detail": "Establish the supplier's regulatory position with the gap assessment that matches its products. That is the CRA assessment for products with digital elements and the Machinery Regulation assessment for machinery with digital control. Classification and the conformity route decide market access, so they need more than a screening to settle."
       },
       {
         "domainId": "chain",
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-2-4:2023 Service Provider Security Program Assessment",
         "instrumentId": "iec-62443-2-4",
-        "detail": "Where the supplier also integrates, maintains or supports the customer's systems, assess its service provider security program in depth against 62443-2-4. That covers remote access, accounts and passwords, staffing and the other processes its people use on those systems. The screening judged the supplier's access on its answers alone."
+        "detail": "Where the supplier also integrates, maintains or supports the customer's systems, assess its service provider security program in depth against 62443-2-4. That covers remote access, accounts and passwords, staffing and the other processes its people use on those systems. The screening relied on the supplier's own account of its access."
       }
     ]
   },
@@ -89,7 +89,7 @@
         "0": "No identifiable security function or owner",
         "1": "Someone answers security questions, role informal or buried in IT",
         "2": "Named lead and team, but limited authority or product reach",
-        "3": "Named, senior, reachable security function covering the products you buy"
+        "3": "Named, senior, reachable security function covering the products the customer buys"
       },
       "capture": [
         { "id": "who", "type": "choice", "label": "Who answers for security?", "options": ["No one identified", "Sales / account team", "IT security team", "Named security officer / PSIRT", "Other"] },
@@ -165,8 +165,8 @@
       "domainId": "dev",
       "prompt": "Is security testing built into the supplier's releases?",
       "shortTitle": "Security testing in releases",
-      "rationale": "Testing shows whether an SDL exists. Static analysis, dependency scanning and penetration testing leave artefacts that are easy to evidence and hard to fake. A supplier that ships OT products without security testing leaves its customers' plants to find the problems.",
-      "goodLooksLike": "The build pipeline includes static analysis and dependency and vulnerability scanning, and each release gets security-focused testing. Independent penetration tests of the product itself, beyond the website, take place periodically, with findings tracked to closure and summaries shared under NDA.",
+      "rationale": "Testing shows whether an SDL exists. Static analysis, dependency scanning and penetration testing leave artefacts that are easy to evidence and hard to fake. A supplier that ships OT products without security testing leaves its customers to find the problems in their own plants.",
+      "goodLooksLike": "The build pipeline includes static analysis and dependency and vulnerability scanning, and each release gets security-focused testing. Independent penetration tests cover the product itself as well as the website and take place periodically, with findings tracked to closure and summaries shared under NDA.",
       "references": ["IEC 62443-4-1 (SVV practices)", "EU CRA Annex I Part I (testing)", "OWASP ASVS"],
       "scored": true,
       "allowNA": true,
@@ -357,7 +357,7 @@
       "domainId": "reg",
       "prompt": "Is the supplier on a credible path to conformity by the applicable dates?",
       "shortTitle": "Path to conformity",
-      "rationale": "Knowing the obligations does not meet them. The CRA's full obligations apply from 11 December 2027 and the Machinery Regulation from 14 January 2027, and notified body capacity is limited across the industry. A supplier that has not booked its route will struggle to find one in the final year, and its products may become impossible to supply just when replacements are hardest to find.",
+      "rationale": "Knowing the obligations is only the first step. The CRA's full obligations apply from 11 December 2027 and the Machinery Regulation from 14 January 2027, and notified body capacity is limited across the industry. A supplier that has not booked its route will struggle to find one in the final year, and its products may become impossible to supply just when replacements are hardest to find.",
       "goodLooksLike": "For each product the supplier has chosen a conformity route, either self-assessment or a notified body, correctly derived from the class. A notified body is engaged where required, technical documentation is in progress, and dated plans finish before the applicable deadlines. The supplier can share these as a roadmap, even in summary.",
       "references": ["EU CRA Arts 32/Annex VIII (routes)", "EU Machinery Regulation Art 25/Annex I", "Notified-body engagement lead times"],
       "scored": true,
@@ -378,9 +378,9 @@
       "domainId": "reg",
       "prompt": "Could the supplier meet its incident and exploited-vulnerability reporting duties, and would the customer hear about it?",
       "shortTitle": "Incident and vulnerability reporting duties",
-      "rationale": "The CRA's Article 14 deadlines, starting with a 24-hour early warning from 11 September 2026, cannot be met without a rehearsed process. A supplier that cannot notify a regulator within 24 hours will not notify its customers any faster. The customer's own NIS2 and incident response obligations depend on the supplier telling it promptly when its product is being exploited.",
+      "rationale": "The CRA's Article 14 deadlines, starting with a 24-hour early warning from 11 September 2026, cannot be met without a rehearsed process. A supplier that cannot notify a regulator within 24 hours will not notify its customers any faster. The customer's own NIS2 and incident response obligations depend on hearing promptly from the supplier when its product is being exploited.",
       "goodLooksLike": "The supplier has a working reporting process for the statutory routes, with named owners and out-of-hours cover. The contract commits it to notify affected customers of actively exploited vulnerabilities and relevant product incidents within defined hours, and exercises or past cases provide evidence.",
-      "references": ["EU CRA Art 14", "NIS2 Art 23 (your own reporting dependencies)", "Contractual notification clauses"],
+      "references": ["EU CRA Art 14", "NIS2 Art 23 (the customer's own reporting dependencies)", "Contractual notification clauses"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
@@ -422,8 +422,8 @@
       "prompt": "Is the supplier's access into the customer's estate known, minimised and controlled?",
       "shortTitle": "Supplier access to the estate",
       "rationale": "Supplier remote access is the most common unrecorded route into OT estates. Support VPNs, cellular modems in cabinets and standing TeamViewer accounts build up with each project and outlast it. Whatever the supplier's own security, its access is part of the customer's attack surface, and several well-known OT incidents began there.",
-      "goodLooksLike": "The customer has a complete, current record of the supplier's access, including accounts, tunnels and embedded modems. Each access is attributed to an individual, limited in time and activated per session with the customer's approval. Sessions are recorded or monitored, and access is removed promptly, with evidence, when supplier staff change.",
-      "references": ["ISA/IEC 62443-2-4 / 62443-3-3 (SR 1/2)", "NCSC remote access guidance", "Your own access-control policy"],
+      "goodLooksLike": "There is a complete, current record of the access the supplier holds, including accounts, tunnels and embedded modems. Each connection is attributed to an individual, limited in time and activated per session with the customer's approval. Sessions are recorded or monitored, and access is removed promptly, with evidence, when supplier staff change.",
+      "references": ["ISA/IEC 62443-2-4 / 62443-3-3 (SR 1/2)", "NCSC remote access guidance", "The customer's access control policy"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
@@ -443,7 +443,7 @@
       "prompt": "Is the customer protected if the supplier fails, is acquired or withdraws from the product line?",
       "shortTitle": "Supplier failure and exit protection",
       "rationale": "Supplier risk includes the supplier disappearing. Insolvency, acquisition by a competitor or an unannounced withdrawal from a product line can leave safety-relevant systems partway through their life with no updates, no licence server and no documentation. Continuity terms cost little when the contract is signed and are almost impossible to obtain once the event happens.",
-      "goodLooksLike": "Escrow of source code, build instructions and signing capability, or another update continuity arrangement, has defined release triggers. The contract provides for data return and portability, documentation is good enough for a third party to maintain the product, licence terms survive supplier failure, and the supplier must give notice of a change of control.",
+      "goodLooksLike": "An escrow or update continuity arrangement covers source code, build instructions and signing capability, with defined release triggers. The contract provides for data return and portability, documentation is good enough for a third party to maintain the product, licence terms survive supplier failure, and the supplier must give notice of a change of control.",
       "references": ["Escrow agreements (e.g. NCC-style)", "Procurement continuity clauses", "NIS2 Art 21(2)(d)"],
       "scored": true,
       "allowNA": true,

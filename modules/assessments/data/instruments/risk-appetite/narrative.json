@@ -18,7 +18,7 @@
 
     "method_technical": "The assessor also looked at how systems are patched, segmented, monitored, accessed and recovered, so that the appetite described in interview could be checked against the appetite the systems themselves reveal.",
 
-    "limitations": "This is a point-in-time judgement, based on what people said and what could be seen in the time available. A borderline item could reasonably be placed one band either side. The report does not test controls in depth, which needs a detailed assessment against a standard such as ISA/IEC 62443. Exposure in particular can change quickly, so it should be looked at again if {clientShort}'s circumstances or the threats it faces change.",
+    "limitations": "This is a point-in-time judgement, based on what people said and what could be seen in the time available. A borderline item could reasonably be placed one band either side. The report does not test controls in depth. That needs a detailed assessment against a standard such as ISA/IEC 62443. Exposure in particular can change quickly, so it should be looked at again if {clientShort}'s circumstances or the threats it faces change.",
 
     "not_measurement_caveat_title": "Limits of this characterisation",
 
@@ -142,8 +142,8 @@
     "direction_closer": "{clientShort} has moved closer to proportion, with its appetite now nearer to what its exposure warrants.",
     "direction_further": "{clientShort} has moved further from proportion, with its appetite now further from what its exposure warrants.",
     "direction_same": "{clientShort} sits the same distance from proportion as it did at the previous assessment.",
-    "moved_many": "{countWord} readings moved between the two assessments. No single move is better or worse in itself. The change in fit described above is the measure to judge by.",
-    "moved_one": "One reading moved between the two assessments. The move is neither better nor worse in itself. The change in fit described above is the measure to judge by.",
+    "moved_many": "{countWord} readings moved between the two assessments. No single move is better or worse in itself. What counts is the change in fit described above.",
+    "moved_one": "One reading moved between the two assessments. The move is neither better nor worse in itself. What counts is the change in fit described above.",
     "moved_none": "No reading moved between the two assessments.",
     "chart_note": "The hollow marker shows where {clientShort} sat at the previous assessment, and the arrow shows how its position has moved since."
   },
