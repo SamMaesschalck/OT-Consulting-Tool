@@ -111,7 +111,7 @@ window.docx = (function () {
        "the prose leads with the number of REQUIREMENTS", sysText);
     ok(sysText.indexOf("appearing " + ru.floorOccurrences + " times") !== -1,
        "...and explains the occurrence count rather than hiding it");
-    ok(sysText.indexOf("one piece of work, done once for every") !== -1,
+    ok(sysText.indexOf("one piece of work that covers every") !== -1,
        "...and says how much of it is a single shared job");
 
     // closing a shared gap must move BOTH numbers
@@ -395,7 +395,7 @@ window.docx = (function () {
         ok(E.getReportSection("the-system-as-a-whole").hidden === true, "hide is stored");
         ok(card("the-system-as-a-whole").classList.contains("section-hidden"),
            "the preview keeps the section, dimmed, so it can be put back");
-        ok(mainText().indexOf("Hidden: left out of the Word document") !== -1, "...and says so");
+        ok(mainText().indexOf("Hidden from the Word document") !== -1, "...and says so");
 
         build(function (err2) {
           try {

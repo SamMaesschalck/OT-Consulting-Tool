@@ -311,9 +311,9 @@ H.test(function (ok, done) {
     var emClose = em && Array.prototype.filter.call(em.querySelectorAll("button"), function (x) { return /Close|Cancel/.test(x.textContent); })[0];
     if (emClose) emClose.click();
     // Text written from the framework, with nowhere to edit it, says so by name.
-    var sm = d[0].blocks.filter(function (x) { return x.sectionKey === "scoring-methodology" && x.type === "heading"; })[0];
+    var sm = d[0].blocks.filter(function (x) { return x.sectionKey === "what-is-reported" && x.type === "heading"; })[0];
     ok(!!sm && RV.goTo(thread(blockAnchor(sm), null)) === null, "Go to on the scoring methodology goes nowhere");
-    ok(/"Scoring methodology" is only in the Word report/.test(document.getElementById("toast").textContent), "and says so, naming the section", document.getElementById("toast").textContent);
+    ok(/"What is reported" is only in the Word report/.test(document.getElementById("toast").textContent), "and says so, naming the section", document.getElementById("toast").textContent);
     // An item, on its capture page.
     RV.goTo(thread({ documentIndex: 0, kind: "item", targetName: it.targetName, itemId: it.itemId, field: "evidence", quote: it.evidence }, null));
     return new Promise(function (r) { setTimeout(r, 120); }).then(function () {

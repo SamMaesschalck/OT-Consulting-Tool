@@ -260,11 +260,11 @@ H.test(function (ok, done) {
     ok(rf1.verdict === "met-so-far" && rf1.incomplete.join() === "Safety zone" && rf1.short.length === 0,
        "D: FR1 across zones is met so far, not met everywhere", rf1.verdict);
     var lines = R.systemRollupLines(roll, inst).join(" ");
-    ok(/Safety zone has nothing short of its target so far, but is not yet fully assessed\./.test(lines),
+    ok(/Safety zone has no shortfall against its target so far, but is not yet fully assessed\./.test(lines),
        "D: the rollup prose says the safety zone is not yet fully assessed", lines.slice(0, 500));
     ok(!/Safety zone (falls|fall) short/.test(lines) && !/other Foundational Requirements have not been assessed/.test(lines),
        "D: and never that it falls short or that its other FRs are unassessed", lines.slice(0, 500));
-    ok(/FR1 [^.]*has nothing short in any assessed zone or conduit so far, but is not yet fully assessed in Safety zone\./.test(lines),
+    ok(/FR1 [^.]*has no shortfall in any assessed zone or conduit so far, but is not yet fully assessed in Safety zone\./.test(lines),
        "D: FR1 is met so far, not yet fully assessed in the safety zone", lines);
     return word(eD, "z-a");
   }).then(function (d) {
@@ -273,7 +273,7 @@ H.test(function (ok, done) {
     ok(!/Safety zone (falls|fall) short/.test(es.text) && !/(Both|all \d+) zones and conduits in scope fall short/i.test(es.text),
        "D Word: and never that a zone falls short", es.text.slice(0, 900));
     var sys = sec(d.list, /Results across the system/);
-    ok(/Safety zone has nothing short of its target so far, but is not yet fully assessed\./.test(sys.text),
+    ok(/Safety zone has no shortfall against its target so far, but is not yet fully assessed\./.test(sys.text),
        "D Word: the system section says the same", (sys.text.match(/Safety zone has[^\n]*/) || [""])[0]);
     ok(/Met so far/.test(sys.text), "D Word: the rollup table reads Met so far for FR1");
     ok(/SL 1\nnot yet, target SL 2/.test(sys.text), "D Word: the zone grid marks FR1 not yet", (sys.text.match(/SL \d\nnot yet[^\n]*/) || [""])[0]);

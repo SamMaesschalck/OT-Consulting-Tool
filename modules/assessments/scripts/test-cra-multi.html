@@ -131,7 +131,7 @@ window.docx = (function () {
           check("exec summary states org-wide obligations are assessed once", allText.indexOf("assessed once for the manufacturer") !== -1);
           // The org-wide Art 14 gap (CRA-C.7 not in place) is a conformity
           // floor for EVERY product, so both are correctly named as blocked.
-          check("blocker line names every blocked product (org conformity gap blocks all)", allText.indexOf("Market placement is currently blocked for SentinelEdge IDS-2200 and SentinelEdge IDS-4400") !== -1);
+          check("blocker line names every blocked product (org conformity gap blocks all)", allText.indexOf("Open conformity obligations affect SentinelEdge IDS-2200 and SentinelEdge IDS-4400") !== -1);
           check("scope table lists each product with class and route", allText.indexOf("Important - Class II") !== -1 && allText.indexOf("Important - Class I") !== -1);
           check("organisation-wide P2 results appear exactly once", count(/P2 - Annex I Part II[^\n]*\(organisation-wide\)/g) === 1);
           check("each product gets its own P1 results section", count(/P1 - [^\n]*SentinelEdge IDS-2200/g) >= 1 && count(/P1 - [^\n]*SentinelEdge IDS-4400/g) >= 1);

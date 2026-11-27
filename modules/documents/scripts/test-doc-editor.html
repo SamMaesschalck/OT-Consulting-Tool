@@ -345,7 +345,7 @@
     open([{ id: "b1", type: "picture", media: "m1", width: 300, height: 200 }, { id: "b2", type: "picture", media: "m2", width: 300, height: 200 }], {
       media: { m1: { type: "image/x-emf", name: "plan.emf", width: 300, height: 200, source: "import", blob: new Blob(["x"]) }, m2: { type: "image/png", name: "lost.png", width: 300, height: 200, source: "insert", blob: null, missing: true } }
     });
-    ok(!el("b1").querySelector("img") && /plan\.emf \(EMF\)/.test(el("b1").textContent) && /Shown as a placeholder here\. It prints in the Word file\./.test(el("b1").textContent), "a picture the browser cannot draw is a placeholder with its name and type", el("b1").textContent);
+    ok(!el("b1").querySelector("img") && /plan\.emf \(EMF\)/.test(el("b1").textContent) && /The preview shows a placeholder, and the Word file prints the picture./.test(el("b1").textContent), "a picture the browser cannot draw is a placeholder with its name and type", el("b1").textContent);
     ok(/could not be restored/.test(el("b2").textContent), "a picture whose bytes are missing says so", el("b2").textContent);
 
     // ---- kept objects ----
@@ -354,7 +354,7 @@
     open([P("b1", "Before"), kept, P("b3", "Between"), wide, P("b5", "After")], { parts: { p1: { name: "word/diagrams/data1.xml", contentType: "application/xml", blob: new Blob(["<x/>"]), rels: [] } } });
     var card = el("b2").querySelector(".kept-card");
     ok(card && card.getAttribute("role") === "group" && card.getAttribute("aria-label") === "Drawing 1 of 2. Diagram (SmartArt), 15.2 x 8.9 cm", "a kept object is a card, a group named by its number and description", card && card.getAttribute("aria-label"));
-    ok(/Diagram 1/.test(card.textContent) && /Plan Do Check/.test(card.textContent) && /Kept from the original Word file\. It prints in the Word export as it was\./.test(card.textContent), "with its own name, the text inside it and the line that it is kept");
+    ok(/Diagram 1/.test(card.textContent) && /Plan Do Check/.test(card.textContent) && /This comes from the original Word file and prints unchanged in the Word export./.test(card.textContent), "with its own name, the text inside it and the line that it is kept");
     ok(!/wider than the page/.test(card.textContent) && /It is wider than the page and will be made smaller to fit\./.test(el("b4").textContent), "one wider than the page says it will be made smaller");
     E.selectBlocks(["b2"]);
     ok(ctxButton("Replace with a picture") && ctxButton("Duplicate") && ctxButton("Caption") && ctxButton("Move down") && ctxButton("Delete"), "selected, its controls appear");

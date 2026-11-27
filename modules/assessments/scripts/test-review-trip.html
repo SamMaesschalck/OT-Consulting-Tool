@@ -211,7 +211,7 @@ H.test(function (ok, done) {
     var bad2 = RV.importTexts([{ name: "y.json", text: "not json" }]);
     ok(bad2.bad === 1 && /could not be read/.test(bad2.lines[0]), "a file that is not JSON is refused");
     var bad3 = RV.importTexts([{ name: "z.json", text: JSON.stringify(Object.assign({}, later, { packId: "rp-other" })) }]);
-    ok(bad3.bad === 1 && /different pack/.test(bad3.lines[0]), "a review file for another pack is refused", bad3.lines[0]);
+    ok(bad3.bad === 1 && /is for a pack that was not sent from here/.test(bad3.lines[0]), "a review file for another pack is refused", bad3.lines[0]);
     // A pack is not a review file: this assessment's own is already on its
     // rounds (importing it re-registers a round sent from an unsaved copy),
     // and another client's is refused.

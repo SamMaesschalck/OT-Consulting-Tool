@@ -162,7 +162,7 @@ window.docx = (function () {
     var sc = E.scoreActiveTarget();
     var l = R.defaultNextSteps({ instrument: E.state.instrument, scored: sc });
     ok(/\d+ actions on the roadmap above/.test(l[0]), "scaffold: counts the real roadmap", l[0]);
-    ok(l.some(function (x) { return /weakest area in this read/.test(x); }), "scaffold: names the weakest domain", l.join(" | "));
+    ok(l.some(function (x) { return /weakest area found/.test(x); }), "scaffold: names the weakest domain", l.join(" | "));
     flush();
   }
 

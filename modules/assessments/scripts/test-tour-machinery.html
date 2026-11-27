@@ -150,7 +150,7 @@ window.docx = (function () {
           check("NO consultant placeholders remain in the demo report", placeholders.length === 0, placeholders.map(function (p) { return p.text.slice(0, 60); }).join(" | "));
           check("report names the client and machine", allText.indexOf("Meridian Handling Systems") !== -1 && allText.indexOf("AutoStak AS-90") !== -1);
           check("exec summary carries the consultant narrative", allText.indexOf("Sequence the conformity route first") !== -1 && allText.indexOf("growth product") !== -1);
-          check("conformity blocker is called out", allText.indexOf("The conformity layer is currently the blocker") !== -1);
+          check("conformity blocker is called out", allText.indexOf("The conformity layer is the main gap") !== -1);
           check("Machinery Regulation framing (glance + 2027 date)", allText.indexOf("Machinery Regulation readiness at a glance") !== -1 && allText.indexOf("14 January 2027") !== -1);
           check("basis of assessment carries the interviews", allText.indexOf("L. Okonkwo") !== -1);
           check("roadmap leads with the notified-body route", /P1\s+MR-M3\.1/.test(allText));

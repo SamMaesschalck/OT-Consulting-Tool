@@ -228,8 +228,8 @@ window.docx = (function () {
                 var allText2 = docText();
                 check("multi doc: one report covering 2 machines", allText2.indexOf("gap assessment of 2 machines") !== -1);
                 check("multi doc: org obligations sentence is machinery-specific", allText2.indexOf("were assessed once for the manufacturer and apply to every machine") !== -1);
-                check("multi doc: blocker names only the machine with conformity floors", allText2.indexOf("Market placement is currently blocked for PalletPro AGV-350") !== -1 && allText2.indexOf("blocked for PalletPro AGV-350 and SortMaster Cell 8") === -1);
-                check("multi doc: roadmap covers all machines with org gaps tagged", allText2.indexOf("conformance gap roadmap (all machines)") !== -1 && allText2.indexOf("Applies to: Organisation-wide") !== -1);
+                check("multi doc: blocker names only the machine with conformity floors", allText2.indexOf("Open conformity obligations affect PalletPro AGV-350") !== -1 && allText2.indexOf("affect PalletPro AGV-350 and SortMaster Cell 8") === -1);
+                check("multi doc: roadmap covers all machines with org gaps tagged", allText2.indexOf("Recommendations and gap roadmap (all machines)") !== -1 && allText2.indexOf("Applies to: Organisation-wide") !== -1);
                 check("multi doc: no CRA text leaks", allText2.indexOf("Cyber Resilience") === -1 && allText2.indexOf("CRA") === -1);
               } catch (e2) { check("multi doc assertions threw: " + e2.message, false); }
               finish();

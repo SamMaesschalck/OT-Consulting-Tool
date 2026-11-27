@@ -84,7 +84,7 @@ window.App.Report = (function () {
     }
     if (empty.length) {
       body.push(h("p", { class: "muted", style: "margin-bottom:0; font-size:12px;", text:
-        "Not set: " + empty.map(function (r) { return r[0]; }).join(", ") + ". These stay blank in the Word report." }));
+        "No value yet for " + empty.map(function (r) { return r[0]; }).join(", ") + ". These fields stay blank in the Word report." }));
     }
 
     return h("div", { class: "card" }, [
@@ -399,7 +399,7 @@ window.App.Report = (function () {
       ]),
       h("div", { class: "card-b" }, [
         h("p", { class: "muted", style: "margin-top:0;", text:
-          "This section lists each " + noun + " that meets its target, with the evidence recorded for it, so the gaps can be read against what is in place." }),
+          "Each " + noun + " that meets its target is listed with the evidence recorded for it, as context for the gaps." }),
         h("div", null, groups.map(function (g) {
           return h("div", { class: "evidence-group" }, [
             h("div", { class: "evidence-group-h" }, [
@@ -660,7 +660,7 @@ window.App.Report = (function () {
         : "Every assessed FR meets its target." }));
     }
     if (partly.length > 0) {
-      body.push(h("div", { class: "muted", style: "margin:14px 0 8px;", text: "Partly assessed, with nothing short so far:" }));
+      body.push(h("div", { class: "muted", style: "margin:14px 0 8px;", text: "Partly assessed, with no shortfall found so far:" }));
       body.push(h("div", { class: "priority-list" }, partRows));
     }
     if (notAssessed.length > 0) {
@@ -920,8 +920,75 @@ window.App.Report = (function () {
     return window.App.ReportSections.sectionKey(title, names);
   }
 
+  // Headings renamed since a customisation could first be saved. The key is
+  // the slug of the generated heading, so a rename would orphan whatever the
+  // consultant set on the old one. Each old key maps to the key of the heading
+  // that replaced it: exact keys first, then the patterns (a noun or a suffix
+  // in the old heading varies by instrument).
+  var SECTION_KEY_ALIASES = {
+    "not-a-formal-assessment": "status-of-this-assessment",
+    "conformance-and-gap-analysis-not-a-compliance-determination": "status-of-this-gap-analysis",
+    "conformance-and-gap-analysis-not-a-certification": "status-of-this-gap-analysis",
+    "important": "status-of-this-gap-analysis",
+    "a-characterisation-not-a-measurement": "limits-of-this-characterisation",
+    "the-three-positions-side-by-side": "results-by-layer",
+    "eu-cra-gap-assessment-indicative-not-a-conformity-assessment": "eu-cra-gap-assessment-indicative",
+    "maturity-profile-no-single-grade": "maturity-profile",
+    "program-maturity-headline": "programme-maturity-headline",
+    "roadmap-toward-expected-outcomes": "roadmap-towards-expected-outcomes",
+    "fr-achievement-vs-target": "fr-achievement-against-target",
+    "alignment-at-a-glance": "alignment-summary",
+    "conformance-at-a-glance": "conformance-summary",
+    "scoring-methodology": "what-is-reported"
+  };
+  var SECTION_KEY_PATTERNS = [
+    [/^finding-possible-(.+)-misclassification$/, "possible-$1-misclassification"],
+    [/^recommendations-conformance-gap-roadmap(.*)$/, "recommendations-and-gap-roadmap$1"],
+    [/^(.+)s-side-by-side$/, "results-by-$1"]
+  ];
+  function sectionKeyAlias(key) {
+    var k = String(key || "");
+    if (Object.prototype.hasOwnProperty.call(SECTION_KEY_ALIASES, k)) return SECTION_KEY_ALIASES[k];
+    for (var i = 0; i < SECTION_KEY_PATTERNS.length; i++) {
+      if (SECTION_KEY_PATTERNS[i][0].test(k)) return k.replace(SECTION_KEY_PATTERNS[i][0], SECTION_KEY_PATTERNS[i][1]);
+    }
+    return k;
+  }
+  // Moves every customisation saved under an old key to its new key, in place,
+  // so the next save writes the new key. Where the new key already holds a
+  // customisation, its own fields win and the old one only fills the gaps.
+  function migrateSectionKeys(store) {
+    if (!store || typeof store !== "object") return store;
+    Object.keys(store).forEach(function (old) {
+      var to = sectionKeyAlias(old);
+      if (!to || to === old) return;
+      var from = store[old], cur = store[to];
+      store[to] = (cur && typeof cur === "object" && from && typeof from === "object")
+        ? Object.assign({}, from, cur) : (cur !== undefined ? cur : from);
+      delete store[old];
+    });
+    return store;
+  }
+
   function reportCustom(opts) {
-    return (opts && opts.engagement && opts.engagement.reportCustom) || {};
+    var store = opts && opts.engagement && opts.engagement.reportCustom;
+    return store ? migrateSectionKeys(store) : {};
+  }
+  // A project is migrated as it loads, and each assessment as it is opened, so
+  // the page's editors (which read the store through the engine) see the new
+  // keys before the report is drawn.
+  function hookKeyMigration() {
+    var E = window.App.Engine;
+    if (hookKeyMigration.done || !E || !E.on || !E.getReportCustom) return;
+    hookKeyMigration.done = true;
+    function run() { try { migrateSectionKeys(E.getReportCustom()); } catch (e) {} }
+    E.on("project-changed", run);
+    E.on("instrument-changed", run);
+  }
+  if (typeof document !== "undefined" && document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", hookKeyMigration);
+  } else {
+    setTimeout(hookKeyMigration, 0);
   }
   function sectionCustom(opts, key) {
     return reportCustom(opts)[key] || {};
@@ -1030,7 +1097,7 @@ window.App.Report = (function () {
 
       if (c.hidden) {
         card.classList.add("section-hidden");
-        if (head) head.appendChild(h("span", { class: "section-hidden-tag", text: "Hidden: left out of the Word document" }));
+        if (head) head.appendChild(h("span", { class: "section-hidden-tag", text: "Hidden from the Word document" }));
         // The licence notice is not the consultant's to drop: hiding the About
         // section leaves it in the Word document, where it closes the report
         // (ExportDOCX.applyReportCustom). Left inside the dimmed card it would
@@ -1277,7 +1344,7 @@ window.App.Report = (function () {
           ["Under-protected", "Appetite is more tolerant than the exposure warrants. The organisation is carrying more risk than its position justifies."],
           ["Over-invested", "Appetite is more cautious than the exposure requires. The organisation may be spending money, or constraining operations, beyond what the risk calls for."],
           ["Stated and revealed appetite", "Stated appetite is the position described in interview. Revealed appetite is the position the systems themselves point to, taken from the optional technical review. A gap between the two is reported as a finding."],
-          ["Managed constraint", "A technical reading that reflects an operational limit outside the organisation's choice, such as firmware held back by a vendor's certification, where the risk is compensated and tracked. It is reported but not counted as appetite. A limit that nobody is managing is still counted."],
+          ["Managed constraint", "A technical reading that reflects an operational constraint that is being managed, such as firmware held back by a vendor's certification with compensating measures in place. It is reported but not counted as appetite. A constraint that nobody is managing is still counted."],
           ["Not established", "The question was asked during the engagement, but nobody could answer it. The reading is left out of the band. For appetite, not knowing is usually a finding in itself. For exposure, it lowers confidence in the position."],
           COMMON_TERMS.basis
         ] }
@@ -1349,13 +1416,13 @@ window.App.Report = (function () {
       { heading: "How the grade works",
         intro: "The consultant scores each answer on a four-point scale. The question scores give a letter grade for each " + noun + ", and the " + noun + " grades give one indicative headline grade.",
         rows: [
-          ["A / B", "Strong. What is expected is in place and managed."],
-          ["C / D", "Mixed. Parts are in place, but there is material work to do."],
-          ["E / F", "Weak. Little or nothing of what is expected is in place."],
+          ["A / B", "The position is strong. What is expected is in place and managed."],
+          ["C / D", "The position is mixed. Parts are in place, but there is material work to do."],
+          ["E / F", "The position is weak. Little or nothing of what is expected is in place."],
           ["Indicative", "The grade is an early read from a structured interview. It does not assess conformance with a standard and is not a regulatory determination. It shows where a detailed assessment should focus."]
         ] },
       { heading: "How the headline is set", rows: [
-          ["Headline grade", "The average of the graded " + noun + "s, with two limits. It can sit at most two grades above the weakest graded " + noun + ", and the top grade is given only when every " + noun + " reaches it. A single weak area therefore cannot be averaged away by strong ones, and an A means every " + noun + " is strong."],
+          ["Headline grade", "The average of the graded " + noun + "s, with two limits. It can sit at most two grades above the weakest graded " + noun + ", and the top grade is given only when every " + noun + " reaches it. A single weak area therefore cannot be averaged away by strong ones, and an A means every " + noun + " is graded A."],
           ["Provisional", "A " + noun + " answered below the coverage threshold is reported as provisional and is excluded from the headline, because it could not be graded with confidence. It still counts against overall coverage."],
           COMMON_TERMS.coverage,
           COMMON_TERMS.unknown
@@ -1380,7 +1447,7 @@ window.App.Report = (function () {
       { heading: "How the assessment is structured", rows: [
           [mlNoun(instrument, "elementNounTitle"),
            "The top-level grouping of the " + mlNoun(instrument, "programmeNoun") + ". Results are reported per " +
-           mlNoun(instrument, "elementNoun").toLowerCase() + "."],
+           mlNoun(instrument, "elementNoun") + "."],
           ["Requirement", "The individual practice assessed. Each is placed at one maturity level, independently of the others."],
           ["Target maturity level", "The level the organisation is aiming at for that requirement. Results are read against it."],
           ["No single grade", "Results are a profile across the elements. Maturity levels are not averaged into one programme score."]
@@ -1421,8 +1488,8 @@ window.App.Report = (function () {
     var CS = window.App.ScoringCSMS;
     function lbl(s, f) { return (CS && CS.stateLabelFor ? CS.stateLabelFor(s, null) : null) || f; }
     var states = [
-      [lbl("in-place", "In place"), "Fully in place and demonstrable."],
-      [lbl("largely", "Largely in place"), "Mostly in place, with identified shortfalls."],
+      [lbl("in-place", "In place"), "It is fully in place and can be demonstrated."],
+      [lbl("largely", "Largely in place"), "Most of it is in place, with identified shortfalls."],
       [lbl("partially", "Partially in place"), "Some of it is in place. It counts as a gap."],
       [lbl("not", "Not in place"), "None of it is in place."],
       [COMMON_TERMS.unknown[0], COMMON_TERMS.unknown[1]],
@@ -1435,7 +1502,7 @@ window.App.Report = (function () {
     ];
     if (isLayered) {
       structure.unshift(["Layer", "The assessment is split into layers that are judged separately and not combined, because each covers a different set of obligations: what the product must do, what the manufacturer's process must do, and what must be reported."]);
-      structure.push(["Classification", "The product class determines which requirements and which conformity route apply. It is set during setup and drives the whole assessment."]);
+      structure.push(["Classification", "The product class determines which requirements and which conformity route apply. The consultant sets it at the start of the assessment."]);
     }
     return [
       { heading: "How each item is judged", intro: "Each item is judged against full conformance. The consultant records one state per item.", rows: states },
@@ -1458,7 +1525,7 @@ window.App.Report = (function () {
     var fn = (narrative && narrative.fr_narrative) || {};
 
     var levels = [
-      ["SL 0", "No protection claimed. The requirement is not in place, or the level below SL 1 could not be reached."],
+      ["SL 0", "No protection is claimed. The requirement is not in place, or SL 1 could not be reached."],
       ["SL 1", "Protection against casual or coincidental violation: a mistake, or someone wandering in without trying."],
       ["SL 2", "Protection against intentional violation using simple means: low resources, generic skills, low motivation."],
       ["SL 3", "Protection against sophisticated means, moderate resources, system-specific skills and moderate motivation."],
@@ -1491,7 +1558,7 @@ window.App.Report = (function () {
       ["Floor finding", "A requirement that is not in place at all, or that sits two or more Security Levels below its target. It offers little or no protection where protection is required, so it is treated as a priority."],
       ["Blocking item", "The specific item holding a Foundational Requirement below its target. Closing the blocking items raises that Foundational Requirement to the next level."],
       ["Closeness", "The share of assessed items that are satisfied. It is shown for context only and does not raise a Security Level. A high closeness with one item missing still means the target is not met."],
-      ["Compensating countermeasure", "A measure outside the requirement that delivers the same outcome. It counts toward the level but is also reported separately, because compensating measures are usually the first to lapse."],
+      ["Compensating countermeasure", "A measure outside the requirement that delivers the same outcome. It counts towards the level but is also reported separately, because compensating measures are usually the first to lapse."],
       ["Not applicable", "The item cannot apply here and is excluded from the result, with the reason recorded against it. Without a recorded reason it counts as not assessed."],
       ["Not assessed", "No position was established. It is reported as a gap in coverage and is not assumed to be in place."]
     ];
@@ -1757,8 +1824,8 @@ window.App.Report = (function () {
     }).filter(Boolean);
     if (wNames.length) {
       lines.push("Commission a detailed assessment of " + joinNames(wNames) +
-        (wNames.length === 1 ? ", which is the weakest area in this read."
-                             : ", which are tied as the weakest areas in this read."));
+        (wNames.length === 1 ? ", which is the weakest area found."
+                             : ", which share the lowest grade."));
     }
 
     // 4. The two things only the consultant in the room can supply.
@@ -1826,7 +1893,7 @@ window.App.Report = (function () {
         h("h2", { text: "Proposed next steps" }),
         h("span", { class: "sub", text: scaffold
           ? "a suggested starting point for you to edit"
-          : "the consultant's recommendation for what happens now" })
+          : "the actions the consultant recommends next" })
       ]),
       h("div", { class: "card-b" }, [h("div", { "data-prose-block": "1" }, [body])])
     ]);
@@ -1925,7 +1992,7 @@ window.App.Report = (function () {
       });
       var anyPartly = incomplete.some(function (n) { return partlyZones[n]; });
       if (anyPartly) {
-        parts.push(joinNames(incomplete) + (incN === 1 ? " has" : " have") + " nothing short of " +
+        parts.push(joinNames(incomplete) + (incN === 1 ? " has" : " have") + " no shortfall against " +
                    (incN === 1 ? "its" : "their") + " target so far, but " + (incN === 1 ? "is" : "are") +
                    " not yet fully assessed.");
       } else {
@@ -1946,7 +2013,7 @@ window.App.Report = (function () {
       lines.push("All " + assessedN + " assessed " + plural + " meet their target Security Level across every Foundational Requirement.");
     } else if (metN === 0) {
       lines.push("None of the " + assessedN + " assessed " + plural + " meets its target Security Level across every Foundational Requirement. " +
-                 (shortN === 1 ? "The one short is " : "Those short are ") + joinNames(rollup.zonesShort) + ".");
+                 (shortN === 1 ? "The one that falls short is " : "Those that fall short are ") + joinNames(rollup.zonesShort) + ".");
     } else {
       lines.push(metN + " of the " + assessedN + " assessed " + plural + " meet their target Security Level across every Foundational Requirement (" +
                  joinNames(rollup.zonesMeetingTarget) + "). " +
@@ -1982,7 +2049,7 @@ window.App.Report = (function () {
       soFar.forEach(function (f) {
         (f.incomplete || []).forEach(function (n) { if (soFarZones.indexOf(n) === -1) soFarZones.push(n); });
       });
-      lines.push(named(soFar) + " " + (soFar.length === 1 ? "has" : "have") + " nothing short in any assessed " + noun +
+      lines.push(named(soFar) + " " + (soFar.length === 1 ? "has" : "have") + " no shortfall in any assessed " + noun +
                  " so far, but " + (soFar.length === 1 ? "is" : "are") + " not yet fully assessed in " + joinNames(soFarZones) + ".");
     }
     if (mixed.length) {
@@ -2019,10 +2086,10 @@ window.App.Report = (function () {
       var sharedN = rollup.floorSharedCount || 0;
       if (sharedN > 0) {
         lines.push(sharedN === distinct
-          ? (distinct === 1 ? "That gap is answered on the shared layer, so it is one piece of work, done once for every " + noun + " it reaches."
-                            : "All of them are answered on the shared layer, so each is one piece of work, done once for every " + noun + " it reaches.")
-          : sharedN + " of the " + distinct + " are answered on the shared layer, so " +
-            (sharedN === 1 ? "it is" : "each of those is") + " one piece of work, done once for every " + noun + " it reaches. " +
+          ? (distinct === 1 ? "That gap is in a shared countermeasure, so it is one piece of work that covers every " + noun + " it reaches."
+                            : "All of them are in shared countermeasures, so each is one piece of work that covers every " + noun + " it reaches.")
+          : sharedN + " of the " + distinct + " are in shared countermeasures, so " +
+            (sharedN === 1 ? "it is" : "each of those is") + " one piece of work that covers every " + noun + " it reaches. " +
             "The " + (distinct - sharedN === 1 ? "remaining one belongs" : "remaining " + (distinct - sharedN) + " belong") +
             " to a single " + noun + ".");
       }
@@ -2077,7 +2144,7 @@ window.App.Report = (function () {
           }))
         ]),
         h("p", { class: "muted", style: "margin:10px 0 0;", text:
-          "\"Lowest achieved\" is the weakest position across the assessed " + plural +
+          "\"Lowest achieved\" is the lowest level achieved in any of the assessed " + plural +
           ". ISA/IEC 62443-3-3 assigns an achieved Security Level to each " +
           ((instrument && instrument.targetDimensionLabel) || "zone").toLowerCase() +
           ", so this figure is a floor and is not a Security Level held by the system. Nothing here averages or combines the levels." })
@@ -2109,9 +2176,9 @@ window.App.Report = (function () {
         h("p", { class: "muted", style: "margin-top:0;", text:
           "Each of these requirements depends on a countermeasure implemented once and shared between " +
           pluralLower(noun, instrument) + ", so each is a single piece of work. A shared countermeasure does not always reach every " +
-          String(noun).toLowerCase() + ", so the table names the " + pluralLower(noun, instrument) + " each action resolves, with each " +
+          String(noun).toLowerCase() + ". The table names the " + pluralLower(noun, instrument) + " each action resolves, with each " +
           String(noun).toLowerCase() + "'s own target Security Level." +
-          (edit ? " Click a row to write the action once for every " + String(noun).toLowerCase() + " it reaches." : "") }),
+          (edit ? " Click a row to write one action that covers every " + String(noun).toLowerCase() + " it reaches." : "") }),
         h("table", { class: "tbl" }, [
           h("thead", null, [h("tr", null, [
             h("th", { text: "Requirement" }),
@@ -2189,13 +2256,13 @@ window.App.Report = (function () {
   // is the level's shortAnchor, then the 2-1:2024 wording.
   var ML_LEVEL_DEFAULTS = [
     { id: "ML1", name: "Initial", readAs: "ad hoc",
-      glossary: "Done ad hoc, if at all. It depends on individuals, with no process behind it." },
-    { id: "ML2", name: "Managed", readAs: "documented and repeatable, with documentation starting at ML2",
-      glossary: "Documented and repeatable. Documentation begins here." },
+      glossary: "The process is ad hoc, if it is performed at all, and depends on the individuals involved." },
+    { id: "ML2", name: "Managed", readAs: "documented and repeatable",
+      glossary: "The process is documented and can be repeated. ML2 is the first level that requires documentation." },
     { id: "ML3", name: "Defined / Practiced", readAs: "actively practised on the IACS",
-      glossary: "Written down and actively practised on the industrial automation and control system." },
+      glossary: "The documented process is practised on the industrial automation and control system and is shown to repeat over time." },
     { id: "ML4", name: "Improving", readAs: "metrics-driven improvement",
-      glossary: "Measured, and improved on the basis of what the measurements show." }
+      glossary: "The process is measured, and the measurements are used to improve it." }
   ];
   function mlLevels(instrument) {
     var mm = instrument && instrument.maturityModel;
@@ -2230,7 +2297,7 @@ window.App.Report = (function () {
   function mlOutOfScopeLine(scored, instrument) {
     var outs = (scored && scored.outOfScopeElements) || [];
     if (!outs.length) return "";
-    var noun = mlNoun(instrument, outs.length === 1 ? "elementNoun" : "elementNounPlural").toLowerCase();
+    var noun = mlNoun(instrument, outs.length === 1 ? "elementNoun" : "elementNounPlural");
     var named = outs.map(function (o) {
       return o.elementId + " " + o.name + (o.note ? " (" + String(o.note).trim().replace(/[.\s]+$/, "") + ")" : "");
     });
@@ -2331,7 +2398,7 @@ window.App.Report = (function () {
       h("span", null, [h("span", { class: "sw near" }), "C or D"]),
       h("span", null, [h("span", { class: "sw gap"  }), "E or F"]),
       h("span", null, [h("span", { class: "sw na"   }), "Not graded"]),
-      h("span", null, [provisionalMarker(), "Provisional: coverage below threshold"])
+      h("span", null, [provisionalMarker(), "Provisional (coverage below threshold)"])
     ]);
   }
 
@@ -2764,7 +2831,7 @@ window.App.Report = (function () {
           lbl,
           h("p", {
             style: "border-left:4px solid var(--near); background:var(--near-bg); padding:10px 14px; margin:10px 0 0; color:var(--text);",
-            text: "This regulator profile is a placeholder with no expected states, so there are no meeting or below counts."
+            text: "This regulator profile is a placeholder with no expected states, so no outcome can be counted as meeting or falling below expectation."
           })
         ])
       ]);
@@ -2775,7 +2842,7 @@ window.App.Report = (function () {
   function cafNotFormalCaveat(narrative) {
     if (!narrative || !narrative.boilerplate || !narrative.boilerplate.not_formal_caveat) return null;
     return h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Not a formal assessment" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Status of this assessment" })]),
       h("div", { class: "card-b" }, [
         h("p", {
           style: "border-left:4px solid var(--gap); background:var(--gap-bg); padding:10px 14px; margin:0; color:var(--text);",
@@ -3043,7 +3110,7 @@ window.App.Report = (function () {
   function cafRoadmapCard(scored, narrative, opts) {
     var instrument = opts.instrument;
     return remediationRoadmapCard({
-      title: "Roadmap toward expected outcomes",
+      title: "Roadmap towards expected outcomes",
       scored: scored,
       planning: opts.planning,
       emptyText: "Every applicable outcome meets the expected state for the selected profile.",
@@ -3331,11 +3398,11 @@ window.App.Report = (function () {
 
     // No-grade notice (the maturity model produces a profile, never a single grade).
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Maturity profile (no single grade)" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Maturity profile" })]),
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--brand-blue); background:var(--brand-blue-tint); padding:10px 14px; margin:0; color:var(--text);",
-          text: "This is a maturity assessment against " + standardRef(instrument) + ". The result is an achieved-ML profile for each " +
-            mlNoun(instrument, "elementNounTitle").toLowerCase() + ". There is no single programme grade, and mean ML is shown for context only. A requirement that is Not met or below its target ML is reported as a floor finding and is not averaged into a mean." }),
+          text: "This is a maturity assessment against " + standardRef(instrument) + ". The result is a profile of achieved maturity levels for each " +
+            mlNoun(instrument, "elementNoun") + ". The mean ML is shown for context only. A requirement that is Not met or below its target ML is reported as a floor finding, so no average can hide it." }),
         // Groupings set out of scope are named here, once, not on every row.
         mlOutOfScopeLine(scored, instrument)
           ? h("p", { class: "ml-out-of-scope", style: "margin:10px 0 0;", text: mlOutOfScopeLine(scored, instrument) })
@@ -3345,7 +3412,7 @@ window.App.Report = (function () {
 
     // Headline KPIs.
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Program maturity headline - " + (target ? target.name : "") })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Programme maturity headline - " + (target ? target.name : "") })]),
       h("div", { class: "card-b" }, [ mlKpiRow(scored, instrument) ])
     ]));
 
@@ -3364,7 +3431,7 @@ window.App.Report = (function () {
     // Standing prose + cover sheet close the preview.
     var mlBoiler = boilerplateStack([
       instrument.framing ? withAttribution(proseCard("About this assessment", instrument.framing), instrument) : null,
-      proseCard("How to read this report", mlHowToRead(instrument, mlNoun(instrument, "elementNounPlural").toLowerCase()))
+      proseCard("How to read this report", mlHowToRead(instrument, mlNoun(instrument, "elementNounPlural")))
     ]);
     if (mlBoiler) container.appendChild(mlBoiler);
     appendReportTail(container, opts);
@@ -3499,8 +3566,8 @@ window.App.Report = (function () {
         h("div", { class: "lbl", text: "Conformance profile" }),
         h("div", { class: "val kpi-pills" }, [
           h("span", { class: "pill met",  text: c.achieved + " Achieved" }),
-          h("span", { class: "pill near", text: c.partially + " Partially" }),
-          h("span", { class: "pill gap",  text: c.not + " Not" })
+          h("span", { class: "pill near", text: c.partially + " Partially achieved" }),
+          h("span", { class: "pill gap",  text: c.not + " Not achieved" })
         ])
       ]),
       h("div", { class: "kpi" }, [
@@ -3632,7 +3699,7 @@ window.App.Report = (function () {
 
     // Not-compliance caveat, prominent, first.
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Conformance and gap analysis (not a compliance determination)" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Status of this gap analysis" })]),
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--gap); background:var(--gap-bg); padding:10px 14px; margin:0; color:var(--text);",
           text: "This is a readiness and gap analysis against the obligations of the EU NIS2 Directive (Directive (EU) 2022/2555). The consultant has judged each obligation as Achieved, Partially Achieved or Not Achieved, and there is no single grade or pass mark. The analysis does not determine legal compliance with NIS2 or with the national law that transposes it. Scope should be confirmed against the applicable national transposition." })
@@ -4194,7 +4261,7 @@ window.App.Report = (function () {
     // The caveat leads, because this instrument is a characterisation and the
     // single worst outcome is a client reading it as a measurement.
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: B.not_measurement_caveat_title || "A characterisation, not a measurement" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: B.not_measurement_caveat_title || "Limits of this characterisation" })]),
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--gap); background:var(--gap-bg); padding:10px 14px; margin:0; color:var(--text);",
           text: B.not_measurement_caveat || (instrument.criticalCaveats && instrument.criticalCaveats[0]) ||
@@ -4304,7 +4371,7 @@ window.App.Report = (function () {
   function renderCSMS(container, opts) {
     var engagement = opts.engagement, instrument = opts.instrument, scored = opts.scored, target = opts.activeTarget;
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Conformance and gap analysis (not a certification)" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Status of this gap analysis" })]),
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--gap); background:var(--gap-bg); padding:10px 14px; margin:0; color:var(--text);",
           text: "This is a conformance and gap analysis of the CSMS against ISA/IEC 62443-2-1:2010. The consultant has judged each element as Not in place, Partially in place, Largely in place or In place, and there is no single CSMS grade. The analysis does not certify the CSMS or state that it conforms with the standard." })
@@ -4394,10 +4461,10 @@ window.App.Report = (function () {
 
     // Indicative / not-a-certification banner.
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: disp.reportBannerTitle || "EU CRA gap assessment (indicative, not a conformity assessment)" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: disp.reportBannerTitle || "EU CRA gap assessment (indicative)" })]),
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--near); background:var(--near-bg); padding:10px 14px; margin:0; color:var(--text);",
-          text: disp.reportBannerBody || "This is a gap assessment against the EU Cyber Resilience Act. The three layers are scored separately and shown side by side. They are not combined into one CRA score, because strong product security cannot make up for missing conformity work, and missing conformity work on its own stops the product being placed on the market. The assessment informs conformity but does not determine or certify it." })
+          text: disp.reportBannerBody || "This is a gap assessment against the EU Cyber Resilience Act. The three layers are scored separately and shown side by side, with no combined CRA score, because missing conformity work blocks market placement however strong the product security is. The assessment supports the conformity work but does not determine or certify conformity." })
       ])
     ]));
 
@@ -4424,7 +4491,7 @@ window.App.Report = (function () {
     // Misclassification finding, prominent.
     if (cls.misclassification) {
       container.appendChild(h("div", { class: "card" }, [
-        h("div", { class: "card-h" }, [h("h2", { text: "Finding: possible " + nounR + " misclassification" })]),
+        h("div", { class: "card-h" }, [h("h2", { text: "Possible " + nounR + " misclassification" })]),
         h("div", { class: "card-b" }, [
           h("p", { style: "border-left:4px solid var(--gap); background:var(--gap-bg); padding:10px 14px; margin:0; color:var(--text);",
             text: cls.misclassificationNote })
@@ -4453,7 +4520,7 @@ window.App.Report = (function () {
       ]);
     });
     container.appendChild(h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "The three positions, side by side" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Results by layer" })]),
       h("div", { class: "card-b" }, [
         h("div", { style: "display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;" }, panels)
       ])
@@ -4562,6 +4629,8 @@ window.App.Report = (function () {
     sectionKey: sectionKey,
     sectionCustom: sectionCustom,
     reportCustom: reportCustom,
+    sectionKeyAlias: sectionKeyAlias,
+    migrateSectionKeys: migrateSectionKeys,
     // Shared with the editor, so "the wording that opens this section" means
     // the same nodes when they are captured and when they are edited in place.
     leadingProse: leadingProse,

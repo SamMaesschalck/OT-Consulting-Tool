@@ -151,9 +151,9 @@
   // What the author is told about a replacement that is not in the report.
   // Null for one that is.
   var PARAGRAPH_NOTES = {
-    changed: "No longer applies: the text it replaced has changed.",
-    hidden: "Not printed: its section is hidden.",
-    rewritten: "Does not apply: the opening of its section has since been rewritten as a whole."
+    changed: "This no longer applies because the text it replaced has changed.",
+    hidden: "This is not printed because its section is hidden.",
+    rewritten: "This does not apply because the opening of its section has been rewritten."
   };
   function paragraphNote(state) { return PARAGRAPH_NOTES[state] || null; }
 

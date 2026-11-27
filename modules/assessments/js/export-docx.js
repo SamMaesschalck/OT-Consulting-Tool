@@ -705,7 +705,7 @@ window.App.ExportDOCX = (function () {
     var ab = progress.aboveBaseline || [];
     if (ab.length > 0) {
       children.push(h2("Implemented beyond the requirement"));
-      children.push(body(ab.length + " control" + (ab.length === 1 ? "" : "s") + " implemented beyond the selected profile" + (progress.aboveBaselineNew ? ", " + progress.aboveBaselineNew + " added since the previous assessment" : "") + ". They go further than the profile requires and do not affect the score."));
+      children.push(body(ab.length + " control" + (ab.length === 1 ? " was" : "s were") + " implemented beyond the selected profile" + (progress.aboveBaselineNew ? ", " + progress.aboveBaselineNew + " of them since the previous assessment" : "") + ". They do not affect the score."));
       var AW = [1000, 3400, 1700, 1200, 1726];
       var TR2 = window.docx.TableRow;
       var abRows = [ buildHeaderRow(["Ref", "Control", "Area", "State", "Since baseline"], AW) ];
@@ -722,9 +722,9 @@ window.App.ExportDOCX = (function () {
     }
 
     if (progress.versionMismatch) {
-      children.push(caption("The previous assessment used content version " + progress.baselineContentVersion + " of the instrument, and this one uses version " + progress.currentContentVersion + ". Items renamed or removed since then are compared as not assessed."));
+      children.push(caption("The previous assessment used version " + progress.baselineContentVersion + " of the assessment content, and this one uses version " + progress.currentContentVersion + ". Items renamed or removed since then are compared as not assessed."));
     }
-    children.push(caption("The previous responses are re-scored against the current instrument content and targets, so both assessments are compared on the same basis. Where the content or targets have changed, the figures can differ from those in the previous report."));
+    children.push(caption("The previous responses are re-scored against the current assessment content and targets, so both assessments are compared on the same basis. Where the content or targets have changed, the figures can differ from those in the previous report."));
     return children;
   }
 
@@ -834,7 +834,7 @@ window.App.ExportDOCX = (function () {
       ["Issued to",         e.issuedTo],
       ["Issued date",       e.issuedDate],
       ["Confidentiality",   e.confidentiality],
-      ["Instrument",        instrument.title],
+      ["Assessed against",  instrument.title],
       ["Edition",           instrument.edition || ""],
       ["Content version",   instrument.contentVersion || ""]
     ];
@@ -935,7 +935,7 @@ window.App.ExportDOCX = (function () {
       if (progress.gaps) {
         txt += ", and the number of open gaps moved from " + progress.gaps.prev + " to " + progress.gaps.curr;
       }
-      txt += ". The full comparison is in the section Progress since previous assessment.";
+      txt += ". The full comparison is under Progress since previous assessment.";
       out.push({ text: txt, note: false });
     }
 
@@ -945,7 +945,7 @@ window.App.ExportDOCX = (function () {
       if (c.interviews)   parts.push(c.interviews + " interview" + (c.interviews === 1 ? "" : "s"));
       if (c.documents)    parts.push(c.documents + " document" + (c.documents === 1 ? "" : "s") + " reviewed");
       if (c.observations) parts.push(c.observations + " system" + (c.observations === 1 ? "" : "s") + " observed");
-      out.push({ text: "This assessment is based on " + joinList(parts) + ", listed in the section Basis of assessment.", note: false });
+      out.push({ text: "This assessment is based on " + joinList(parts) + ", listed under Basis of assessment.", note: false });
     } else {
       out.push({ text: BASIS_NOT_RECORDED, note: true });
     }
@@ -1149,8 +1149,8 @@ window.App.ExportDOCX = (function () {
       // outstanding, so it is not said twice.
       if (anyIncomplete && phrases.met && !(sys && sys.summaryLine)) {
         incompleteSentence = (scored.partlyAssessedFRs || []).length
-          ? " Not every Foundational Requirement in scope has been fully assessed yet, so the target is not yet shown to be met."
-          : " Not every Foundational Requirement in scope has been assessed yet, so the target is not yet shown to be met.";
+          ? " Some Foundational Requirements in scope are only partly assessed, so it cannot yet be confirmed that the target is met."
+          : " Some Foundational Requirements in scope have not been assessed, so it cannot yet be confirmed that the target is met.";
       }
     }
     else if (floorCount > 0) verdictPhrase = phrases.short;
@@ -1163,7 +1163,7 @@ window.App.ExportDOCX = (function () {
       var w = ties[0];
       weakestFRName = slFRName(scored, w.frId);
       weakestFRDetail = "the achieved level is " + S.formatSL(w.conformantAchievedSL) + " against a target of " + S.formatSL(w.targetSL)
-        + (w.floorFlagCount > 0 ? ", and " + w.floorFlagCount + " requirement(s) are floor-flagged" : "");
+        + (w.floorFlagCount > 0 ? ", and " + w.floorFlagCount + (w.floorFlagCount === 1 ? " requirement is" : " requirements are") + " floor-flagged" : "");
     } else if (ties.length > 1) {
       weakestFRName = nis2ListJoin(ties.map(function (f) { return slFRName(scored, f.frId); }));
       weakestFRDetail = "each reaches only " + S.formatSL(ties[0].conformantAchievedSL);
@@ -1189,7 +1189,7 @@ window.App.ExportDOCX = (function () {
 
     var counts = buildScopeCounts(scored);
     var naParts = [];
-    if (counts.notAssessed > 0) naParts.push(counts.notAssessed + " Foundational Requirement(s) were not assessed");
+    if (counts.notAssessed > 0) naParts.push(counts.notAssessed + " " + frCountWord(counts.notAssessed) + (counts.notAssessed === 1 ? " was" : " were") + " not assessed");
     if (counts.outOfScope > 0) naParts.push((naParts.length ? String(counts.outOfScope) : counts.outOfScope + " " + frCountWord(counts.outOfScope)) +
       " " + (counts.outOfScope === 1 ? "was" : "were") + " out of scope");
     var notAssessedClause = naParts.length ? " (" + naParts.join(" and ") + ")" : "";
@@ -1297,7 +1297,7 @@ window.App.ExportDOCX = (function () {
 
     // Composed scope lines - assembled only by substituting values into fixed strings.
     if (instrument.title) {
-      children.push(body("Instrument: " + instrument.title + (instrument.edition ? " (" + instrument.edition + " edition)" : "") + "."));
+      children.push(body("Assessed against: " + instrument.title + (instrument.edition ? " (" + instrument.edition + " edition)" : "") + "."));
     }
     var siteNames = (engagement.targets || []).map(function (t) { return t.name; }).join(", ");
     var siteLabel = (instrument.targetDimensionLabel || "Site");
@@ -1367,7 +1367,7 @@ window.App.ExportDOCX = (function () {
         headerCell("Overall target met", 25),
         headerCell("Weakest FR", 25),
         headerCell("Floor flags", 25),
-        headerCell("Closeness (context)", 25)
+        headerCell("Closeness (for context)", 25)
       ] }),
       new TableRow({ children: [
         cell(body(tmPosture.value + (tmPosture.detail ? " (" + tmPosture.detail + ")" : ""),
@@ -1386,7 +1386,7 @@ window.App.ExportDOCX = (function () {
     ];
 
     if (radarBuf) {
-      children.push(h2("FR achievement vs target"));
+      children.push(h2("FR achievement against target"));
       children.push(new window.docx.Paragraph({
         style: "BodyText",
         children: [new ImageRun({ data: radarBuf, transformation: { width: 380, height: 380 } })]
@@ -1675,7 +1675,7 @@ window.App.ExportDOCX = (function () {
     }).length : 0;
     if (alreadyExplained) {
       var nounR = scopeNoun(instrument);
-      children.push(body("Where a requirement also appears in an earlier " + nounR + "'s roadmap, the explanation of its target and any evidence or plan recorded for the whole system are given there.",
+      children.push(body("Where a requirement also appears in an earlier " + nounR + "'s roadmap, that entry gives what its target requires, why it matters and any evidence or plan recorded for the whole system.",
         { color: COLOR.muted }));
     }
 
@@ -1811,7 +1811,7 @@ window.App.ExportDOCX = (function () {
   // appendix and the Excel "Read me" sheet, so the two deliverables describe
   // scoring identically. Edit METHODOLOGY_LINES to change both at once.
   var METHODOLOGY_LINES = [
-    { kind: "head", text: "Scoring methodology" },
+    { kind: "head", text: "What is reported" },
     { kind: "body", text: "Results are reported as an achieved Security Level (SL-A) for each Foundational Requirement, set against the target Security Level (SL-T) for the scope assessed. The report gives no letter grade or overall score." },
     { kind: "head", text: "The unit of assessment is the item" },
     { kind: "bullet", text: "Each requirement contributes a base item plus one item for each requirement enhancement. The standard assigns each item to a Security Level, and the item applies at that level and above." },
@@ -1828,7 +1828,7 @@ window.App.ExportDOCX = (function () {
     { kind: "bullet", text: "Blocking items are the unsatisfied items at or below the first failing level. Closing those items is enough to raise the Foundational Requirement to the next level." },
     { kind: "bullet", text: "Closeness is the share of in-scope items satisfied, with partial credit from the scoring profile. It is given for context. It never raises a level and does not replace SL-A." },
     { kind: "bullet", text: "FR target met = the achieved Security Level is at least the target for that Foundational Requirement." },
-    { kind: "bullet", text: "Only an answered item that is not met or partially met is a shortfall. A Foundational Requirement whose answered items are all met, but which still has items to assess, is reported as not yet meeting its target. It is not reported as falling short, although its achieved level still counts the open items as not satisfied. Its requirements stay on the roadmap, marked To assess." },
+    { kind: "bullet", text: "Only an answered item that is not met or partially met is a shortfall. A Foundational Requirement whose answered items are all met, but which still has items to assess, is reported as not yet meeting its target and is not counted as a shortfall. Its achieved level still treats the open items as not satisfied, and its requirements stay on the roadmap, marked To assess." },
     { kind: "bullet", text: "A requirement is floor-flagged where its base item is in scope and not satisfied, or where it sits two or more Security Levels below its target. Without the base item none of the requirement is in place. Floor findings are treated as priorities and listed first in the roadmap." },
     { kind: "head", text: "Overall" },
     { kind: "bullet", text: "Overall target met = every Foundational Requirement in scope has been assessed and meets its target. A strong Foundational Requirement does not offset a weak one, and results are not averaged. Where nothing assessed falls short but some Foundational Requirements are still to be assessed in full or in part, the target is reported as not yet met and the result as incomplete." },
@@ -1856,12 +1856,12 @@ window.App.ExportDOCX = (function () {
       { kind: "bullet", text: "Where the optional technical review is included, it is placed on the appetite scale in the same way. This gives a revealed position to compare with the one described in interview." },
       { kind: "bullet", text: "A technical reading is reported but not counted towards revealed appetite where it reflects an operational constraint that is being managed, or where it could not be established. A constraint that nobody is managing is counted." },
       { kind: "bullet", text: "Each item describes what every band looks like, so that different assessors place the same organisation in the same band." },
-     { kind: "bullet", text: "A reading that could not be established is left out of the band and reported. For appetite, not knowing is usually a finding." },
+     { kind: "bullet", text: "A reading that could not be established is reported but does not count towards the band. For appetite, not knowing is usually a finding." },
       { kind: "bullet", text: "The verdict is the assessor's judgement. It takes account of both positions and of anything else found during the engagement that bears on whether the organisation's appetite is appropriate to the risks it faces." }
     ],
 
     "caf-achieved": [
-      { kind: "head", text: "Scoring methodology" },
+      { kind: "head", text: "What is reported" },
       { kind: "body", text: "Each contributing outcome is judged in one state against the indicators of good practice. The report gives no single grade. Results are reported as a profile of states and, for the selected profile, as meeting or below the expected state." },
       { kind: "head", text: "Per outcome" },
       { kind: "bullet", text: "The consultant sets exactly one state per outcome." },
@@ -1887,11 +1887,11 @@ window.App.ExportDOCX = (function () {
       { kind: "bullet", text: "The headline is the weighted mean of the graded domain scores, equally weighted unless the profile sets domain weights." },
       { kind: "bullet", text: "Two caps then apply. The headline can be at most two grades above the weakest graded domain, so an F in any domain caps the headline at D and an E caps it at C. An A is awarded only where every graded domain reaches A. Where either cap applies, the report says so." },
       { kind: "head", text: "Overall" },
-      { kind: "bullet", text: "The grade is an indicative reading based on interviews. It does not measure conformance with any standard, which is established by the detailed assessments that follow in the priority areas." }
+      { kind: "bullet", text: "The grade is an indicative reading based on interviews and does not measure conformance with any standard. Conformance is established by the detailed assessments that follow in the priority areas." }
     ],
 
     "program-maturity-ml": [
-      { kind: "head", text: "Scoring methodology" },
+      { kind: "head", text: "What is reported" },
       { kind: "body", text: "Each requirement is assessed at one maturity level, independently of the others. The report gives no single programme grade." },
       { kind: "head", text: "Per requirement" },
       { kind: "bullet", text: "The consultant selects one level, or records the requirement as Not met." },
@@ -1905,7 +1905,7 @@ window.App.ExportDOCX = (function () {
     ],
 
     "nis2-conformance": [
-      { kind: "head", text: "Scoring methodology" },
+      { kind: "head", text: "What is reported" },
       { kind: "body", text: "Each obligation is judged in one state against full conformance with the Directive. There are no profiles or targets for individual obligations, and every applicable obligation is expected to be Achieved." },
       { kind: "head", text: "Per obligation" },
       { kind: "bullet", text: "The consultant sets exactly one state per obligation." },
@@ -1919,7 +1919,7 @@ window.App.ExportDOCX = (function () {
     ],
 
     "csms-conformance": [
-      { kind: "head", text: "Scoring methodology" },
+      { kind: "head", text: "What is reported" },
       { kind: "body", text: "Each element is judged in one conformance state against full conformance. The scale is defined in the scoring profile." },
       { kind: "head", text: "Per element" },
       { kind: "bullet", text: "The consultant sets exactly one state per element." },
@@ -1956,7 +1956,7 @@ window.App.ExportDOCX = (function () {
     });
     if (!rows.length) return [];
     var out = [ headingLevel === 2 ? h2("Further recommendations") : h1("Further recommendations"),
-      body("The items below already meet their target. The assessor recorded advice against them that is worth acting on, but they are not gaps and are not counted as outstanding work.") ];
+      body("The items below already meet their target. The assessor recorded advice on each and judged it worth acting on. They are not gaps and are not counted as outstanding work.") ];
     rows.forEach(function (r) {
       out.push(bullet(r.code + "  " + r.title + (r.band ? "  -  " + r.band.charAt(0).toUpperCase() + r.band.slice(1) + " priority" : "")));
       out.push(labelled("Recommended action", r.action));
@@ -2288,7 +2288,7 @@ window.App.ExportDOCX = (function () {
           children: [
             new window.docx.Paragraph({
               style: "BodyText",
-              children: [run("Indicative grade", { bold: true, color: COLOR.gap })]
+              children: [run("Limits of the grade", { bold: true, color: COLOR.gap })]
             }),
             new window.docx.Paragraph({ style: "BodyText", children: [run(caveat)] })
           ],
@@ -2797,7 +2797,7 @@ window.App.ExportDOCX = (function () {
     var scale = (instrument.responseModel && instrument.responseModel.bandScale) || [];
     var topLabel = scale.length ? (scale[scale.length - 1].label || "") : "";
 
-    children.push(body("The roadmap lists every scored question below the top capability band, in the consultant's priority order, with the lowest scores first."));
+    children.push(body("The roadmap lists every scored question below the top capability band. The lowest scores come first unless the consultant has set a different order."));
 
     roadmap.forEach(function (it, i) {
       var q = qById[it.questionId] || {};
@@ -3153,7 +3153,7 @@ window.App.ExportDOCX = (function () {
       ["Issued to",         e.issuedTo],
       ["Issued date",       e.issuedDate],
       ["Confidentiality",   e.confidentiality],
-      ["Instrument",        instrument.title],
+      ["Assessed against",  instrument.title],
       ["Edition",           instrument.edition || ""],
       ["Content version",   instrument.contentVersion || ""],
       ["Selected profile",  info.name + (info.placeholder ? " (expected states not available)" : "")]
@@ -3266,6 +3266,24 @@ window.App.ExportDOCX = (function () {
       ? nis2ListJoin(na.slice(0, 2).map(function (it) { return it.outcomeId + " " + it.title; }))
       : "the highest-priority outcomes in the roadmap";
 
+    // With a single objective (ONR SyAPs cyber covers FSyP 7 alone) the groups
+    // are its principles, so a sentence naming "the weakest" objective would
+    // name a principle under the objective's title, or the one objective there
+    // is. Such a sentence is left out; the rest of the template prints. The
+    // template is filled first, with a marker for the name, because a slot
+    // such as {gapConcentrationSentence} carries sentences of its own.
+    var objTitle = String((instrument.display && instrument.display.objectiveTitle) || "").trim();
+    function fillOneObjectiveSafe(tpl, slots) {
+      if (useObjectives || !tpl || !objTitle) return nis2Fill(tpl, slots);
+      var MARK = "\u0001weakest\u0001", marked = {};
+      Object.keys(slots).forEach(function (k) { marked[k] = slots[k]; });
+      marked.weakestObjectiveName = MARK;
+      var named = new RegExp("weakest " + objTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+      return nis2Fill(tpl, marked).split(/(?<=[.!?])\s+/).filter(function (s) {
+        return !(named.test(s) && s.indexOf(MARK) !== -1);
+      }).join(" ").split(MARK).join(String(slots.weakestObjectiveName));
+    }
+
     var slots = {
       clientName: clientName, profileName: info.name, verdictPhrase: verdictPhrase,
       weakestObjectiveName: weakestObjectiveName, weakestObjectiveDetail: weakestObjectiveDetail,
@@ -3278,14 +3296,16 @@ window.App.ExportDOCX = (function () {
 
     children.push(body(nis2Fill(hasGaps ? T.exec_verdict : T.exec_verdict_nogaps, slots)));
     children.push(body(nis2Fill(T.exec_scope, slots) + " " + nis2Fill(T.exec_profile, slots)));
+    var gapShape = fillOneObjectiveSafe(T.exec_gap_shape, slots).trim();
     if (hasGaps) {
-      children.push(body(nis2Fill(T.exec_gap_shape, slots)));
+      if (gapShape) children.push(body(gapShape));
       if (B.exec_partial_vs_absent) children.push(body(B.exec_partial_vs_absent));
     }
     if (B.regulatory_stakes) children.push(body(B.regulatory_stakes));
     var dGaps = (scored.byObjective || []).some(function (o) { return o.objectiveId === "D" && (o.counts.partially + o.counts.not) > 0; });
     slots.repExposureClause = dGaps ? (CB.consultant_exposure_rep_clause || "") : "";
-    if (CB.consultant_exposure_seed) children.push(body(nis2Fill(CB.consultant_exposure_seed, slots)));
+    var expoSeed = CB.consultant_exposure_seed ? fillOneObjectiveSafe(CB.consultant_exposure_seed, slots).trim() : "";
+    if (expoSeed) children.push(body(expoSeed));
     // Consultant exposure / top priorities use the in-tool input when supplied,
     // else fall back to the bracketed placeholder for completion in Word.
     var expo = (rn.regulatoryExposure || "").trim();
@@ -3315,7 +3335,7 @@ window.App.ExportDOCX = (function () {
           children: [
             new window.docx.Paragraph({
               style: "BodyText",
-              children: [run("Not a formal assessment", { bold: true, color: COLOR.gap })]
+              children: [run("Limits of this assessment", { bold: true, color: COLOR.gap })]
             }),
             new window.docx.Paragraph({ style: "BodyText", children: [run(caveat)] })
           ],
@@ -3324,7 +3344,7 @@ window.App.ExportDOCX = (function () {
       }) ]
     });
     return [
-      h1("Not a formal assessment"),
+      h1("Status of this assessment"),
       tbl,
       body("", { spacing: { after: 160 } })
     ];
@@ -3503,7 +3523,7 @@ window.App.ExportDOCX = (function () {
   // state).
   function cafRoadmapSection(scored, info, instrument, secNo) {
     var TableRow = window.docx.TableRow;
-    var children = [ h1n(secNo || "4", "Roadmap toward expected outcomes") ];
+    var children = [ h1n(secNo || "4", "Roadmap towards expected outcomes") ];
 
     if (!scored.roadmap || scored.roadmap.length === 0) {
       children.push(body("Every applicable outcome meets the expected state for the " + info.name + " profile."));
@@ -3555,10 +3575,15 @@ window.App.ExportDOCX = (function () {
   function cafLimitationsSection(narrative, info, engagement) {
     var bp = narrative.boilerplate || {};
     var children = [ h1("Method and limitations") ];
-    // The "Not a formal assessment" box near the front already says this in
+    // The "Status of this assessment" box near the front already says this in
     // full; it is repeated here only if the consultant has hidden that box.
-    var cust = (engagement && engagement.reportCustom) || {};
-    var boxHidden = !!(cust["not-a-formal-assessment"] && cust["not-a-formal-assessment"].hidden);
+    // Through Report.reportCustom, which moves a box hidden under its old
+    // heading ("Not a formal assessment") to the new key; the old key is still
+    // read for a store that has not been through it.
+    var R = window.App.Report;
+    var cust = (R && R.reportCustom) ? R.reportCustom({ engagement: engagement }) : ((engagement && engagement.reportCustom) || {});
+    var box = cust["status-of-this-assessment"] || cust["not-a-formal-assessment"] || {};
+    var boxHidden = !!box.hidden;
     if (bp.not_formal_caveat && boxHidden) children.push(body(bp.not_formal_caveat));
     children.push(body("This report uses the " + info.name + " profile." + (info.placeholder ? " Expected states are not available for this profile, so meeting and below counts are not reported." : "")));
     return children;
@@ -3631,7 +3656,7 @@ window.App.ExportDOCX = (function () {
     barStates.forEach(function(s){tot[s.value]=0;});
     scored.byObjective.forEach(function(o){barStates.forEach(function(s){tot[s.value]+=(o.counts[s.value]||0);});tot.meeting+=(o.meeting||0);tot.below+=(o.below||0);});
     var compared=tot.meeting+tot.below;
-    var children=[h1("Alignment at a glance")];
+    var children=[h1("Alignment summary")];
     // KPI tiles: separated cards. Tile width scales to the number of states so
     // a 2-state instrument (NIST: Satisfied / Other Than Satisfied) fills the row.
     var nTiles=barStates.length+1, gapPct=2.6, tilePct=(100-gapPct*(nTiles-1))/nTiles;
@@ -3642,7 +3667,7 @@ window.App.ExportDOCX = (function () {
     tileCells.push(gp());
     tileCells.push(tile((info.placeholder||compared===0)?"-":(tot.meeting+" / "+compared),COLOR.navy,"Meeting expected","F5F8FA"));
     children.push(new window.docx.Table({width:{size:100,type:WT.PERCENTAGE},borders:TBL_NONE,rows:[new TR({children:tileCells})]}));
-    children.push(body("Outcome profile for the "+info.name+" profile, showing the states across the assessed "+groupNoun+". There is no single grade.",{color:COLOR.muted,spacing:{before:180,after:0}}));
+    children.push(body("The tiles and bars count the outcome states across the assessed "+groupNoun+" for the "+info.name+" profile. The report gives no single grade.",{color:COLOR.muted,spacing:{before:180,after:0}}));
     // Full-width stacked bars per group (objective, or principle when single-objective)
     children.push(h2("Outcome profile by "+groupSingular.toLowerCase()));
     var barW=6026;
@@ -3714,7 +3739,7 @@ window.App.ExportDOCX = (function () {
       return children;
     }
     children.push(body(per.length + " of " + (scored.perOutcome || []).length + " " +
-      unit.toLowerCase() + " were assessed as achieved. Each is listed with the evidence recorded against it, for use when that evidence is requested."));
+      unit.toLowerCase() + " were assessed as achieved. Each is listed with the evidence recorded against it."));
 
     var widths = [1500, 4200, 3326];
     var byObj = {};
@@ -3912,7 +3937,7 @@ window.App.ExportDOCX = (function () {
       ["Document revision", e.documentRevision], ["Status", statusLabel(opts)], ["QA review by", e.qaReviewBy],
       ["Authorised by", e.authorisedBy], ["Issued to", e.issuedTo],
       ["Issued date", e.issuedDate], ["Confidentiality", e.confidentiality],
-      ["Instrument", instrument.title], ["Edition", instrument.edition || ""],
+      ["Assessed against", instrument.title], ["Edition", instrument.edition || ""],
       ["Content version", instrument.contentVersion || ""]
     ];
     var rows = pairs.map(function (r) {
@@ -3929,11 +3954,11 @@ window.App.ExportDOCX = (function () {
     var ML = window.App.ScoringProgramML;
     var ov = scored.overall, c = ov.counts;
     var children = [ h1n("1", "Executive summary") ];
-    children.push(body("This is a maturity assessment against " + window.App.Report.standardRef(instrument) + ". The result is a profile of achieved maturity levels across the " + window.App.Report.mlNoun(instrument, "elementNounPlural").toLowerCase() + ", with no single programme grade."));
-    children.push(bullet("Program ML profile: " + c.ML1 + " at ML1, " + c.ML2 + " at ML2, " + c.ML3 + " at ML3, " + c.ML4 + " at ML4, " + c.notMet + " not met, of " + ov.total + " applicable requirements."));
+    children.push(body("This is a maturity assessment against " + window.App.Report.standardRef(instrument) + ". The result is a profile of achieved maturity levels across the " + window.App.Report.mlNoun(instrument, "elementNounPlural") + ", with no single programme grade."));
+    children.push(bullet("Maturity profile: " + c.ML1 + " at ML1, " + c.ML2 + " at ML2, " + c.ML3 + " at ML3, " + c.ML4 + " at ML4, " + c.notMet + " not met, of " + ov.total + " applicable requirements."));
     var worst = (scored.worstElements || []).map(function (el) { return el.elementId + " " + el.name; });
-    if (worst.length > 0) children.push(bullet("Weakest " + window.App.Report.mlNoun(instrument, "elementNounTitle").toLowerCase() + (worst.length === 1 ? "" : "s") + ": " + worst.join("; ") + "."));
-    children.push(bullet("Coverage: " + ML.formatPct(ov.coverage) + (ov.confidenceLevel ? " (" + ov.confidenceLevel + ")" : "") + ". The mean ML for each element is given for context and is not a programme grade."));
+    if (worst.length > 0) children.push(bullet("Weakest " + window.App.Report.mlNoun(instrument, worst.length === 1 ? "elementNoun" : "elementNounPlural") + ": " + worst.join("; ") + "."));
+    children.push(bullet("Coverage: " + ML.formatPct(ov.coverage) + (ov.confidenceLevel ? " (" + ov.confidenceLevel + ")" : "") + ". The mean ML for each element is given for context only."));
     if (scored.anyTargets) {
       var compared = ov.meeting + ov.below;
       children.push(bullet("Against target ML: " + ov.meeting + " of " + compared + " assessed requirements meet their target and " + ov.below + " are below it."));
@@ -3962,7 +3987,7 @@ window.App.ExportDOCX = (function () {
 
     if (ov.scored === 0) {
       children.push(body(narrative.boilerplate.report_intro));
-      children.push(body("Too few requirements were assessed to report a maturity profile. The first priority is to complete the assessment in every " + window.App.Report.mlNoun(instrument, "elementNoun").toLowerCase() + "."));
+      children.push(body("Too few requirements were assessed to report a maturity profile. The first priority is to complete the assessment in every " + window.App.Report.mlNoun(instrument, "elementNoun") + "."));
       return children;
     }
 
@@ -4033,7 +4058,7 @@ window.App.ExportDOCX = (function () {
   // wording it is used verbatim; where it does not - a skeleton instrument, or
   // one built from the instrument alone - a generic statement stands in, so no
   // document ever leaves without one.
-  var GENERIC_CAVEAT = "This alignment and gap analysis is intended to support improvement. It does not certify the organisation and is neither a formal conformity assessment nor a regulatory determination. The judgements are the consultant's, based on the evidence available at the time of the engagement.";
+  var GENERIC_CAVEAT = "This alignment and gap analysis is advisory. It does not certify the organisation, and it is not a formal conformity assessment or a regulatory determination. The judgements are the consultant's, based on the evidence available at the time of the engagement.";
 
   function mlNotCertificationCaveatBlock(narrative) {
     var caveat = (narrative && narrative.boilerplate && narrative.boilerplate.not_certification_caveat) || GENERIC_CAVEAT;
@@ -4059,7 +4084,7 @@ window.App.ExportDOCX = (function () {
     if (sc) out.push(body(sc));
     out = out.concat(attributionParas(instrument, !!instrument.framing));
     out.push(h1("How to read this report"));
-    out.push(body(window.App.Report.mlHowToRead(instrument, window.App.Report.mlNoun(instrument, "elementNounPlural").toLowerCase())));
+    out.push(body(window.App.Report.mlHowToRead(instrument, window.App.Report.mlNoun(instrument, "elementNounPlural"))));
     return out;
   }
 
@@ -4163,7 +4188,7 @@ window.App.ExportDOCX = (function () {
     var children = [ h1n("5", "Roadmap") ];
     var roadmap = scored.roadmap || [];
     if (roadmap.length === 0) {
-      children.push(body(scored.anyTargets ? "Every requirement meets its target ML." : "No requirement is not met or at ML1, so there is nothing to prioritise."));
+      children.push(body(scored.anyTargets ? "Every requirement meets its target ML." : "No requirement was recorded as not met or at ML1, so there is nothing to prioritise."));
       return children;
     }
     var reqById = {};
@@ -4211,7 +4236,7 @@ window.App.ExportDOCX = (function () {
 
   function mlLimitationsSection(scored, instrument) {
     var children = [ h1("Method and limitations") ];
-    children.push(body("The consultant set a maturity level for each requirement against the ML1 to ML4 anchors, taking account of the OT context. The result is a profile of achieved maturity levels with no single programme grade, and the mean ML is given for context. Unknown answers reduce coverage and confidence, and Not applicable requirements are excluded. A requirement that is Not met, or below its target ML, is reported as a floor finding."));
+    children.push(body("The consultant set a maturity level for each requirement against the ML1 to ML4 anchors, taking account of the OT context. The result is a profile of achieved maturity levels, and the mean ML is given for context only. Unknown answers reduce coverage and confidence, and Not applicable requirements are excluded. A requirement that is Not met, or below its target ML, is reported as a floor finding."));
     // Groupings set out of scope are named once, here, never per requirement.
     var outLine = window.App.Report.mlOutOfScopeLine(scored, instrument);
     if (outLine) children.push(body(outLine));
@@ -4230,12 +4255,12 @@ window.App.ExportDOCX = (function () {
       {t:String(c2.ML3),color:COLOR.met,label:"ML3",fill:COLOR.metBg,size:40},
       {t:String(c2.ML4),color:COLOR.blue,label:"ML4",fill:COLOR.metBg,size:40}
     ]));
-    children.push(body("Maturity profile across "+scored.overall.total+" applicable requirements, assessed against "+window.App.Report.standardRef(instrument)+". There is no single programme grade.",{color:COLOR.muted,spacing:{before:180,after:0}}));
+    children.push(body("The profile covers "+scored.overall.total+" applicable requirements, assessed against "+window.App.Report.standardRef(instrument)+".",{color:COLOR.muted,spacing:{before:180,after:0}}));
     children.push(h2("Maturity distribution by element"));
     children.push(sbStackTable(scored.byElement.map(function(el){ return sbStackRow(el.elementId+" "+el.name,[{n:el.counts.notMet,color:COLOR.gap},{n:el.counts.ML1,color:COLOR.soft},{n:el.counts.ML2,color:COLOR.near},{n:el.counts.ML3,color:COLOR.met},{n:el.counts.ML4,color:COLOR.blue}]); })));
     children.push(sbLegend([{color:COLOR.gap,label:"Not met"},{color:COLOR.soft,label:"ML1"},{color:COLOR.near,label:"ML2"},{color:COLOR.met,label:"ML3"},{color:COLOR.blue,label:"ML4"}]));
     var foc=scored.byElement.slice().sort(function(a,b){return (a.meanMl||0)-(b.meanMl||0);}).slice(0,3);
-    if(foc.length){ children.push(h2("Where to focus first")); children.push(body("These programme elements have the lowest maturity.",{color:COLOR.muted,spacing:{after:40}}));
+    if(foc.length){ children.push(h2("Where to focus first")); children.push(body("These have the lowest mean maturity.",{color:COLOR.muted,spacing:{after:40}}));
       foc.forEach(function(el,i){ children.push(sbFocusCard(i+1, el.elementId+" "+el.name, "mean ML "+MLs.formatMean(el.meanMl)+(el.counts.notMet>0?" · "+el.counts.notMet+" not met":""))); children.push(sbSpacer()); }); }
     return children;
   }
@@ -4476,7 +4501,7 @@ window.App.ExportDOCX = (function () {
     var out = [h2("The system as a whole")];
     lines.forEach(function (t) { out.push(body(t)); });
     out.push(table([head].concat(rows)));
-    out.push(body("\"Lowest achieved\" is the weakest position across the assessed " + plural +
+    out.push(body("\"Lowest achieved\" is the lowest level achieved in any of the assessed " + plural +
       ". ISA/IEC 62443-3-3 assigns an achieved Security Level to each " + noun +
       ", so this figure is a floor and not a Security Level held by the system. The " + noun + " levels are not averaged or combined.",
       { color: COLOR.muted, spacing: { before: 80 } }));
@@ -4812,7 +4837,7 @@ window.App.ExportDOCX = (function () {
       var doc = makeDoc(engagement, {
         creator: (engagement.engagement && engagement.engagement.consultant) || "OT Cyber Assessment Tool",
         title: instrument.title + " - " + ((engagement.engagement && engagement.engagement.clientName) || "Client"),
-        description: "Executive site security assessment (multi-site)",
+        description: window.App.Report.standardRef(instrument) + " Security Level assessment across " + sites.length + " " + plural,
         styles: buildStyles(),
         sections: [
           { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0, gutter: 0 } } }, children: coverChildren },
@@ -4968,8 +4993,8 @@ window.App.ExportDOCX = (function () {
     return [
       h2("Actions that span " + plural),
       body("Each of these requirements depends on a countermeasure implemented once and shared between " + plural +
-           ", so it needs one piece of work for the whole system. A shared countermeasure does not always reach every " + noun +
-           ", so the table names each " + noun + " the action resolves, with that " + noun +
+           ", so it is one piece of work however many " + plural + " it covers. A shared countermeasure does not always reach every " + noun +
+           ". The table names each " + noun + " the action resolves, with that " + noun +
            "'s own target Security Level. The requirements also appear in the relevant " + noun + " roadmaps, marked as shared."),
       table([head].concat(body_))
     ];
@@ -5000,7 +5025,7 @@ window.App.ExportDOCX = (function () {
       {t:S.formatPct(scored.overallCloseness),color:COLOR.navy,label:"Closeness",fill:"F5F8FA",size:36},
       {t:String(scored.floorFlagCount),color:scored.floorFlagCount>0?COLOR.gap:COLOR.met,label:"Floor flags",fill:scored.floorFlagCount>0?COLOR.gapBg:COLOR.metBg,size:40}
     ]));
-    if (firstTime("sl-scorecard-caption")) children.push(body("The headline is whether each Foundational Requirement meets its target Security Level. Closeness is shown for context, and there is no single grade.",{color:COLOR.muted,spacing:{before:180}}));
+    if (firstTime("sl-scorecard-caption")) children.push(body("Each Foundational Requirement is reported against its target Security Level. Closeness is shown for context only.",{color:COLOR.muted,spacing:{before:180}}));
     children=children.concat(slCapabilityVector(scored,taxonomy,instrument));
     children=children.concat(slBlockingItems(scored,taxonomy,instrument));
     // What an SL-A does and does not cover is a statement about the whole
@@ -5011,7 +5036,7 @@ window.App.ExportDOCX = (function () {
     }
     children=children.concat(slScopeAccounting(scored,instrument));
     children=children.concat(slClosenessBars(scored,taxonomy));
-    if(radarBuf){ children.push(h2("FR achievement vs target")); children.push(new window.docx.Paragraph({children:[new window.docx.ImageRun({data:radarBuf,transformation:{width:360,height:360}})]})); }
+    if(radarBuf){ children.push(h2("FR achievement against target")); children.push(new window.docx.Paragraph({children:[new window.docx.ImageRun({data:radarBuf,transformation:{width:360,height:360}})]})); }
     children=children.concat(slRequirementHeatmap(scored,taxonomy,instrument));
     // The top of the SAME ranking the screen card shows, rather than a second
     // sort of its own: two differently-ordered "focus first" lists in one
@@ -5074,7 +5099,7 @@ window.App.ExportDOCX = (function () {
     var rows = [
       ["Author", e.consultant], ["Document revision", e.documentRevision], ["Status", statusLabel(opts)], ["QA review by", e.qaReviewBy], ["Authorised by", e.authorisedBy],
       ["Issued to", e.issuedTo], ["Issued date", e.issuedDate], ["Confidentiality", e.confidentiality],
-      ["Instrument", instrument.title], ["Framework", instrument.framework || "Directive (EU) 2022/2555"], ["Content version", instrument.contentVersion || ""]
+      ["Assessed against", instrument.title], ["Framework", instrument.framework || "Directive (EU) 2022/2555"], ["Content version", instrument.contentVersion || ""]
     ].map(function (r) {
       return new TableRow({ children: [ cellDxa(body(r[0], { bold: true }), labelW, { fill: COLOR.subBg }), cellDxa(r[1] || "", valueW) ] });
     });
@@ -5091,7 +5116,7 @@ window.App.ExportDOCX = (function () {
       ],
       shading: { type: ShadingType.SOLID, color: COLOR.gapBg, fill: COLOR.gapBg }
     }) ] }) ] });
-    return [ h1("Important"), tbl, body("", { spacing: { after: 160 } }) ];
+    return [ h1("Status of this gap analysis"), tbl, body("", { spacing: { after: 160 } }) ];
   }
 
   // Slot-substitution only - replaces {key} with slots[key]; never free-writes.
@@ -5413,7 +5438,7 @@ window.App.ExportDOCX = (function () {
   function nis2RegisterSection(scored, instrument) {
     var TableRow = window.docx.TableRow;
     var children = [ h1n("3", "Full obligation register") ];
-    children.push(body("The register lists every obligation assessed, including those assessed as Achieved, grouped by NIS2 area."));
+    children.push(body("The register lists every obligation assessed, grouped by NIS2 area, including those found to be Achieved."));
     var widths = [1600, 5600, 1700, 6498];   // sums to the full landscape content width (15398), matching the results table
     var headers = ["Area", "Obligation", "Current", "Captured evidence"];
     var rows = [ buildHeaderRow(headers, widths) ];
@@ -5442,14 +5467,14 @@ window.App.ExportDOCX = (function () {
   function nis2ScorecardDesignB(scored, instrument) {
     var N = window.App.ScoringNIS2;
     var ov = scored.overall, cc = ov.counts, children = [];
-    children.push(h1("Conformance at a glance"));
+    children.push(h1("Conformance summary"));
     children.push(sbTilesRow([
       { t: String(cc.achieved),  color: COLOR.met,  label: "Achieved",     fill: COLOR.metBg,  size: 44 },
       { t: String(cc.partially), color: COLOR.near, label: "Partially",    fill: COLOR.nearBg, size: 44 },
       { t: String(cc.not),       color: COLOR.gap,  label: "Not achieved", fill: COLOR.gapBg,  size: 44 },
       { t: N.formatPct(ov.conformance), color: COLOR.navy, label: "Conformance (context)", fill: "F5F8FA", size: 32 }
     ]));
-    children.push(body("Conformance profile across " + ov.total + " applicable NIS2 obligations. NIS2 has no single grade or pass mark. The conformance figure of " + pctText(N.formatPct(ov.conformance)) + " is given for context and does not determine legal compliance. The exact counts for each area are in Results by NIS2 area.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+    children.push(body("The profile covers " + ov.total + " applicable NIS2 obligations. The conformance figure of " + pctText(N.formatPct(ov.conformance)) + " is given for context and does not determine legal compliance. The exact counts for each area are in Results by NIS2 area.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
     children.push(h2("Conformance profile by NIS2 area"));
     children.push(sbStackTable(scored.byCategory.map(function (g) {
       return sbStackRow(g.categoryId + " " + g.name, [
@@ -6089,14 +6114,14 @@ window.App.ExportDOCX = (function () {
   function csmsScorecardDesignB(scored) {
     var C = window.App.ScoringCSMS;
     var ov = scored.overall, cc = ov.counts, children = [];
-    children.push(h1("Conformance at a glance"));
+    children.push(h1("Conformance summary"));
     children.push(sbTilesRow([
       { t: String(cc.inPlace),    color: COLOR.met,  label: "In place",     fill: COLOR.metBg,  size: 44 },
       { t: String(cc.largely),    color: COLOR.blue, label: "Largely",      fill: "EAF0FB",     size: 44 },
       { t: String(cc.partially),  color: COLOR.near, label: "Partially",    fill: COLOR.nearBg, size: 44 },
       { t: String(cc.notInPlace), color: COLOR.gap,  label: "Not in place", fill: COLOR.gapBg,  size: 44 }
     ]));
-    children.push(body("Conformance profile across " + ov.total + " applicable CSMS elements. ISA/IEC 62443-2-1:2010 gives no single grade, and the conformance index of " + pctText(C.formatPct(ov.conformance)) + " is given for context.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+    children.push(body("The profile covers " + ov.total + " applicable CSMS elements. The conformance index of " + pctText(C.formatPct(ov.conformance)) + " is given for context only.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
     children.push(h2("Conformance profile by category"));
     children.push(sbStackTable(scored.byCategory.map(function (g) {
       return sbStackRow(g.name, [
@@ -6252,7 +6277,7 @@ window.App.ExportDOCX = (function () {
   function pctText(s) { return (!s || s === "-") ? "not available" : s; }
   function craBandPhrase(b) {
     if (b === "met")  return "a strong position";
-    if (b === "near") return "a developing position with recognised gaps";
+    if (b === "near") return "partial conformance";
     if (b === "gap")  return "substantial gaps";
     return "not yet assessed";
   }
@@ -6294,22 +6319,22 @@ window.App.ExportDOCX = (function () {
       regName: d.regName || "the EU Cyber Resilience Act (Regulation (EU) 2024/2847)",
       layersSentence: d.layersSentence || "Three layers were assessed separately: the Annex I Part I product requirements, the Annex I Part II vulnerability-handling requirements, and the conformity and obligations layer. They are reported side by side and are not combined into a single CRA score, because a product with strong security and unfinished conformity work is not ready for the market.",
       keyDatesNote: d.keyDatesNote || "The CRA's Article 14 reporting obligations apply from 11 September 2026 and the full obligations from 11 December 2027. Readiness should be judged against the date that applies to each finding.",
-      misclassFinding: d.misclassFinding || "Finding: the product may be misclassified. The matched Annex III/IV category indicates a higher class than the one set, which changes the required conformity route. See the dedicated section below.",
+      misclassFinding: d.misclassFinding || "The product may be misclassified. The matched Annex III/IV category indicates a higher class than the one set, which changes the required conformity route. A later section sets out the finding.",
       seqPlaceholder: d.seqPlaceholder || "Consultant: one short paragraph on sequencing. Say what must close before the Article 14 date, what CE marking depends on, and what can run in parallel.",
       exposurePlaceholder: d.exposurePlaceholder || "Consultant: one paragraph on the commercial exposure. Say which markets and revenue depend on CE marking under the CRA, and what non-conformity would mean for them.",
       glanceTitle: d.glanceTitle || "CRA readiness at a glance",
-      howToRead: d.howToRead || "Each requirement is judged In place, Partially in place or Not in place. Unknown reduces coverage and confidence, and Not applicable is excluded. The three layers are scored separately and reported side by side with no single CRA score, because missing conformity work on its own prevents the product being placed on the market.",
+      howToRead: d.howToRead || "Each requirement is judged In place, Partially in place or Not in place. Unknown reduces coverage and confidence, and Not applicable is excluded. The three layers are scored separately and reported side by side.",
       limitations: d.limitations || [
-        "The consultant set a conformance state for each requirement on the three-point scale (Not in place, Partially in place, In place), based on the captured evidence. Each layer is rolled up separately, and the three layers are not combined into a single CRA score. The conformance index is given for context. Unknown answers reduce coverage and confidence, and Not applicable requirements are excluded. A requirement that is Not in place is reported as a floor finding.",
+        "The consultant set a conformance state for each requirement on the three-point scale (Not in place, Partially in place, In place), based on the captured evidence. Each layer is rolled up separately, and the conformance index is given for context only. Unknown answers reduce coverage and confidence, and Not applicable requirements are excluded. A requirement that is Not in place is reported as a floor finding.",
         "This is an indicative gap assessment against the EU CRA. It is not a conformity assessment and does not certify the product. The Regulation text governs. No harmonised standard has yet been cited in the Official Journal under the CRA, so presumption of conformity through a standard is not formally available, and a 62443 or other certificate does not establish CRA conformity. The manufacturer, or a notified body where the class requires one, remains responsible for the conformity decision."
       ],
       coverSubLine: d.coverSubLine || "EU Cyber Resilience Act: indicative gap assessment",
       docDescription: d.docDescription || "EU Cyber Resilience Act (CRA) indicative gap assessment",
       defaultClassLabel: d.defaultClassLabel || "Default (self-assessment / internal control)",
-      categoryRowLabel: d.categoryRowLabel || "Matched Annex III/IV category (aid)",
+      categoryRowLabel: d.categoryRowLabel || "Matched Annex III/IV category (classification aid)",
       noBlendPhrase: d.noBlendPhrase || "a single CRA score",
-      blockerTail: d.blockerTail || " cannot yet be lawfully CE-marked or placed on the EU market, however strong its technical security. Closing these gaps is a market-access matter.",
-      blockerTailMulti: d.blockerTailMulti || " cannot yet be lawfully CE-marked or placed on the EU market, however strong their technical security. Closing those gaps is a market-access matter.",
+      blockerTail: d.blockerTail || " cannot yet be lawfully CE-marked or placed on the EU market, however strong its technical security, until the conformity work behind these gaps is done.",
+      blockerTailMulti: d.blockerTailMulti || " cannot yet be lawfully CE-marked or placed on the EU market, however strong their technical security, until the conformity work behind those gaps is done.",
       multiOrgSentence: d.multiOrgSentence || "The organisation-wide obligations (the Annex I Part II vulnerability-handling process, Article 14 reporting readiness and component due diligence) were assessed once for the manufacturer and apply to every product. The Annex I Part I product requirements and the remaining conformity obligations were assessed for each product. The layers are reported side by side and are not combined into a single CRA score.",
       seqPlaceholderMulti: d.seqPlaceholderMulti || "Consultant: one short paragraph on sequencing. Say what must close before the Article 14 date, what CE marking depends on for each product, and what can run in parallel."
     };
@@ -6340,7 +6365,7 @@ window.App.ExportDOCX = (function () {
     if (p3 && p3.overall.counts.notInPlace > 0) {
       var nBlock = p3.overall.counts.notInPlace;
       children.push(body([
-        run("The conformity layer is currently the blocker. ", { bold: true }),
+        run("The conformity layer is the main gap. ", { bold: true }),
         run("With " + nBlock + " conformity obligation" + (nBlock === 1 ? "" : "s") + " not in place, the " + pk.noun + pk.blockerTail)
       ]));
     } else if (layers.length) {
@@ -6350,7 +6375,7 @@ window.App.ExportDOCX = (function () {
         return ac - bc;
       })[0];
       if (worst && craLayerBand(worst.overall) !== "met") {
-        children.push(body("The weakest position is " + worst.layerId + " " + worst.name + ", and the recommendations below start there."));
+        children.push(body("The weakest layer is " + worst.layerId + " " + worst.name + "."));
       } else if (gaps.length === 0) {
         children.push(body("On the evidence captured, all layers in scope are at full conformance. The remaining work is to keep that position current as the product and the supporting standards change."));
       }
@@ -6362,7 +6387,7 @@ window.App.ExportDOCX = (function () {
       children.push(body([run(pk.misclassFinding, { bold: true, color: COLOR.gap })]));
     }
     if (scored.interlock && scored.interlock.triggered) {
-      children.push(body([run("The conformity layer has been assessed without the technical layers that support it. See the dedicated section below.", { color: COLOR.gap })]));
+      children.push(body([run("The conformity layer has been assessed without the technical layers that support it. A later section names the missing layers.", { color: COLOR.gap })]));
     }
 
     if (gaps.length) {
@@ -6380,7 +6405,7 @@ window.App.ExportDOCX = (function () {
     else children.push(placeholderPara(pk.exposurePlaceholder, NARR_EXPOSURE));
 
     // Said once: the critical caveats box under the summary carries it where the instrument lists it.
-    if (!/informs conformity/.test((scored.criticalCaveats || []).join(" "))) children.push(body("This assessment informs conformity but does not determine or certify it. The manufacturer, or a notified body where the class requires one, remains responsible for the conformity decision."));
+    if (!/informs conformity|determine or certify/.test((scored.criticalCaveats || []).join(" "))) children.push(body("This assessment supports the conformity work but does not determine or certify conformity. The manufacturer, or a notified body where the class requires one, remains responsible for the conformity decision."));
     return children;
   }
 
@@ -6391,10 +6416,10 @@ window.App.ExportDOCX = (function () {
     // The classification-driven caveats only exist once the product has been
     // classified. A report produced before that is the one most in need of
     // saying what it is not, so the standing statement is always present.
-    caveats.push("This gap analysis supports preparation for conformity. It is not a conformity assessment and confers no presumption of conformity. It is not a determination by a notified body or a market surveillance authority.");
+    caveats.push("This gap analysis supports preparation for conformity. It is not a conformity assessment or a determination by a notified body or market surveillance authority, and it confers no presumption of conformity.");
     if (!caveats.length) return [];
     var TableRow = window.docx.TableRow, WidthType = window.docx.WidthType, Table = window.docx.Table, ShadingType = window.docx.ShadingType, TableCell = window.docx.TableCell;
-    var paras = [ new window.docx.Paragraph({ style: "BodyText", children: [run("Critical caveats: read before using this report", { bold: true, color: COLOR.gap })] }) ];
+    var paras = [ new window.docx.Paragraph({ style: "BodyText", children: [run("Critical caveats", { bold: true, color: COLOR.gap })] }) ];
     caveats.forEach(function (c) {
       paras.push(new window.docx.Paragraph({ style: "BodyText", spacing: { before: 60 }, children: [run(c)] }));
     });
@@ -6421,7 +6446,7 @@ window.App.ExportDOCX = (function () {
         return { t: CRA.formatPct(l.overall.conformance), color: b.color, label: l.layerId + "  " + l.name + "  (" + l.overall.gaps + " gap" + (l.overall.gaps === 1 ? "" : "s") + ")", fill: b.fill, size: 40 };
       })));
     }
-    children.push(body(pk.Noun + ": " + ((target && target.name) || "(not set)") + " (classified " + (cls.classLabel || "Default") + "). The conformance index for each layer is given for context. The three layers are not combined into " + pk.noBlendPhrase + ", and open conformity gaps prevent market placement however strong the technical position is.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+    children.push(body(pk.Noun + ": " + ((target && target.name) || "(not set)") + " (classified " + (cls.classLabel || "Default") + "). The conformance index for each layer is given for context only.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
 
     children.push(h2("Conformance profile by layer"));
     children.push(sbStackTable(layers.map(function (l) {
@@ -6490,7 +6515,7 @@ window.App.ExportDOCX = (function () {
     var cls = scored.classification || {};
     var children = [];
     if (cls.misclassification) {
-      children.push(h1("Finding: possible " + pk.noun + " misclassification"));
+      children.push(h1("Possible " + pk.noun + " misclassification"));
       children.push(body([run(cls.misclassificationNote, { color: COLOR.gap })]));
     }
     if (scored.interlock && scored.interlock.triggered) {
@@ -6597,7 +6622,7 @@ window.App.ExportDOCX = (function () {
   // open gap with the requirement, why it matters, evidence, impact, action
   // and owner. Empty consultant fields render as the red to-be-completed note.
   function craRoadmapSection(scored, profile) {
-    var children = [ h1n("4", "Recommendations: conformance gap roadmap") ];
+    var children = [ h1n("4", "Recommendations and gap roadmap") ];
     var roadmap = craSortedRoadmap(scored);
     if (!roadmap.length) {
       children.push(body("No applicable requirement is Not in place or Partially in place across the layers in scope, so there are no recommendations."));
@@ -6675,8 +6700,8 @@ window.App.ExportDOCX = (function () {
     }).map(function (pt) { return pt.target.name; });
     if (blocked.length) {
       children.push(body([
-        run("Market placement is currently blocked for " + nis2ListJoin(blocked) + ". ", { bold: true }),
-        run("Because of open conformity obligations, these " + pk.noun + "s" + pk.blockerTailMulti)
+        run("Open conformity obligations affect " + nis2ListJoin(blocked) + ". ", { bold: true }),
+        run("These " + pk.noun + "s" + pk.blockerTailMulti)
       ]));
     }
 
@@ -6685,11 +6710,11 @@ window.App.ExportDOCX = (function () {
     perT.forEach(function (pt) {
       var cls = pt.result.classification || {};
       if (cls.misclassification) {
-        children.push(body([run("Finding (" + pt.target.name + "): " + pk.misclassFinding.replace(/^Finding: /, "").replace(/ See the dedicated section below\.$/, ""), { bold: true, color: COLOR.gap })]));
+        children.push(body([run("Finding (" + pt.target.name + "): " + pk.misclassFinding.replace(/^Finding: /, "").replace(/ (See the dedicated section below|A later section sets out the finding)\.$/, ""), { bold: true, color: COLOR.gap })]));
       }
     });
     if (perT[0].result.interlock && perT[0].result.interlock.triggered) {
-      children.push(body([run("The conformity layer has been assessed without the technical layers that support it. See the dedicated section below.", { color: COLOR.gap })]));
+      children.push(body([run("The conformity layer has been assessed without the technical layers that support it. A later section names the missing layers.", { color: COLOR.gap })]));
     }
 
     if (combined.length) {
@@ -6707,7 +6732,7 @@ window.App.ExportDOCX = (function () {
     else children.push(placeholderPara(pk.exposurePlaceholder, NARR_EXPOSURE));
 
     // Said once: the critical caveats box under the summary carries it where the instrument lists it.
-    if (!/informs conformity/.test(((perT[0] && perT[0].result && perT[0].result.criticalCaveats) || []).join(" "))) children.push(body("This assessment informs conformity but does not determine or certify it. The manufacturer, or a notified body where the class requires one, remains responsible for the conformity decision."));
+    if (!/informs conformity|determine or certify/.test(((perT[0] && perT[0].result && perT[0].result.criticalCaveats) || []).join(" "))) children.push(body("This assessment supports the conformity work but does not determine or certify conformity. The manufacturer, or a notified body where the class requires one, remains responsible for the conformity decision."));
     return children;
   }
 
@@ -6731,7 +6756,7 @@ window.App.ExportDOCX = (function () {
         return { t: CRA.formatPct(l.overall.conformance), color: b.color, label: l.layerId + "  " + l.name + "  (" + l.overall.gaps + " gap" + (l.overall.gaps === 1 ? "" : "s") + ")", fill: b.fill, size: 40 };
       })));
     });
-    children.push(body("The conformance index for each layer is given for context. The layers are not combined into " + pk.noBlendPhrase + ", and open conformity gaps prevent market placement however strong the technical position is. The organisation-wide answers are one shared set, and the tiles for each " + pk.noun + " show its own position.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+    children.push(body("The conformance index for each layer is given for context only. The organisation-wide tiles show one shared set of answers, and the tiles for each " + pk.noun + " show its own layers.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
 
     var stacks = [];
     orgLs.forEach(function (l) {
@@ -6777,7 +6802,7 @@ window.App.ExportDOCX = (function () {
   function craScopeSectionMulti(perT, scoredFirst, pk) {
     var TableRow = window.docx.TableRow;
     var widths = [2400, 2000, 2726, 1900];
-    var rows = [ buildHeaderRow([pk.Noun, "Class", "Matched category (aid)", "Conformity route"], widths) ];
+    var rows = [ buildHeaderRow([pk.Noun, "Class", "Matched category", "Conformity route"], widths) ];
     perT.forEach(function (pt) {
       var cls = pt.result.classification || {};
       rows.push(new TableRow({ children: [
@@ -6799,7 +6824,7 @@ window.App.ExportDOCX = (function () {
     perT.forEach(function (pt) {
       var cls = pt.result.classification || {};
       if (cls.misclassification) {
-        children.push(h1("Finding: possible " + pk.noun + " misclassification - " + pt.target.name));
+        children.push(h1("Possible " + pk.noun + " misclassification - " + pt.target.name));
         children.push(body([run(cls.misclassificationNote, { color: COLOR.gap })]));
       }
     });
@@ -6830,7 +6855,7 @@ window.App.ExportDOCX = (function () {
   }
 
   function craRoadmapSectionMulti(combined, profile, pk) {
-    var children = [ h1n("4", "Recommendations: conformance gap roadmap (all " + pk.noun + "s)") ];
+    var children = [ h1n("4", "Recommendations and gap roadmap (all " + pk.noun + "s)") ];
     if (!combined.length) {
       children.push(body("No applicable requirement is Not in place or Partially in place across the " + pk.noun + "s and layers in scope, so there are no recommendations."));
       return children;
@@ -7025,7 +7050,7 @@ window.App.ExportDOCX = (function () {
     children.push(body("This report covers " + roll.siteCount + " " + nounP + ": " +
       roll.siteNames.join(", ") + ". Each " + noun + " is assessed separately, and the organisation-wide result " +
       "for a requirement is the result at the weakest " + noun + ". The " + nounP + " that set each result are named."));
-    children.push(body("The weakest " + noun + " sets the result because an organisation is exposed " +
+    children.push(body("An organisation is exposed " +
       "wherever it is weakest. An average of " + roll.siteCount + " " + nounP + " would give a comfortable figure for an " +
       "organisation with a serious gap at one of them."));
 
@@ -7076,7 +7101,7 @@ window.App.ExportDOCX = (function () {
 
     // Where each site stands overall, so the reader can see which site is
     // carrying the organisation and which is holding it back.
-    var per = [ h1n("3", cap(nounP) + " side by side") ];
+    var per = [ h1n("3", "Results by " + noun) ];
     // This one stays portrait with the prose, so it sums to CAF_PORTRAIT_W.
     var W2 = { name: 3426, differ: 2800, cover: 2800 };
     var headRow = new window.docx.TableRow({ tableHeader: true, children: [
@@ -7286,7 +7311,7 @@ window.App.ExportDOCX = (function () {
         var doc = makeDoc(engagement, {
           creator: (engagement.engagement && engagement.engagement.consultant) || "OT Cyber Assessment Tool",
           title:   instrument.title + " - " + ((engagement.engagement && engagement.engagement.clientName) || "Client"),
-          description: "Executive site security assessment",
+          description: window.App.Report.standardRef(instrument) + " Security Level assessment",
           styles: buildStyles(),
           sections: [
             { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0, gutter: 0 } } }, children: coverChildren },

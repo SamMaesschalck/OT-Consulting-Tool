@@ -147,19 +147,19 @@
       var ws = lost();
       ok(ws.length === 1 && /^Detailed report: 1 accepted rewording is not in the Word report, as the text it replaced has changed\./.test(ws[0].text) && !/[–—]/.test(ws[0].text), "the review's warnings say so once", JSON.stringify(ws));
       ok(RR.exportWarningTexts().some(function (t) { return /accepted rewording/.test(t); }), "and so does the question before a download, which only asks");
-      ok(RR.acceptedNote(x.t0) === "No longer applies: the text it replaced has changed.", "the comment's note says the same");
+      ok(RR.acceptedNote(x.t0) === "This no longer applies because the text it replaced has changed.", "the comment's note says the same");
       RT.state.stage = "peer"; RT.render();
       var sel = main.querySelector(".rv-filters select");
       if (sel) { sel.value = ""; sel.dispatchEvent(new w.Event("change", { bubbles: true })); }
       return poll(function () { return main.querySelector('[data-comment-id="' + x.t0.comment.id + '"]'); });
     }).then(function (card) {
       var note = card.querySelector(".rv-accept-note");
-      ok(!!note && note.textContent === "No longer applies: the text it replaced has changed." && !!card.querySelector(".rv-undo"), "the comment's card shows it, with Undo the accepted wording still offered", card.textContent);
+      ok(!!note && note.textContent === "This no longer applies because the text it replaced has changed." && !!card.querySelector(".rv-undo"), "the comment's card shows it, with Undo the accepted wording still offered", card.textContent);
       ok(!!main.querySelector('[data-review-warning="reworded-not-applied"]'), "and the Peer review page lists the warning");
       return reportPage(0);
     }).then(function () {
       var r = row(KEY);
-      ok(!!r && r.getAttribute("data-reworded-state") === "changed" && /No longer applies: the text it replaced has changed\./.test(r.textContent), "the Report page says it no longer applies", r && r.textContent);
+      ok(!!r && r.getAttribute("data-reworded-state") === "changed" && /This no longer applies because the text it replaced has changed./.test(r.textContent), "the Report page says it no longer applies", r && r.textContent);
       ok(!!main.querySelector('.rv-warn-card [data-review-warning="reworded-not-applied"]'), "and shows the warning in its Peer review card");
       r.querySelector(".wo-back").click();
       ok(!(P().reportCustom || {}).detailed, "Back to the generated version takes it out, and nothing is left stored");

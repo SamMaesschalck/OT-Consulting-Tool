@@ -112,12 +112,12 @@ H.test(function (ok, done) {
 
   word(eOut, "z1").then(function (d) {
     var es = sec(d, /Executive summary$/);
-    ok(/covered 1 of the seven Foundational Requirements.*\(5 Foundational Requirement\(s\) were not assessed and 1 was out of scope\)/.test(es.text),
+    ok(/covered 1 of the seven Foundational Requirements.*\(5 Foundational Requirements were not assessed and 1 was out of scope\)/.test(es.text),
        "exec summary: 1 assessed, 5 not assessed and 1 out of scope, as the tile counts", (es.text.match(/The assessment covered[^\n]*/) || [""])[0]);
-    ok(es.text.indexOf("(6 Foundational Requirement(s) were not assessed)") === -1, "exec summary: never 6 not assessed");
+    ok(es.text.indexOf("(6 Foundational Requirements were not assessed)") === -1, "exec summary: never 6 not assessed");
     // 2. The caveat is its own sentence; the verdict is "so far".
     ok(es.text.indexOf(MET + " so far") >= 0, "the verdict reads met so far", es.text.slice(0, 300));
-    ok(es.text.indexOf("Not every Foundational Requirement in scope has been assessed yet, so the target is not yet shown to be met.") >= 0,
+    ok(es.text.indexOf("Some Foundational Requirements in scope have not been assessed, so it cannot yet be confirmed that the target is met.") >= 0,
        "followed by a sentence saying the result is not complete");
     ok(!/, though not every/.test(es.text), "and nothing is spliced into the verdict phrase");
     var sm = sec(d, /Scope and method$/);
@@ -141,7 +141,7 @@ H.test(function (ok, done) {
     return word(eng(one, {}, responsesFor(inst, "z1", 2, ["FR1"]).concat(naResp)), "z1");
   }).then(function (d) {
     var es = sec(d, /Executive summary$/);
-    ok(/covered 2 of the seven Foundational Requirements.*\(5 Foundational Requirement\(s\) were not assessed\)/.test(es.text),
+    ok(/covered 2 of the seven Foundational Requirements.*\(5 Foundational Requirements were not assessed\)/.test(es.text),
        "an all-N/A FR counts as assessed: 2 covered, 5 not", (es.text.match(/The assessment covered[^\n]*/) || [""])[0]);
     var sm = sec(d, /Scope and method$/);
     ok(/Foundational Requirements assessed: 2 of 7\./.test(sm.text) && !/not assessed: [^\n]*FR2 /.test(sm.text),

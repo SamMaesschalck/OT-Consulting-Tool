@@ -264,7 +264,7 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
       ok(list.length === 1 && list[0].text === "Add the document title" && list[0].where.kind === "info" && list[0].where.field === "title", "an empty title is the one thing still to complete, and it names the field", JSON.stringify(list));
       return HD.buildDocument(p, { issueStatus: "final" });
     }).then(function () { ok(false, "a final without a title is refused"); }, function (e) {
-      ok(e.message === "This document still has 1 thing to write, so it cannot be issued as final. Export it as a draft, or complete it first.", "a final is refused while a prompt is outstanding", e.message);
+      ok(e.message === "This document still has 1 red prompt to complete, so it cannot be issued as final. Export it as a draft, or complete the prompt first.", "a final is refused while a prompt is outstanding", e.message);
     }).then(function () { return build(p, "draft"); }).then(function (r) {
       var tbl = controlTable(r.doc), row = (tbl.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || [])[7] || "";
       ok(/>Add the document title</.test(row) && /<w:color w:val="E00000"\/>/.test(row), "a draft still builds, with the prompt in red in the Document row");

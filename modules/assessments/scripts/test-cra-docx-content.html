@@ -99,7 +99,7 @@ window.docx = (function () {
       check("names the client and the product", allText.indexOf("Ferrovia Controls") !== -1 && allText.indexOf("commissioned a gap assessment of SentinelEdge IDS-2200") !== -1);
       check("states the class and conformity route", allText.indexOf("Important - Class II") !== -1);
       check("characterises each layer (strong / developing / substantial gaps)", allText.indexOf("a strong position") !== -1 && allText.indexOf("substantial gaps") !== -1);
-      check("names the conformity layer as the blocker", allText.indexOf("The conformity layer is currently the blocker") !== -1);
+      check("names the conformity layer as the blocker", allText.indexOf("The conformity layer is the main gap") !== -1);
       check("states the Article 14 / full-obligation dates", allText.indexOf("11 September 2026") !== -1 && allText.indexOf("11 December 2027") !== -1);
       check("names the immediate priorities from the roadmap", allText.indexOf("The immediate priorities are") !== -1);
       // The tour dataset fills the consultant narrative slots, so the demo
@@ -112,7 +112,7 @@ window.docx = (function () {
       check("closes with the not-a-determination statement", allText.indexOf("informs conformity but does not determine or certify it") !== -1);
 
       section("Critical caveats as a shaded block");
-      check("caveat block heading present", allText.indexOf("Critical caveats: read before using this report") !== -1);
+      check("caveat block heading present", allText.indexOf("Critical caveats") !== -1);
       check("no-harmonised-standard caveat present", allText.indexOf("harmonised standard") !== -1);
 
       section("Scorecard page");
@@ -129,7 +129,7 @@ window.docx = (function () {
       check("register carries captured evidence text", allText.indexOf("No known exploitable vulnerabilities open at release") !== -1);
 
       section("Recommendations (prose roadmap)");
-      check("Recommendations section present", allText.indexOf("Recommendations: conformance gap roadmap") !== -1);
+      check("Recommendations section present", allText.indexOf("Recommendations and gap roadmap") !== -1);
       check("entries carry the paraphrased requirement", allText.indexOf("Requirement (paraphrased):") !== -1);
       check("entries carry why-it-matters rationale", allText.indexOf("Why this matters:") !== -1);
       check("entries carry impact, action and owner", allText.indexOf("Business impact:") !== -1 && allText.indexOf("Recommended action:") !== -1 && allText.indexOf("Owner:") !== -1);
