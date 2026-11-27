@@ -118,9 +118,25 @@ window.addEventListener("DOMContentLoaded", function () {
       function machItem(code) {
         return (mach.items || []).filter(function (it) { return it.code === code; })[0] || {};
       }
-      ok(/learning phase/.test(machItem("MR-M1.7").verbatimText || ""),
-         "Machinery: the self-evolving item carries Annex III 1.2.1(c), including the learning phase",
-         (machItem("MR-M1.7").verbatimText || "").slice(0, 70));
+      // Checked against the Official Journal (OJ L 165, 29.6.2023, p. 47-49).
+      // The learning-phase provision is point (d) of the first list in 1.2.1
+      // and belongs to the safety-function limits item. It was once quoted
+      // against the self-evolving item, which has its own list in 1.2.1.
+      ok(/^the limits of the safety functions .*learning phase/.test(machItem("MR-M1.5").verbatimText || "") &&
+         /1\.2\.1, point \(d\)/.test(machItem("MR-M1.5").reference || ""),
+         "Machinery: the safety-function limits item carries Annex III 1.2.1(d), including the learning phase",
+         (machItem("MR-M1.5").verbatimText || "").slice(0, 70) + " | " + (machItem("MR-M1.5").reference || ""));
+      ok(!/settings or rules/.test(machItem("MR-M1.7").verbatimText || "") &&
+         /self-evolving/.test(machItem("MR-M1.7").reference || ""),
+         "Machinery: the self-evolving item cites its own provisions and does not quote the settings point",
+         machItem("MR-M1.7").reference || "");
+      ok(/^the tracing log of the data generated/.test(machItem("MR-M1.6").verbatimText || "") &&
+         /1\.2\.1, point \(f\)/.test(machItem("MR-M1.6").reference || ""),
+         "Machinery: the tracing-log item carries Annex III 1.2.1(f)",
+         machItem("MR-M1.6").reference || "");
+      ok(/1\.1\.6/.test(machItem("MR-M1.9").reference || ""),
+         "Machinery: the HMI item cites Annex III 1.1.6",
+         machItem("MR-M1.9").reference || "");
       ok(/For wireless control/.test(machItem("MR-M1.8").verbatimText || ""),
          "Machinery: the wireless item carries the wireless-control provision",
          (machItem("MR-M1.8").verbatimText || "").slice(0, 70));
