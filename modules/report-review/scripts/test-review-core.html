@@ -73,7 +73,7 @@
     r = RC.importFile(s, file("fa", "A", "2026-01-06T00:00:00Z", []));
     ok(r.removed === 0 && RC.findThread(s, "c1") && RC.findThread(s, "c1").withdrawn, "unless the author has answered it: then it stays, marked");
     r = RC.importFile(s, file("x", "X", "2026-01-06T00:00:00Z", [], "none", "p-other"));
-    ok(!r.ok && /different pack/.test(r.error), "a file for another pack is refused", r.error);
+    ok(!r.ok && /is for a pack that was not sent from here/.test(r.error), "a file for another pack is refused", r.error);
     ok(!RC.importFile(s, { schema: "nope" }).ok, "and so is anything else");
 
     // ---- status and replies ---------------------------------------------------------
@@ -106,7 +106,7 @@
     var w = RC.emptyStore();
     ok(kinds(w, null) === "not-reviewed", "nothing sent: not reviewed");
     RC.recordRound(w, { round: 1, packId: "p1", createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
-    ok(/round 1 was sent/.test(RC.warnings(w, null)[0].text), "sent: says so");
+    ok(/Round 1 was sent/.test(RC.warnings(w, null)[0].text), "sent: says so");
     RC.importFile(w, file("f1", "A", "2026-01-02T00:00:00Z", [comment("c1", "A", "x")], "changes-requested"));
     ok(kinds(w, ["a"]) === "changes-requested,must-fix", "changes requested and an open must-fix", kinds(w, ["a"]));
     RC.setStatus(w, "c1", "resolved");
@@ -155,7 +155,7 @@
     ok(RC.warnings(qa, null, { qaReviewBy: "A N Other" }).length === 0, "nothing sent but QA review by filled in: reviewed outside the tools, no warning");
     ok(RC.warnings(qa, null, { qaReviewBy: "   " })[0].kind === "not-reviewed", "a blank QA review by does not count");
     RC.recordRound(qa, { round: 1, packId: "pq", createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
-    ok(/round 1 was sent/.test(RC.warnings(qa, null, { qaReviewBy: "A N Other" })[0].text), "once a round is sent, waiting for it still warns");
+    ok(/Round 1 was sent/.test(RC.warnings(qa, null, { qaReviewBy: "A N Other" })[0].text), "once a round is sent, waiting for it still warns");
 
     // ---- a reviewer who changes a comment the author has closed ------------------------------
     var ro = RC.emptyStore(); RC.recordRound(ro, pack);
@@ -333,7 +333,7 @@
     // Undo the accepted wording, and what Reopen does.
     var a1 = m.box.querySelector('[data-comment-id="a1"]');
     ok(a1.querySelector(".rv-undo") && /Undo the accepted wording/.test(a1.querySelector(".rv-undo").textContent), "an accepted comment offers to undo the wording");
-    ok(/does not change the report text/.test(a1.querySelector(".rv-reopen").getAttribute("title") || ""), "and Reopen says it leaves the text as it is");
+    ok(/leave the report text as it is/.test(a1.querySelector(".rv-reopen").getAttribute("title") || ""), "and Reopen says it leaves the text as it is");
     a1.querySelector(".rv-undo").click();
     ok(m.log.undone === "a1" && /Put back/.test(m.box.querySelector(".rv-notice").textContent), "Undo goes to the tool and the card says what happened");
     var noUndo = mk(s, { undoAccept: null });

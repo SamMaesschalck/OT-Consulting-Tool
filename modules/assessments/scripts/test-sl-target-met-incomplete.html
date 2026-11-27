@@ -245,8 +245,8 @@ H.test(function (ok, done) {
     // The caption under the value is export-docx.js's wording; the count is pinned.
     ok(/Not yet\n[^\n]*\(1 of 7 FRs assessed\)/.test(d.all), "the scorecard tile reads Not yet, with 1 of 7 FRs assessed",
        (d.all.match(/Not yet\n.{0,40}/) || [""])[0]);
-    ok(/Closeness \(context\)\nNot yet \(1 of 7 FRs assessed\)\n/.test(d.all), "the overall posture table reads Not yet (1 of 7 FRs assessed)",
-       (d.all.match(/Closeness \(context\)\n.{0,40}/) || [""])[0]);
+    ok(/Closeness \(for context\)\nNot yet \(1 of 7 FRs assessed\)\n/.test(d.all), "the overall posture table reads Not yet (1 of 7 FRs assessed)",
+       (d.all.match(/Closeness \(for context\)\n.{0,40}/) || [""])[0]);
     var es = sec(d.list, /Executive summary$/);
     ok(es.text.indexOf(MET) >= 0 && qualified(es.text), "the executive summary says met across the assessed FRs, qualified as not yet complete",
        es.text.slice(0, 400));
@@ -265,10 +265,10 @@ H.test(function (ok, done) {
     ok(!/(^|\n)Not yet( \(|\n|$)/.test(d.all), "control: with every FR met, no Word tile or table reads Not yet",
        (d.all.match(/.{0,40}Not yet.{0,40}/) || [""])[0]);
     // Pinned to the posture table's own row: its header ends "Closeness
-    // (context)" and the first value cell follows it. Any per-FR "Yes" row
+    // (for context)" and the first value cell follows it. Any per-FR "Yes" row
     // satisfied the looser check this replaced.
-    ok(/Closeness \(context\)\nYes\nFR\d/.test(d.all), "control: and the posture table reads Yes",
-       (d.all.match(/Closeness \(context\)\n.{0,40}/) || [""])[0]);
+    ok(/Closeness \(for context\)\nYes\nFR\d/.test(d.all), "control: and the posture table reads Yes",
+       (d.all.match(/Closeness \(for context\)\n.{0,40}/) || [""])[0]);
     ok(/Yes\nTarget met\n/.test(d.all), "control: the scorecard tile reads Yes", (d.all.match(/.{0,20}Target met.{0,20}/) || [""])[0]);
     var es = sec(d.list, /Executive summary$/);
     ok(es.text.indexOf(MET) >= 0 && !qualified(es.text), "control: the summary says the target is met, with no caveat", es.text.slice(0, 300));

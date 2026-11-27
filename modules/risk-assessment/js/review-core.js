@@ -39,9 +39,9 @@
   // help: what each severity means, shown to the reviewer as they choose and
   // to the author on the comments list.
   var SEVERITIES = [
-    { id: "must-fix", label: "Must fix", help: "Wrong, misleading, or not fit to send to the client. The author's Issue check warns while any are open." },
-    { id: "should-fix", label: "Should fix", help: "Weakens the report. The author should change it unless there is a good reason not to." },
-    { id: "suggestion", label: "Suggestion", help: "An improvement the author can take or leave." }
+    { id: "must-fix", label: "Must fix", help: "The text is wrong or misleading, or not fit to send to the client. The author's Issue check warns while any are open." },
+    { id: "should-fix", label: "Should fix", help: "The point weakens the report, and the author should change it unless there is a good reason not to." },
+    { id: "suggestion", label: "Suggestion", help: "The author can take this improvement or leave it." }
   ];
   var STATUSES = { open: "Open", resolved: "Resolved", wontchange: "Won't change" };
   var VERDICTS = {
@@ -94,7 +94,7 @@
     if (/^PK/.test(t)) return { ok: false, error: "This is a Word or Excel file. Open the review pack (.json) the author sent, not the report itself." };
     if (/^%PDF/.test(t)) return { ok: false, error: "This is a PDF. Open the review pack (.json) the author sent, not the report itself." };
     var d = parseJson(t);
-    if (!d || typeof d !== "object") return { ok: false, error: "This is not a review pack or a review file: it could not be read." };
+    if (!d || typeof d !== "object") return { ok: false, error: "This file could not be read as a review pack or a review file." };
     var s = d.schema;
     if (contract("reviewPack").acceptedSchemas.indexOf(s) !== -1) return checkPack(d);
     if (contract("reviewFile").acceptedSchemas.indexOf(s) !== -1) return checkFile(d);
@@ -115,7 +115,7 @@
   }
   function checkFile(d) {
     if (!d || contract("reviewFile").acceptedSchemas.indexOf(d.schema) === -1) return { ok: false, error: "This is not a review file." };
-    if (!d.packId || !Array.isArray(d.comments)) return { ok: false, error: "This review file is incomplete: it names no pack, or holds no comment list." };
+    if (!d.packId || !Array.isArray(d.comments)) return { ok: false, error: "This review file is incomplete. It has no pack reference or no comment list." };
     if (d.comments.some(function (c) { return !c || typeof c !== "object" || !c.id || !c.anchor || typeof c.anchor !== "object"; })) {
       return { ok: false, error: "This review file is damaged: some of its comments cannot be read." };
     }
@@ -190,7 +190,7 @@
     if (!store.rounds.length) return { ok: false, noPack: true, error: "No pack has been sent from here, so this review file has nothing to attach to. Open the assessment or risk project it was reviewed from." + OLDER_COPY };
     var round = roundOfPack(store, file.packId);
     if (!round) {
-      return { ok: false, noPack: true, error: "This review file answers a different pack" + (file.reviewer ? " (from " + file.reviewer + ", round " + (file.round || "?") + ")" : "") + ", not one sent from here." + OLDER_COPY };
+      return { ok: false, noPack: true, error: "This review file" + (file.reviewer ? " from " + file.reviewer + " (round " + (file.round || "?") + ")" : "") + " is for a pack that was not sent from here." + OLDER_COPY };
     }
     var fileId = file.fileId || (file.packId + "|" + norm(file.reviewer));
     var res = { ok: true, reviewer: file.reviewer || "Reviewer", round: round.round, added: 0, updated: 0, reopened: 0, removed: 0, withdrawn: 0, withdrawnAccepted: 0,
@@ -407,7 +407,7 @@
     var out = [];
     var files = counted(store), latest = latestVerdicts(store), last = lastRound(store);
     if (!last) {
-      if (!files.length && !(opts && norm(opts.qaReviewBy))) out.push({ kind: "not-reviewed", text: "Not reviewed yet: no review has come back for this report." });
+      if (!files.length && !(opts && norm(opts.qaReviewBy))) out.push({ kind: "not-reviewed", text: "No review has come back for this report yet." });
     } else {
       var back = files.filter(function (f) { return f.packId === last.packId; });
       var aside = store.files.filter(function (f) { return f.setAside && f.packId === last.packId; }).length;
@@ -415,7 +415,7 @@
         out.push({ kind: "not-reviewed", text: back.length
           ? plural(back.length, "review file") + (back.length === 1 ? " is" : " are") + " back for round " + last.round + " with no verdict yet."
           : aside ? "Round " + last.round + " was sent, and the only " + (aside === 1 ? "review back has" : "reviews back have") + " been set aside."
-          : !files.length ? "Not reviewed yet: round " + last.round + " was sent, and no review has come back."
+          : !files.length ? "Round " + last.round + " was sent, and no review has come back yet."
           : "Round " + last.round + " was sent, and no review has come back for it yet." });
       }
     }

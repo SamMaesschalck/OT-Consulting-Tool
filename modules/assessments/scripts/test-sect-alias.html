@@ -1,0 +1,145 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Report customisations saved under a renamed heading</title></head>
+<body>
+<!--
+  A section customisation is keyed by the slug of the GENERATED heading. The
+  wording pass renamed several headings ("Not a formal assessment" became
+  "Status of this assessment", "Roadmap toward expected outcomes" became
+  "Roadmap towards ...", and so on), which changes their keys. Report.js maps
+  each old key to its new one (sectionKeyAlias) and moves a saved
+  customisation across (migrateSectionKeys) when the project loads, when an
+  assessment is opened and wherever the store is read.
+
+  This loads a CAF project saved with customisations under the old keys and
+  checks that they apply to the renamed sections on screen and in Word:
+  the hidden status box stays hidden (and its caveat moves to Method and
+  limitations, the export's own check on that key), and the renamed roadmap
+  keeps its consultant title. The alias map itself is checked against the
+  slugs of the new headings, so a map entry that points nowhere fails.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: ["caf"] }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+function parse(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    var t = textOf(el);
+    if (/^Heading1$/i.test(val)) { cur = { title: t.trim(), paras: [] }; out.push(cur); return; }
+    if (cur) cur.paras.push(t);
+  });
+  return out;
+}
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, R = A.Report;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+
+  // ---- the map: every old key lands on the slug of the heading that replaced it ----
+  var pairs = [
+    ["Not a formal assessment", "Status of this assessment"],
+    ["Conformance and gap analysis (not a compliance determination)", "Status of this gap analysis"],
+    ["Conformance and gap analysis (not a certification)", "Status of this gap analysis"],
+    ["Important", "Status of this gap analysis"],
+    ["A characterisation, not a measurement", "Limits of this characterisation"],
+    ["The three positions, side by side", "Results by layer"],
+    ["EU CRA gap assessment (indicative, not a conformity assessment)", "EU CRA gap assessment (indicative)"],
+    ["Maturity profile (no single grade)", "Maturity profile"],
+    ["Program maturity headline", "Programme maturity headline"],
+    ["Roadmap toward expected outcomes", "Roadmap towards expected outcomes"],
+    ["FR achievement vs target", "FR achievement against target"],
+    ["Alignment at a glance", "Alignment summary"],
+    ["Conformance at a glance", "Conformance summary"],
+    ["Scoring methodology", "What is reported"],
+    ["Finding: possible product misclassification", "Possible product misclassification"],
+    ["Finding: possible machine misclassification", "Possible machine misclassification"],
+    ["Recommendations: conformance gap roadmap", "Recommendations and gap roadmap"],
+    ["Recommendations: conformance gap roadmap (all products)", "Recommendations and gap roadmap (all products)"],
+    ["Sites side by side", "Results by site"]
+  ];
+  pairs.forEach(function (p) {
+    var from = R.sectionKey(p[0], {}), to = R.sectionKey(p[1], {});
+    ok(R.sectionKeyAlias(from) === to, "old key " + from + " maps to " + to, R.sectionKeyAlias(from));
+  });
+  ["status-of-this-assessment", "executive-summary", "terms-used-in-this-report", "results-by-layer", "how-to-read-this-report"].forEach(function (k) {
+    ok(R.sectionKeyAlias(k) === k, "a current key is left alone: " + k);
+  });
+  var merged = R.migrateSectionKeys({ "not-a-formal-assessment": { hidden: true, title: "Old" }, "status-of-this-assessment": { title: "New" } });
+  ok(!merged["not-a-formal-assessment"] && merged["status-of-this-assessment"].title === "New" && merged["status-of-this-assessment"].hidden === true,
+     "where both keys are set, the new key's fields win and the old one fills the gaps", JSON.stringify(merged));
+
+  // ---- a project saved with customisations under the old keys ----
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === "ncsc-caf" && !E.__toured) { E.__toured = true; A.TourCAF.apply(E); } });
+  E.activateInstrument("ncsc-caf");
+  var pf = JSON.parse(JSON.stringify(E.getProjectFile()));
+  var assId = pf.activeAssessmentId;
+  pf.assessments[assId].reportCustom = {
+    "not-a-formal-assessment": { hidden: true },
+    "roadmap-toward-expected-outcomes": { title: "Agreed remediation plan" }
+  };
+  E.loadProjectFile(pf);
+
+  var store = E.getReportCustom();
+  ok(store["status-of-this-assessment"] && store["status-of-this-assessment"].hidden === true,
+     "on load, the hidden flag moved to the new key", JSON.stringify(store));
+  ok(!store["not-a-formal-assessment"] && !store["roadmap-toward-expected-outcomes"],
+     "on load, the old keys are gone, so the next save writes the new ones", JSON.stringify(store));
+  ok(E.getReportSection("roadmap-towards-expected-outcomes").title === "Agreed remediation plan",
+     "the engine's own lookup finds the title under the new key");
+  var saved = E.getProjectFile().assessments[assId].reportCustom || {};
+  ok(saved["status-of-this-assessment"] && !saved["not-a-formal-assessment"], "the project file now carries the new key");
+
+  // ---- the screen report ----
+  A.UI.go("report");
+  var main = document.getElementById("main");
+  var statusCard = main.querySelector('.card[data-section="status-of-this-assessment"]');
+  ok(!!statusCard, "the screen card is keyed by the new heading");
+  ok(statusCard && statusCard.classList.contains("section-hidden"), "the screen card is shown as hidden");
+  var road = main.querySelector('.card[data-section="roadmap-towards-expected-outcomes"]');
+  ok(road && /Agreed remediation plan/.test(road.textContent), "the renamed roadmap card shows the consultant's title");
+
+  // ---- the Word report ----
+  A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+    E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err, blob) {
+      if (err || !blob) { ok(false, "the Word report builds", err && err.message); done(); return; }
+      docXml(blob).then(parse).then(function (secs) {
+        var titles = secs.map(function (s) { return s.title; });
+        ok(titles.indexOf("Status of this assessment") === -1, "Word leaves out the status section hidden under its old key", titles.join(" | "));
+        ok(titles.some(function (t) { return /Agreed remediation plan/.test(t); }), "Word prints the roadmap under the consultant's title", titles.join(" | "));
+        var caveat = (E.getActiveNarrative().boilerplate || {}).not_formal_caveat || "";
+        var meth = secs.filter(function (s) { return /^(\d+\.\s*)?Method and limitations$/.test(s.title); })[0];
+        ok(caveat && meth && meth.paras.indexOf(caveat) !== -1,
+           "with the status box hidden, its caveat prints in Method and limitations", meth ? meth.paras.join(" | ").slice(0, 300) : "no section");
+        done();
+      });
+    });
+});
+</script>
+</body></html>

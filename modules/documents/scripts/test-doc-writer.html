@@ -394,7 +394,7 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
         ok(/<w:color w:val="E00000"\/>/.test(runWith(r.body, "red header")) && /<w:b\/>/.test(runWith(r.body, "red header")), "red text in a header cell is red, not white");
         ok((r.body.match(/w:val="PlaceholderText"/g) || []).length === 2, "two prompt paragraphs in the body");
         return HD.buildDocument(p, { issueStatus: "final" }).then(function () { ok(false, "a final with prompts outstanding is refused"); }, function (e) {
-          ok(/^This document still has 10 things to write, so it cannot be issued as final\. Export it as a draft, or complete it first\.$/.test(e.message), "a final with prompts outstanding is refused, with the count", e.message);
+          ok(/^This document still has 10 red prompts to complete, so it cannot be issued as final. Export it as a draft, or complete the prompts first.$/.test(e.message), "a final with prompts outstanding is refused, with the count", e.message);
         });
       });
     });
@@ -465,7 +465,7 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
       ok((r.body.match(/This picture could not be restored\. Replace it or delete it\./g) || []).length === 4 && (r.body.match(/w:val="PlaceholderText"/g) || []).length === 4, "the prompt prints in place of each");
       ok(r.doc.indexOf("KEPT:k1") === -1 && r.doc.indexOf("KEPT:k2") === -1 && r.doc.indexOf("KEPT:k3") !== -1, "a kept object with a missing part is never written as a token; a whole one still is");
       ok(grafts.length === 1 && grafts[0].kept.length === 1 && grafts[0].kept[0].blockId === "k3" && Object.keys(grafts[0].parts).length === 0, "and neither it nor its parts reach the plan");
-      return HD.buildDocument(p, { issueStatus: "final" }).then(function () { ok(false, "an incomplete document cannot be a final"); }, function (e) { ok(/still has 4 things to write/.test(e.message), "an incomplete document cannot be issued as final", e.message); });
+      return HD.buildDocument(p, { issueStatus: "final" }).then(function () { ok(false, "an incomplete document cannot be a final"); }, function (e) { ok(/still has 4 red prompts to complete/.test(e.message), "an incomplete document cannot be issued as final", e.message); });
     });
   });
 

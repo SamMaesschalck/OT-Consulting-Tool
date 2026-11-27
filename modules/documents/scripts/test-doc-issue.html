@@ -249,7 +249,7 @@
       ok(/could not be restored/.test($("dp-final-why").textContent), "a picture that could not be restored is named as the reason first", $("dp-final-why").textContent);
       ok(!/-draft/.test($("dp-export-name").textContent), "and the file name loses -draft");
       return X.blob("final").then(function () { ok(false, "the writer refuses a Final with things outstanding"); }, function (e) {
-        ok(/final/i.test(e.message) && /5 things/.test(e.message), "the writer refuses a Final too, in its own words", e.message);
+        ok(/final/i.test(e.message) && /5 red prompts/.test(e.message), "the writer refuses a Final too, in its own words", e.message);
       });
     }).then(function () {
       reset();

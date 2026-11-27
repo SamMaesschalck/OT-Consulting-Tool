@@ -97,10 +97,10 @@ H.test(function (ok, done) {
     var images = list.reduce(function (a, x) { return a + x.img; }, 0);
     ok(images === zones.length, "one FR radar per assessed zone (" + images + " images for " + zones.length + " zones)");
     var zoneSecs = list.filter(function (x) { return zones.some(function (z) { return x.title.indexOf(z.name) >= 0; }); });
-    ok(zoneSecs.length === zones.length && zoneSecs.every(function (x) { return x.img === 1 && x.h2.indexOf("FR achievement vs target") >= 0; }),
+    ok(zoneSecs.length === zones.length && zoneSecs.every(function (x) { return x.img === 1 && x.h2.indexOf("FR achievement against target") >= 0; }),
        "each zone's own section carries its radar", zoneSecs.map(function (x) { return x.title + ":" + x.img; }).join(" | "));
 
-    var caveatRow = Array.prototype.filter.call(s.doc.getElementsByTagNameNS(W, "tr"), function (tr) { return /does not certify the system/.test(textOf(tr)); })[0];
+    var caveatRow = Array.prototype.filter.call(s.doc.getElementsByTagNameNS(W, "tr"), function (tr) { return /Limits of this capability assessment/.test(textOf(tr)); })[0];
     ok(caveatRow && caveatRow.getElementsByTagNameNS(W, "cantSplit").length === 1, "the caveat box is kept on one page");
 
     // Control: the single-zone report still carries exactly one radar.

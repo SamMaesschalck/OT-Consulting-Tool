@@ -150,7 +150,7 @@
       h("summary", { text: "Add a note for the reviewers (optional)" }),
       h("label", { class: "rv-req-label" }, ["Note to reviewers", noteBox]),
       h("label", { class: "rv-req-label" }, ["Needed by", dueBox]),
-      h("p", { class: "muted rv-req-hint", text: "Reviewers see both in the next pack. Neither goes in the report." })
+      h("p", { class: "muted rv-req-hint", text: "Reviewers see both in the next pack, and neither appears in the report." })
     ]);
     if (ui.request.open || ui.request.note || ui.request.neededBy) reqBox.open = true;
     reqBox.addEventListener("toggle", function () { ui.request.open = reqBox.open; });
@@ -165,7 +165,7 @@
     // ---- where it stands ----------------------------------------------------
     var last = RC().lastRound(store);
     if (!last) {
-      container.appendChild(h("p", { class: "muted rv-empty", text: "Nothing has been sent yet. Send for review saves a pack to give each reviewer. It holds client data, so treat it like the project file." }));
+      container.appendChild(h("p", { class: "muted rv-empty", text: "Nothing has been sent yet. Send for review saves a pack for each reviewer. The pack holds client data, so handle it as you would the project file." }));
       return;
     }
     var fileRows = store.files.slice().sort(function (a, b) { return b.round - a.round || String(a.reviewer).localeCompare(b.reviewer); });
@@ -187,7 +187,7 @@
           // another name: their verdict stops counting, their comments stay.
           h("button", { type: "button", class: "btn sm rv-aside", text: f.setAside ? "Count this review again" : "Set aside this review",
             title: f.setAside ? "This review counts towards the warnings again."
-              : "This review no longer counts towards the warnings. You can count it again at any time.",
+              : "This review will no longer count towards the warnings.",
             onClick: function () { RC().setAside(store, f.fileId, !f.setAside); adapter.touch(); repaint(); } })
         ];
         if (f.verdict && f.verdict.note) kids.push(h("div", { class: "rv-note", text: f.verdict.note }));
@@ -460,7 +460,7 @@
     var ea = e.comment.anchor || {};
     var kids = [h("div", { class: "rv-raised-head", text: "Raised again from round " + e.round + ". " + e.comment.reviewer + " said then:" }),
       h("div", { class: "rv-raised-text", text: e.comment.text })];
-    if (ea.quote) kids.push(h("div", { class: "rv-raised-quote muted", text: "On the wording then: " + (ea.quote.length > 200 ? ea.quote.slice(0, 200) + "…" : ea.quote) }));
+    if (ea.quote) kids.push(h("div", { class: "rv-raised-quote muted", text: "Wording at the time: " + (ea.quote.length > 200 ? ea.quote.slice(0, 200) + "…" : ea.quote) }));
     if (listed(e) && reveal) {
       kids.push(h("button", { type: "button", class: "btn sm rv-raised-go", text: "Show the earlier comment", onClick: function () { reveal(relatesTo); } }));
     }
@@ -571,7 +571,7 @@
       } }));
     } else {
       actions.push(h("button", { type: "button", class: "btn sm rv-reopen", text: "Reopen",
-        title: "Opens the comment again. It does not change the report text" + (canUndo ? ": Undo the accepted wording does that." : "."), onClick: function () {
+        title: "Open the comment again and leave the report text as it is." + (canUndo ? " Undo the accepted wording restores the earlier text." : ""), onClick: function () {
           RC().setStatus(store, id, "open"); adapter.touch(); repaint();
         } }));
     }
@@ -588,7 +588,7 @@
     } else {
       card.appendChild(textNode);
       if (t.status === "wontchange" && t.reason) card.appendChild(h("p", { class: "rv-reason", text: "Won't change: " + t.reason }));
-      var more = h("details", { class: "rv-more" }, [h("summary", { text: "Show what it is on" + ((t.replies || []).length ? " and the replies" : "") })].concat(body));
+      var more = h("details", { class: "rv-more" }, [h("summary", { text: "Show the context" + ((t.replies || []).length ? " and replies" : "") })].concat(body));
       more.open = !!ui.expanded[id];
       more.addEventListener("toggle", function () { ui.expanded[id] = more.open; });
       card.appendChild(more);
@@ -686,9 +686,9 @@
           // What the reviewer deleted after the author had answered it stays.
           (r.withdrawn ? " " + r.reviewer + " also deleted " + RC().plural(r.withdrawn, "comment") + " you had already answered." : "") +
           (r.withdrawnAccepted ? " Wording you accepted from " + (r.withdrawn === 1 ? "it" : r.withdrawnAccepted + " of them") + " is still in the report, so " +
-            (r.withdrawnAccepted === 1 ? "that comment stays" : "those comments stay") + " listed (show All), with Undo the accepted wording." : "") +
-          (r.repliesOnClosed === 1 ? " 1 reply is on a comment you had closed, which stays closed: show All to read it." : "") +
-          (r.repliesOnClosed > 1 ? " " + r.repliesOnClosed + " replies are on comments you had closed, which stay closed: show All to read them." : "") +
+            (r.withdrawnAccepted === 1 ? "that comment stays" : "those comments stay") + " listed under All, where you can still undo the accepted wording." : "") +
+          (r.repliesOnClosed === 1 ? " 1 reply is on a comment you had closed. The comment stays closed. Show All to read the reply." : "") +
+          (r.repliesOnClosed > 1 ? " " + r.repliesOnClosed + " replies are on comments you had closed. The comments stay closed. Show All to read the replies." : "") +
           (r.setAside ? " This review is set aside, so it does not count towards the warnings." : "") +
           (r.renamedFrom ? " This file was " + r.renamedFrom + "'s and is now saved as " + r.reviewer + "." : ""));
       }

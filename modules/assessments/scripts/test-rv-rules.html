@@ -179,9 +179,9 @@ H.test(function (ok) {
     { name: "round2.json", text: JSON.stringify(file(q2, "Ruth", "none", [], "2026-11-03T10:00:00Z", { fileId: "rf-Ruth-2", replies: [{ id: "rg-1", to: "g2", text: "Checked, thank you.", at: "2026-11-03T09:00:00Z" }] })) }
   ], ui2, function () { RA.mount(holder2, ad2, ui2); });
   var said = out.lines.join("\n");
-  ok(/Ruth also deleted 1 comment you had already answered\./.test(said) && /Wording you accepted from it is still in the report, so that comment stays listed \(show All\), with Undo the accepted wording\./.test(said),
+  ok(/Ruth also deleted 1 comment you had already answered\./.test(said) && /Wording you accepted from it is still in the report, so that comment stays listed under All, where you can still undo the accepted wording\./.test(said),
     "the import says a comment with accepted wording was deleted, and where to find it", said);
-  ok(/1 reply\b/.test(said) && /1 reply is on a comment you had closed, which stays closed: show All to read it\./.test(said), "and that a reply came in on a closed comment", said);
+  ok(/1 reply\b/.test(said) && /1 reply is on a comment you had closed. The comment stays closed. Show All to read the reply./.test(said), "and that a reply came in on a closed comment", said);
   ok(!/[–—]/.test(said), "with no em or en dashes");
   ok(RC.findThread(s2, "g2").status === "resolved", "the closed comment stays closed");
   ui2.status = ""; RA.mount(holder2, ad2, ui2);

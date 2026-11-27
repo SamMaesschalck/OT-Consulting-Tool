@@ -279,7 +279,7 @@ H.test(function (ok, done) {
     same(aT.slice(0, aT.indexOf("<w:tr>")), hT.slice(0, hT.indexOf("<w:tr>")), label + ": the document control table's own properties are the same");
     ok(aR.length >= 7 && hR.length >= 7, label + ": at least seven rows in both");
     for (var r = 0; r < 7; r++) same(aR[r] || "", hR[r] || "", label + ": document control row " + (r + 1) + " (" + cellTexts(hR[r] || "")[0] + ") is the same");
-    ok(cellTexts(hR[7])[0] === "Document" && cellTexts(aR[7])[0] === "Instrument", label + ": the rows after the seventh are each tool's own");
+    ok(cellTexts(hR[7])[0] === "Document" && cellTexts(aR[7])[0] === "Assessed against", label + ": the rows after the seventh are each tool's own");
     // the eighth row is laid out as the others are
     same((aR[7] || "").replace(/<w:t [^>]*>[^<]*<\/w:t>/g, "T"), (hR[7] || "").replace(/<w:t [^>]*>[^<]*<\/w:t>/g, "T"), label + ": and are laid out the same way");
     return { ad: ad, hd: hd, aHeads: aHeads, hHeads: hHeads };

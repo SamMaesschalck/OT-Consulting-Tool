@@ -1654,8 +1654,8 @@
     var issues = doc.__issues || [];
     if (opts && opts.issueCheck) { callback(null, { placeholders: issues }); return; }
     if (isFinal(opts) && issues.length) {
-      callback(new Error("This document still has " + issues.length + " thing" + (issues.length === 1 ? "" : "s") +
-        " to write, so it cannot be issued as final. Export it as a draft, or complete it first."));
+      callback(new Error("This document still has " + issues.length + " red prompt" + (issues.length === 1 ? "" : "s") +
+        " to complete, so it cannot be issued as final. Export it as a draft, or complete " + (issues.length === 1 ? "the prompt" : "the prompts") + " first."));
       return;
     }
     var plan = doc.__graft;
@@ -1663,7 +1663,7 @@
       if (!graftNeeded(plan)) return out;
       var G = window.App.DocxGraft;
       // Without the graft a kept object would print as its token.
-      if (!G || !G.apply) throw new Error("This document holds content kept from a Word file, which this page cannot write.");
+      if (!G || !G.apply) throw new Error("This document contains content kept from a Word file, and this page cannot export it.");
       return G.apply(out, plan);
     }).then(function (out) { callback(null, out); }).catch(function (e) { callback(e); });
   }

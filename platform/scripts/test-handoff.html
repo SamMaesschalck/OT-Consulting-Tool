@@ -97,7 +97,7 @@
 
     var other = JSON.parse(fileText); other.packId = "rp-someone-else";
     STUB.listeners[0]("other.json", JSON.stringify(other));
-    ok(toasts[toasts.length - 1].k === "err" && /different pack/.test(toasts[toasts.length - 1].m), "a file for another pack is refused, as with Import", toasts[toasts.length - 1].m);
+    ok(toasts[toasts.length - 1].k === "err" && /is for a pack that was not sent from here/.test(toasts[toasts.length - 1].m), "a file for another pack is refused, as with Import", toasts[toasts.length - 1].m);
   } catch (e) {
     ok(false, "the page ran to the end", e && e.stack || e);
   }

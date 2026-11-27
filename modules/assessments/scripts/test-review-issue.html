@@ -95,9 +95,9 @@ H.test(function (ok, done) {
   step(function () {
     E.activateInstrument("ncsc-caf");
     ok(!E.getReview(), "a fresh assessment has no review on it");
-    ok(warned("not-reviewed") && /Not reviewed yet: no review has come back/.test(warned("not-reviewed").text), "not reviewed: warned", JSON.stringify(RV.warningList()));
+    ok(warned("not-reviewed") && /No review has come back for this report yet/.test(warned("not-reviewed").text), "not reviewed: warned", JSON.stringify(RV.warningList()));
     A.UI.go("report");
-    return poll(function () { return issueLine(/Not reviewed yet/); });
+    return poll(function () { return issueLine(/No review has come back/); });
   });
   step(function (li) {
     ok(/Check before issuing/.test(main.querySelector(".issue-check").textContent), "the warning is under Check before issuing");
@@ -107,7 +107,7 @@ H.test(function (ok, done) {
     return exportDialogText();
   });
   step(function (d) {
-    ok(d.warnings.some(function (w) { return /^not-reviewed: Not reviewed yet/.test(w); }), "the export dialog shows the same warning", d.warnings.join(" | "));
+    ok(d.warnings.some(function (w) { return /^not-reviewed: No review has come back/.test(w); }), "the export dialog shows the same warning", d.warnings.join(" | "));
     return finalBuilds("not reviewed");
   });
   // QA review by filled in with nothing sent: reviewed outside the tools.
@@ -118,7 +118,7 @@ H.test(function (ok, done) {
     return poll(function () { return main.querySelector(".issue-check .issue-line"); });
   });
   step(function () {
-    ok(!issueLine(/Not reviewed yet/), "nor on the Issue check");
+    ok(!issueLine(/No review has come back/), "nor on the Issue check");
     return exportDialogText();
   });
   step(function (d) {
@@ -132,9 +132,9 @@ H.test(function (ok, done) {
   step(function (r) {
     pack = r.pack;
     RC.recordRound(r.store, r.pack);
-    ok(/round 1 was sent, and no review has come back/.test(warned("not-reviewed").text), "once sent, the warning says so", warned("not-reviewed").text);
+    ok(/Round 1 was sent, and no review has come back/.test(warned("not-reviewed").text), "once sent, the warning says so", warned("not-reviewed").text);
     E.updateMetadata({ qaReviewBy: "A. N. Other" });
-    ok(warned("not-reviewed") && /round 1 was sent/.test(warned("not-reviewed").text), "and QA review by does not clear it once a round has been sent");
+    ok(warned("not-reviewed") && /Round 1 was sent/.test(warned("not-reviewed").text), "and QA review by does not clear it once a round has been sent");
     E.updateMetadata({ qaReviewBy: "" });
     RV.importTexts([{ name: "a.json", text: fileFrom(pack, "J. Marsh", "changes-requested", [mustFix("c-1", "J. Marsh"), mustFix("c-2", "J. Marsh")]) }]);
     ok(!warned("not-reviewed"), "a review back clears not-reviewed");

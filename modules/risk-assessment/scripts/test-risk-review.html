@@ -58,7 +58,7 @@
       ok(!!nav, "the sidebar has a Peer review page");
       nav.click();
       ok(/Send for review/.test(main.textContent) && /Import review files/.test(main.textContent), "with Send for review and Import review files");
-      ok(/Not reviewed yet/.test(main.textContent), "and says it is not reviewed yet");
+      ok(/No review has come back/.test(main.textContent), "and says it is not reviewed yet");
       main.querySelector(".rv-send").click();
       return poll(function () { return saved && main.querySelector(".rv-notice.ok"); }, 90000).then(function () {
         var pack = JSON.parse(saved.text);
@@ -93,7 +93,7 @@
         res = RR.importTexts([{ name: "b.json", text: JSON.stringify({ schema: "spt-review/9.9", packId: "x", comments: [] }) }]);
         ok(res.bad === 1 && /spt-review\/9\.9/.test(res.lines[0]), "an unknown schema is refused, saying which", res.lines[0]);
         res = RR.importTexts([{ name: "c.json", text: JSON.stringify(Object.assign({}, file, { packId: "rp-other" })) }]);
-        ok(res.bad === 1 && /different pack/.test(res.lines[0]), "and a file for another pack");
+        ok(res.bad === 1 && /is for a pack that was not sent from here/.test(res.lines[0]), "and a file for another pack");
         RT.state.stage = "peer"; RT.render();
         return poll(function () { return main.querySelector(".rv-comment"); });
       }).then(function () {

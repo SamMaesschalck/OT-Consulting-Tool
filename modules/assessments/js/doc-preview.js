@@ -49,7 +49,7 @@
     smartart: "Diagram (SmartArt)", chart: "Chart", ole: "Embedded object", picture: "Picture",
     equation: "Equation", other: "Drawing"
   };
-  var KEPT_NOTE = "Kept from the original Word file. It prints in the Word export as it was.";
+  var KEPT_NOTE = "This comes from the original Word file and prints unchanged in the Word export.";
   var KEPT_CHECK = " Any text inside it is made smaller too, so check it in a draft in Word.";
   var KEPT_WIDE = "It is wider than the page and will be made smaller to fit." + KEPT_CHECK;
   var KEPT_TALL = "It is taller than a page and will be made smaller to fit." + KEPT_CHECK;
@@ -256,7 +256,7 @@
     } else if (!SHOWN[m.type]) {
       fig.appendChild(placeholderBox(size.w || 240, size.h || 160,
         [(m.name || "Picture") + " (" + String(m.type || "").replace(/^image\/(x-)?/, "").toUpperCase() + ")",
-          "Shown as a placeholder here. It prints in the Word file."]));
+          "The preview shows a placeholder, and the Word file prints the picture."]));
     } else {
       var img = h("img", { alt: block.alt || "", loading: "lazy", decoding: "async", draggable: "false" });
       if (size.w) img.width = size.w;
@@ -528,7 +528,7 @@
       }
     } else {
       // A block from a later version of the tool: kept as it is, printed as nothing.
-      wrap.appendChild(h("p", { class: "unknown", text: "Made by a newer version of the tool. It is kept but does not print." }));
+      wrap.appendChild(h("p", { class: "unknown", text: "A newer version of the tool made this part. It is kept but does not print." }));
     }
     wrap.style.setProperty("contain-intrinsic-block-size", "auto " + Math.round(roughHeight(block)) + "px");
     return wrap;

@@ -169,14 +169,14 @@ H.test(function (ok, done) {
     ok(!has(d[0], "The reviewer's opening sentence for the summary.") && texts(d[0]).some(function (t) { return /^This assessment finds that Borealis Chemicals/.test(t); }), "the paragraph it replaced has changed, so the generated text prints and the rewording does not");
     ok(paras(ES).length === 1, "the replacement is still stored: it is not deleted");
     var row = rewordedRow(ES);
-    ok(!!row && row.getAttribute("data-reworded-state") === "changed" && /No longer applies: the text it replaced has changed\./.test(row.textContent), "the report page says it no longer applies", row && row.textContent);
+    ok(!!row && row.getAttribute("data-reworded-state") === "changed" && /This no longer applies because the text it replaced has changed./.test(row.textContent), "the report page says it no longer applies", row && row.textContent);
     var w = lostWarnings();
     ok(w.length === 1 && /^1 accepted rewording is not in the Word report\. The text it replaced has changed\.$/.test(w[0].text) && /warn/.test(w[0].cls) && !/[–—]/.test(w[0].text), "the Issue check warns once", JSON.stringify(w));
     ok(I.blockerLines(I.last() && I.last().list || []).every(function (l) { return !/reword/i.test(l.text); }), "as a warning, never among the blockers");
     showAll();
     var card = main.querySelector('[data-comment-id="' + x.t1.comment.id + '"]');
     var note = card && card.querySelector(".rv-accept-note");
-    ok(!!note && note.textContent === "No longer applies: the text it replaced has changed." && !!card.querySelector(".rv-undo"), "the comment says the same, with Undo still offered", card && card.textContent);
+    ok(!!note && note.textContent === "This no longer applies because the text it replaced has changed." && !!card.querySelector(".rv-undo"), "the comment says the same, with Undo still offered", card && card.textContent);
     w[0].go();
     ok(main.querySelector('[data-check-anchor="reworded"]').classList.contains("check-flash"), "the warning's button shows the list");
     // A second one in the same state, so the count is seen.
@@ -319,7 +319,7 @@ H.test(function (ok, done) {
   step(function (d) {
     ok(has(d[0], "A closing line the author added by hand.") && has(d[0], "First paragraph, reworded before the author's own edit."), "the rewrite prints");
     var row = rewordedRow(k.key);
-    ok(!!row && row.getAttribute("data-reworded-state") === "rewritten" && /Does not apply: the opening of its section has since been rewritten as a whole\./.test(row.textContent), "the list says the replacement does not apply, as the opening was rewritten", row && row.textContent);
+    ok(!!row && row.getAttribute("data-reworded-state") === "rewritten" && /This does not apply because the opening of its section has been rewritten./.test(row.textContent), "the list says the replacement does not apply, as the opening was rewritten", row && row.textContent);
     ok(lostWarnings().length === 0, "which was the author's own doing, so the Issue check does not warn");
 
     // ---- a rewrite by the author: Accept changes its one line, as before ----------
@@ -352,7 +352,7 @@ H.test(function (ok, done) {
   step(function () { E.setReportSection(k.key, { hidden: true }); return page(); });
   step(function (d) {
     var row = rewordedRow(k.key);
-    ok(!has(d[0], "Reworded, then the section is hidden.") && !!row && row.getAttribute("data-reworded-state") === "hidden" && /Not printed: its section is hidden\./.test(row.textContent) && lostWarnings().length === 0, "a reworded paragraph in a section since hidden is listed as not printed, without a warning", row && row.textContent);
+    ok(!has(d[0], "Reworded, then the section is hidden.") && !!row && row.getAttribute("data-reworded-state") === "hidden" && /This is not printed because its section is hidden./.test(row.textContent) && lostWarnings().length === 0, "a reworded paragraph in a section since hidden is listed as not printed, without a warning", row && row.textContent);
     E.clearReportSection(k.key);
     drop(k.t5);
 
