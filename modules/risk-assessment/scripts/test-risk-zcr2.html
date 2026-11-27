@@ -161,8 +161,9 @@
       ok(det.filter(function (x) { return /^The initial risk of the system under consideration is High/.test(x); }).length === 1, "the full statement is under Risk comparison, once");
       ok(det.indexOf("Mandatory security countermeasures") < 0, "the detailed report does not print the specification's countermeasure list (its treatment plan has them)");
       // 9. the demo's ranking notes.
-      ok(det.some(function (x) { return x === "The primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. Assigned to Z1 and assessed in detail."; }) &&
-        /* step 5: the outside-the-SUC mark is the ranking's own, so the note no longer says it */ det.some(function (x) { return /^Commodity IP equipment that is often probed but has no process consequence. It is ranked low\.$/.test(x); }) && det.indexOf("Outside the SUC") > 0 &&
+      // Wording fixes: the notes open with full sentences (were "The primary control layer." and "Commodity IP equipment ...").
+      ok(det.some(function (x) { return x === "The BPCS is the primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. It is assigned to Z1 and assessed in detail."; }) &&
+        /* step 5: the outside-the-SUC mark is the ranking's own, so the note no longer says it */ det.some(function (x) { return /^The cameras are commodity IP equipment that is often probed, but they have no process consequence, so they rank low\.$/.test(x); }) && det.indexOf("Outside the SUC") > 0 &&
         !det.some(function (x) { return /where a detailed assessment is required|not taken to a detailed assessment/.test(x); }), "the demo's ranking notes fit the model: assessed in detail, or outside the SUC");
       return wordParas(base, { spec: true });
     }).then(function (spec) {

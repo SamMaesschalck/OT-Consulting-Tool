@@ -136,7 +136,7 @@
     ok(/\nT2  [^\n]*\nZ1 · High today\n/.test(wf) && /\nT4  [^\n]*\nZ2 · High today\n/.test(wf) && /\nT5  [^\n]*\nZ3 · High today\n/.test(wf) && wf.indexOf("\nT1  ") < 0 && wf.indexOf("\nT7  ") < 0,
       "scorecard page: the focus cards are the threats still above tolerable risk today, labelled with today's rating", wf.replace(/\n/g, " | ").slice(0, 400));
     ok(text.indexOf("Executive summary") !== -1 && text.indexOf("9 threats were registered") !== -1, "exec summary composed from the data (9 threats)");
-    ok(text.indexOf("Why this assessment") !== -1 && text.indexOf("What this report is") !== -1 && text.indexOf("What we found") !== -1 && text.indexOf("What happens next") !== -1, "exec summary has the why/what/found/next structure");
+    ok(text.indexOf("Why this assessment") !== -1 && text.indexOf("What this report is") !== -1 && text.indexOf("Findings") !== -1 && text.indexOf("What happens next") !== -1, "exec summary has the why/what/found/next structure");
     ok(text.indexOf("essential functions in scope are") !== -1 && text.indexOf("assumed adversary is SL3 grade") !== -1, "exec summary states the operational stakes and adversary assumption from the SRS");
     // Step 4: the demo records a fifth interview, with the group insurance manager (was: 4 interviews).
     ok(text.indexOf("The findings are based on") !== -1 && text.indexOf("5 interviews") !== -1, "exec summary cites the evidence base (basis of assessment)");
@@ -187,7 +187,7 @@
     ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking") !== -1 && hlText.indexOf("the high-level cyber security risk assessment") !== -1, "high-level variant builds with the ranking");
     ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
     // Phase 3a: the candidates are the systems above tolerable risk (was: ranked High or above), and the decision is per zone, not per system.
-    ok(hlText.indexOf("Under the house method, the systems above the tolerable risk of Medium (") !== -1 && hlText.indexOf(") are the candidates for a detailed assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
+    ok(hlText.indexOf("Under the house method, the systems above the tolerable risk of Medium are the candidates for a detailed assessment: Unit 300 BPCS") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
     ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a detailed assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
     ok(!/per-system|detailed tier|promoted|Promoted|ranked High or above/.test(hlText + "\n" + text), "neither report speaks of promotion, a detailed tier or per-system assessment", (( hlText + "\n" + text).match(/[^\n]*(per-system|detailed tier|promoted|Promoted|ranked High or above)[^\n]*/) || [""])[0]);
     // Since the zone-depth step no zone is found not to need a detailed assessment: the SUC is compared once and every zone and conduit is assessed, at its depth.
@@ -373,7 +373,9 @@
       q.srs.highLevelAssets[4].detailed = { required: true, reason: "Feeds the batch release." };
     });
     var hlFound = (vH.hl.match(/[^\n]*systems were ranked[^\n]*/) || [""])[0];
-    ok(hlFound.indexOf(") are the candidates for a detailed assessment") !== -1 && hlFound.indexOf("Under the house method, the systems above") !== -1 && hlFound.split(") are the candidates")[0].indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
+    // Wording fixes: the candidates follow the sentence after a colon (was: in brackets inside it).
+    var hlCands = (hlFound.split("are the candidates for a detailed assessment: ")[1] || "").split(". ")[0];
+    ok(hlCands.length > 0 && hlFound.indexOf("Under the house method, the systems above") !== -1 && hlCands.indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
       "Word, high-level only: a system recorded as Not required leaves the candidates, with its reason", hlFound);
     ok(hlFound.indexOf("A detailed assessment was also judged needed for " + LAB + ": feeds the batch release.") !== -1 && /\n2\nfor detailed assessment/.test(vH.hl), "and one recorded as Required below tolerable risk is named, and the tile counts the two recorded as Required", hlFound);
     phase4b(text, doc, variant);

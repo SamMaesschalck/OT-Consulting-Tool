@@ -6,7 +6,7 @@ window.App.Data.engagementGuidance = {
   "id": "engagement-guidance",
   "_note": "Preparation guidance for a 62443-3-2 zones-and-conduits risk assessment: the documents a consultant most commonly needs, the ones clients often forget, and the stakeholders worth interviewing. ADVISORY ONLY, not a fixed checklist, and it must never pre-populate the basis-of-assessment register; the consultant records what was actually reviewed/observed there.",
   "commonDocuments": [
-    "Network architecture diagrams of the network as it is now",
+    "Network architecture diagrams that show the network as it is today",
     "Asset inventory for the systems in scope",
     "P&IDs and process descriptions for the processes the SUC controls",
     "PHA or HAZOP results, the usual source for the worst credible impact",

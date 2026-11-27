@@ -767,7 +767,7 @@ window.RiskApp.Engine = (function () {
   // hlaComparison() is the consultant's decision per ranked system, which
   // the comparison only suggests, and one that differs needs a reason.
 
-  var CONDUIT_RULE = "a conduit takes the higher initial risk of the zones it joins unless one is entered";
+  var CONDUIT_RULE = "a conduit takes the higher initial risk of the zones it joins, unless a rating is entered for the conduit";
   function isBand(v) { return typeof v === "string" && BAND_RANK[v] != null; }
   function worstBand(list) {
     var worst = null;

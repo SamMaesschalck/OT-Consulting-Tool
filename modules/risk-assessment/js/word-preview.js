@@ -87,7 +87,7 @@ window.RiskWordPreview = (function () {
         if (stateText.isConnected) { say("Drawing the pages…", 0.97); setTimeout(function () { if (seq === ui.seq && paper.isConnected) show(read); }, 0); }
       }, function (e) {
         if (seq !== ui.seq) return;
-        ui.key = key; ui.read = null; ui.error = "The Word report could not be built: " + ((e && e.message) || "the reason is not known.");
+        ui.key = key; ui.read = null; ui.error = "The Word report could not be built: " + ((e && e.message) || "no reason was given.");
         if (stateText.isConnected) say(ui.error, null);
       });
     }, 30);

@@ -175,7 +175,7 @@
   function sourceWords(p) {
     var w = E.criteriaWords(p);
     return w.source === "client-house" ? "The client's criteria are marked as in use, so enter them here." :
-      w.source === "client" ? "These are the client's criteria." : w.source === "project" ? "These criteria were changed from the SolutionsPT defaults for this assessment." : "These are the SolutionsPT default criteria.";
+      w.source === "client" ? "These are the client's criteria." : w.source === "project" ? "These criteria were changed from the SolutionsPT defaults for this assessment." : "These are the SolutionsPT default criteria, part of the house method.";
   }
 
   // ---------- The levels and the categories ----------

@@ -35,9 +35,9 @@ window.App.Data.sltRules = {
     { "id": "severe",     "name": "Severe",     "rank": 3, "note": "Loss of life, a major release, loss of an essential function, or catastrophic cost or regulatory exposure." }
   ],
   "likelihoodScale": [
-    { "id": "low",    "name": "Low",    "rank": 0, "note": "House default: no known history; would require an unlikely combination of access, capability and intent." },
-    { "id": "medium", "name": "Medium", "rank": 1, "note": "House default: plausible given the exposure and a capable adversary; occurrence would not be surprising over the system's life." },
-    { "id": "high",   "name": "High",   "rank": 2, "note": "House default: known-exploited path, an exposed access point, or an actively targeted asset; expected without intervention." }
+    { "id": "low",    "name": "Low",    "rank": 0, "note": "House default: no known history. A compromise would need an unlikely combination of access, capability and intent." },
+    { "id": "medium", "name": "Medium", "rank": 1, "note": "House default: plausible given the exposure and a capable adversary. A compromise could well happen over the system's life." },
+    { "id": "high",   "name": "High",   "rank": 2, "note": "House default: a known-exploited path, an exposed access point or an actively targeted asset. A compromise is expected without intervention." }
   ],
   "riskMatrix": {
     "_note": "HOUSE risk matrix (unmitigated/residual risk = impact severity x likelihood). NOT the 62443-3-2 example matrix. Bands: low, medium, high, very-high. Tune per engagement or replace wholesale with the client's corporate matrix.",

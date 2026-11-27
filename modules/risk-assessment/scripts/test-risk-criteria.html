@@ -159,6 +159,14 @@
       ok(!/[–—]/.test(JSON.stringify(c)), "the " + id + " preset's words carry no dashes");
     });
     ok(M.presetCriteria("nope") === null && M.isHouseContent(M.presetCriteria("house")), "an unknown preset gives nothing; the house preset is the house criteria");
+    // Wording fixes (Nov 2026) reworded the house likelihood definitions. A copy of the house
+    // criteria saved with the earlier words is still the house's, so nothing reads it as changed.
+    var wasHouse = M.houseCriteria();
+    wasHouse.likelihood[1].note = "Plausible given the exposure and a capable adversary; occurrence would not be surprising over the system's life.";
+    wasHouse.likelihood[0].note = "No known history; would require an unlikely combination of access, capability and intent.";
+    wasHouse.likelihood[2].note = "Known-exploited path, an exposed access point, or an actively targeted asset; expected without intervention.";
+    var editedHouse = M.houseCriteria(); editedHouse.likelihood[1].note = "Something else.";
+    ok(M.houseCriteria().likelihood[1].note !== wasHouse.likelihood[1].note && M.isHouseContent(wasHouse) && !M.isHouseContent(editedHouse), "the house criteria saved with the earlier likelihood words are still the house's, and an edited note is not");
     var two = M.houseCriteria(); two.likelihood = two.likelihood.slice(0, 2);
     var six = M.houseCriteria(); six.impact = six.impact.concat([{ id: "x1", name: "X1" }, { id: "x2", name: "X2" }]);
     ok(!M.criteriaUsable(two) && !M.criteriaUsable(six), "a scale of two levels, or of six, is not usable");

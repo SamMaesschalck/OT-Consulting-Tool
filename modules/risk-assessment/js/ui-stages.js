@@ -223,7 +223,7 @@
     main.appendChild(h("h1", { class: "page-title", text: "High-level risk" }));
     main.appendChild(pageSub("srs", hlOnly ? "Rank the systems and use the house method to decide which go forward to a detailed assessment." : "Rank the systems to guide the zoning, then assign them to zones."));
 
-    main.appendChild(card("High-level risk assessment", "context for the zoning only", [
+    main.appendChild(card("High-level risk assessment", "the threat context and what is at stake", [
       selectField("Assumed adversary class (threat context)", s.adversaryClass, Object.keys(RULES.slDefinitions).filter(function (k) { return k !== "_note"; }).map(function (k) { return { value: k, text: "SL" + k + "-grade: " + RULES.slDefinitions[k] }; }), function (v) { s.adversaryClass = v ? Number(v) : null; touched(); rerender(); }, { hint: "Any FR suggestion below this class is flagged as a mismatch." }),
       textField("Essential functions", s.essentialFunctions, function (v) { s.essentialFunctions = v; touched(); }, { textarea: true, placeholder: "What the system must keep doing (production, safety, quality, compliance)." }),
       textField("Worst-case consequences", s.worstCase, function (v) { s.worstCase = v; touched(); }, { textarea: true, placeholder: "The worst credible outcome, e.g. from the PHA/HAZOP." })
@@ -465,7 +465,7 @@
     });
     tbl.appendChild(tb);
     main.appendChild(card("Depth for each zone and conduit", "house method", [
-      h("div", { class: "framing-note", text: "House method: the suggested depth is detailed where a zone's or conduit's own initial risk is above tolerable risk, and proportionate where it is within it. By the same method, " + E.CONDUIT_RULE.replace(/\s*\(house rule\)$/, "") + "." }),
+      h("div", { class: "framing-note", text: "Under the house method, the suggested depth is detailed where a zone's or conduit's own initial risk is above tolerable risk, and proportionate where it is within it. By the same method, " + E.CONDUIT_RULE.replace(/\s*\(house rule\)$/, "") + "." }),
       tbl
     ], null, { "data-check-anchor": "depth-compare" }));
   }

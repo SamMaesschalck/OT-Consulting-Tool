@@ -163,7 +163,7 @@
     main.appendChild(card("How it works", null, [h("ol", { class: "dp-steps" }, [
       h("li", { text: "Fill in Document information for the cover and document control." }),
       h("li", { text: "Write on the Edit page. Mark anything still to complete in red." }),
-      h("li", { text: "To start from a Word file, load it and it is rebuilt in the template." }),
+      h("li", { text: "To start from a Word file, load it. The tool rebuilds it in the template." }),
       h("li", { text: "Export a draft or final Word file from Issue and export." }),
       h("li", { text: "Save writes your work to a document file. It holds client data." })
     ])]));
@@ -201,24 +201,24 @@
   var HINTS = {
     report: {
       title: "You need a title to issue as Final.",
-      docType: "This prints in capitals at the top of the cover.",
+      docType: "It appears in capitals at the top of the cover.",
       reference: "Use a document or opportunity reference.",
-      revision: "This prints on the cover and in document control.",
-      date: "This prints on the cover until an issued date is set.",
-      issuedDate: "This prints in document control, and on the cover in place of the date.",
-      classification: "This prints on the cover, in the footer and as Confidentiality in document control."
+      revision: "The cover and document control both show it.",
+      date: "The cover shows this date until an issued date is set.",
+      issuedDate: "Document control shows it, and the cover uses it in place of the date.",
+      classification: "It goes on the cover and in the footer, and document control lists it as Confidentiality."
     },
     short: {
       title: "You need a title to issue as Final.",
       docType: NOT_SHORT,
       reference: NOT_SHORT,
-      client: "This prints under the title and in the footer.",
+      client: "It appears under the title and in the footer.",
       site: NOT_SHORT,
       author: NOT_SHORT,
       revision: "This prints under the title.",
-      date: "This prints under the title until an issued date is set.",
+      date: "The line under the title shows this date until an issued date is set.",
       issuedDate: "When set, it prints under the title in place of the date.",
-      classification: "This prints at the left of the footer."
+      classification: "It goes at the left of the footer."
     }
   };
   var LEADS = {
@@ -516,7 +516,7 @@
     }
     var radios = h("fieldset", { class: "dp-kinds", id: "dp-status" }, [h("legend", { text: "Export as" })]);
     [["draft", "Draft", "It has a draft watermark, and anything still to complete prints red."],
-     ["final", "Final", "It opens read-only and marked as final. Nothing can be left to complete."]
+     ["final", "Final", "It opens read-only and marked as final. Everything must be complete first."]
     ].forEach(function (o) {
       var radio = h("input", { type: "radio", name: "dp-status", id: "dp-status-" + o[0], value: o[0] });
       radio.checked = st === o[0];
@@ -783,7 +783,7 @@
     ["Ctrl+B, Ctrl+I, Ctrl+U", "Bold, italic or underline."],
     ["Ctrl+Shift+X", "Strike through."],
     ["Ctrl+. and Ctrl+,", "Superscript or subscript."],
-    ["Ctrl+Space", "Clear red text."],
+    ["Ctrl+Space", "Remove the red mark from the text."],
     ["Ctrl+K", "Add a link."],
     ["Ctrl+Alt+1, 2, 3 and Ctrl+Alt+0", "Make the block heading 1, 2 or 3, or a paragraph."],
     ["Ctrl+Shift+8 and Ctrl+Shift+7", "Make a bulleted or numbered list."],

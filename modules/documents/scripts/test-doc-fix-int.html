@@ -343,10 +343,10 @@
     // ---- 18, 70: the hints follow the footer ----
     d = await open(T, project());
     T.D.go("info");
-    ok(T.$("info-classification-hint").textContent === "This prints on the cover, in the footer and as Confidentiality in document control.", "18: a report's Classification hint names the footer", T.$("info-classification-hint").textContent);
+    ok(T.$("info-classification-hint").textContent === "It goes on the cover and in the footer, and document control lists it as Confidentiality.", "18: a report's Classification hint names the footer", T.$("info-classification-hint").textContent);
     d = await open(T, project(null, { kind: "short" }));
     T.D.go("info");
-    ok(T.$("info-classification-hint").textContent === "This prints at the left of the footer.", "18: a short document's says it prints in the footer", T.$("info-classification-hint").textContent);
+    ok(T.$("info-classification-hint").textContent === "It goes at the left of the footer.", "18: a short document's says it prints in the footer", T.$("info-classification-hint").textContent);
     var shortBuilt = await build(T, M.normalise(project(null, { kind: "short", info: { classification: "Commercial in confidence" } })));
     var footerText = Object.keys(shortBuilt.z).filter(function (n) { return /^word\/footer\d+\.xml$/.test(n); }).map(function (n) { return shortBuilt.z[n]; }).join("");
     ok(footerText.indexOf("Commercial in confidence") !== -1, "18: which is true of the Word file");

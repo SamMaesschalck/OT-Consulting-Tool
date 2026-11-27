@@ -136,7 +136,7 @@
           "its method and categories sentences speak of risks, not of the threats and systems it does not list");
         var aboutAt = xml.indexOf(">About this specification<"), sucAt = xml.indexOf(">System under consideration and requirements<", aboutAt);
         ok(aboutAt > 0 && sucAt > aboutAt && xml.slice(aboutAt, sucAt).indexOf('w:type="page"') < 0, "no forced page break after its three-paragraph opening");
-        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The tolerable risk is stated, with the target security level (SL-T) of each zone and conduit, which is the protection it is to be engineered and maintained to. The specification also lists the mandatory security countermeasures that come out of the risk assessment.") > 0 &&
+        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The specification states the tolerable risk and the target security level (SL-T) of each zone and conduit, which is the protection that zone or conduit must be engineered and maintained to. It also lists the mandatory security countermeasures that come out of the risk assessment.") > 0 &&
            now.indexOf("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval.") > 0, "its opening, as reworded in the phase 6 review, naming the mandatory security countermeasures (the 3-2 fixes)");
 
         // ---- the page ---------------------------------------------------------------
@@ -279,7 +279,7 @@
       }).then(function () {
         // ---- the recursion trap, on real Word output -------------------------------------
         reset();
-        RP.setSection("detailed", "what-we-found", { title: "Our findings" });
+        RP.setSection("detailed", "findings", { title: "Our findings" });
         RP.setSection("detailed", "what-this-report-is", { hidden: true });
         RP.setSection("detailed", "executive-summary", { title: "Summary for the board" });
         RP.setSection("detailed", "operating-environment-assumptions", { title: "Assumptions" });
@@ -291,8 +291,8 @@
         ok(hs.indexOf("What this report is") === -1 && hs.indexOf("Why this assessment") !== -1, "a nested h2 hidden, its sibling kept");
         ok(hs.indexOf("Assumptions") !== -1, "an h2 under another h1 renamed");
         var found = bl.filter(function (b) { return b.type === "heading" && b.text === "Our findings"; })[0];
-        ok(found.sectionKey === "what-we-found", "a renamed heading keeps the key of its section", found.sectionKey);
-        ok(bl.some(function (b) { return b.sectionKey === "what-we-found" && b.type === "paragraph" && /threats were registered/.test(b.text); }), "and its body stays under it");
+        ok(found.sectionKey === "findings", "a renamed heading keeps the key of its section", found.sectionKey);
+        ok(bl.some(function (b) { return b.sectionKey === "findings" && b.type === "paragraph" && /threats were registered/.test(b.text); }), "and its body stays under it");
         RP.setSection("detailed", "executive-summary", { hidden: true });
         return wordBlocks({});
       }).then(function (bl) {
@@ -491,7 +491,16 @@
         ok(JSON.parse(saved).schema === "spt-risk-project/0.3", "the file format's schema has not moved for them: the field is optional");
         ok(RT.loadProjectText(saved), "a project with overrides loads");
         ok(RP.sectionOf("detailed", "executive-summary").title === "Saved detailed title" && RP.sectionOf("highLevel", "method-and-limitations").hidden === true, "and they come back, per report");
-        return wordBlocks({}).then(function (bl) {
+        // Wording fixes: "What we found" became "Findings". A file saved before the rename keeps
+        // its customisation of that section under the old key, and it still applies.
+        var oldKeyed = JSON.parse(saved); oldKeyed.reportCustom.detailed["what-we-found"] = { title: "Saved findings title" };
+        ok(RT.loadProjectText(JSON.stringify(oldKeyed)), "a project saved with the old What we found key loads");
+        ok(RP.sectionOf("detailed", "findings").title === "Saved findings title" && !P().reportCustom.detailed["what-we-found"], "and its customisation moves to the Findings key");
+        return wordBlocks({}).then(function (bl0) {
+          ok(bl0.some(function (b) { return b.type === "heading" && b.text === "Saved findings title" && b.sectionKey === "findings"; }) && !bl0.some(function (b) { return b.type === "heading" && b.text === "Findings"; }), "and still renames the section in Word");
+          ok(RT.loadProjectText(saved), "back to the project with overrides");
+          return wordBlocks({});
+        }).then(function (bl) {
           ok(bl.some(function (b) { return b.type === "heading" && b.text === "Saved detailed title"; }), "and reach Word");
           var old = JSON.parse(saved); delete old.reportCustom;
           ok(RT.loadProjectText(JSON.stringify(old)) && !P().reportCustom, "a file from before them loads with none");
@@ -514,7 +523,7 @@
         var MARK = "OVERRIDE-MARKER-XYZ";
         RP.setSection("detailed", "executive-summary", { title: MARK + " title" });
         RP.setSection("detailed", "why-this-assessment", { prose: MARK + " prose." });
-        RP.setSection("highLevel", "what-we-found", { prose: MARK + " high level." });
+        RP.setSection("highLevel", "findings", { prose: MARK + " high level." });
         var V = w.App.Version;
         function unzipAll(blob) { return DB.unzip(blob).then(function (ps) { return ps.map(function (x) { return { name: x.name, text: /\.(xml|rels)$/.test(x.name) ? new w.TextDecoder().decode(x.bytes) : "" }; }); }); }
         return RX.buildWorkbook(P()).xlsx.writeBuffer().then(function (buf) { return unzipAll(new w.Blob([buf])); }).then(function (parts) {

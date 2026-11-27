@@ -1116,7 +1116,7 @@
     var unrated = vm.threats.filter(function (x) { var li = stateLI(x.t, st); return !(li.L && li.I); }).length;
     main.appendChild(card("Heat map", vm.threats.length + " scenario" + (vm.threats.length === 1 ? "" : "s"), [
       toggle,
-      h("p", { class: "hint", text: "Outlined cells are above tolerable risk, and a scenario not rated in this state is placed by its previous rating." }),
+      h("p", { class: "hint", text: "Outlined cells are above tolerable risk. A scenario with no rating in this state is shown at its previous rating." }),
       t,
       unrated ? h("p", { class: "muted", text: unrated + " not rated." }) : null
     ], null, { "data-view": "heatmap" }));
@@ -1130,7 +1130,7 @@
     main.appendChild(h("h1", { class: "page-title", text: "SL-T assignment" }));
     main.appendChild(pageSub("slt", "Set one target security level per foundational requirement, and justify it."));
     main.appendChild(stepTabs("slt"));
-    main.appendChild(h("div", { class: "framing-note", text: "House method: the suggestions are SolutionsPT's and do not come from the standard. You can set an SL-T below a suggestion if you justify it." }));
+    main.appendChild(h("div", { class: "framing-note", text: "The SL-T suggestions come from the SolutionsPT house method, as the standard gives no method for them. You can set an SL-T below a suggestion if you justify it." }));
     if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
     var all = owners(p), sugs = {};
     all.forEach(function (o) { sugs[o.id] = suggestionOf(o, p); });
@@ -1230,7 +1230,7 @@
     var cw = E.criteriaWords(p);
     var tolWords = "Tolerable risk is " + BAND_NAME[E.tolerableOf(p)].toLowerCase() + " (step 1).";
     main.appendChild(h("div", { class: "framing-note", text: cw.source === "client" ? "This assessment uses the client's risk matrix. " + tolWords :
-      cw.source === "project" ? "This assessment uses the risk matrix agreed for it. " + tolWords : "House method: SolutionsPT's risk matrix, as the standard does not prescribe one. " + tolWords }));
+      cw.source === "project" ? "This assessment uses the risk matrix agreed for it. " + tolWords : "This assessment uses the SolutionsPT risk matrix, which is part of the house method, because the standard does not prescribe one. " + tolWords }));
     // By consequence works before there are zones: a consequence needs none.
     if (view === "consequence") { R.ConsequenceUI.render(main, p, R.ViewModel.build(p), openMap(p)); return; }
     if (!p.zones.length && !p.conduits.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
