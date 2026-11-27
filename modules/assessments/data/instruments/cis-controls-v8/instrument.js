@@ -27,6 +27,8 @@ window.App.Data.instruments["cis-controls-v8"].instrument = {
                     "objectiveTitle":  "Control set",
                     "principleNoun":  "Control",
                     "outcomesTitle":  "Safeguards",
+                    "unitNoun":  "Safeguard",
+                    "roadmapTitle":  "Implementation roadmap",
                     "gettingStarted":  {
                                            "cardTitle":  "How the CIS Critical Security Controls v8.1.2 assessment works",
                                            "intro":  "This assessment covers each Safeguard in the CIS Critical Security Controls Version 8.1.2. You record each Safeguard as Implemented, Partially Implemented or Not Implemented. This is a gap analysis. It is not a certified CIS assessment.",

@@ -25,6 +25,8 @@ window.App.Data.instruments["nist-800-53"].instrument = {
                     "profileStep1Label":  "Baseline",
                     "objectiveTitle":  "Control families",
                     "outcomesTitle":  "Controls",
+                    "objectiveNoun":  "control group",
+                    "roadmapTitle":  "Remediation roadmap",
                     "gettingStarted":  {
                                            "cardTitle":  "How the NIST SP 800-53 assessment works",
                                            "intro":  "This assessment covers each control in the NIST SP 800-53 Rev 5 catalog (Release 5.2.0) for enterprise IT and other information systems. You record each control as Satisfied or Other Than Satisfied, as in the NIST SP 800-53A assessment model. This is a gap analysis. It is not a formal assessment or an authorisation package.",

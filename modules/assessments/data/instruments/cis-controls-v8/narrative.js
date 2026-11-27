@@ -21,12 +21,13 @@ window.App.Data.instruments["cis-controls-v8"].narrative = {
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only. Single objective, so the docx gap-shape uses the 18 Controls; 3-band Implemented / Partially / Not Implemented.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against {profileName} of the CIS Critical Security Controls v8.1.2, with the weakest coverage in {weakestObjectiveName}. The Safeguards that are not yet implemented are the focus of the roadmap in this report.",
+                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against {profileName} of the CIS Critical Security Controls v8.1.2. The weakest coverage is in {weakestObjectiveName}, where {weakestObjectiveDetail}.",
                                                "exec_verdict_nogaps":  "This assessment finds that {clientName} {verdictPhrase} against {profileName} of the CIS Critical Security Controls v8.1.2, with every in-scope Safeguard assessed as Implemented.",
                                                "exec_scope":  "The assessment covered {applicableCount} applicable Safeguards across the 18 CIS Controls, judged against {profileName}.",
-                                               "exec_profile":  "Of these, {achievedCount} were assessed as Implemented, {partiallyCount} as Partially Implemented and {notAchievedCount} as Not Implemented, and {unknownCount} could not be verified (Unknown). A Safeguard that cannot be verified counts as a finding. The roadmap therefore covers the {belowCount} Safeguard(s) that are Partially Implemented, Not Implemented or Unknown.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} The weakest Control is {weakestObjectiveName}, where {weakestObjectiveDetail}.",
-                                               "exec_path_forward":  "This report sets out a prioritised roadmap for addressing the {belowCount} Safeguards below the expected state.",
+                                               "exec_profile":  "Of these, {achievedCount} were assessed as Implemented, {partiallyCount} as Partially Implemented and {notAchievedCount} as Not Implemented.{unknownSentence} The roadmap covers the {belowCount|Safeguard|Safeguards} that {belowCount?is|are} Partially Implemented, Not Implemented or Unknown.",
+                                               "exec_unknown":  "{unknownCount|Safeguard|Safeguards} could not be verified and {unknownCount?is|are} marked Unknown. A Safeguard that cannot be verified counts as a finding.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
+                                               "exec_path_forward":  "This report sets out a prioritised roadmap for the Safeguards below the expected state.",
                                                "exec_confidence":  "These findings rest on answers for {coveragePct} of applicable Safeguards ({confidenceLabel}). Results are reported as the spread of Implemented, Partially Implemented and Not Implemented Safeguards for each Control, with no overall grade or pass mark.",
                                                "verdictPhrases":  {
                                                                       "foundations":  "demonstrates strong implementation",
@@ -34,6 +35,7 @@ window.App.Data.instruments["cis-controls-v8"].narrative = {
                                                                       "substantial":  "has substantial gaps"
                                                                   },
                                                "gapConcentrationFragments":  {
+                                                                                 "mostlyClause":  "most Safeguards are implemented but some are not",
                                                                                  "partialClause":  "Safeguards are partly in place",
                                                                                  "absentClause":  "the Safeguards are not yet implemented"
                                                                              }
@@ -41,10 +43,10 @@ window.App.Data.instruments["cis-controls-v8"].narrative = {
                              "boilerplate":  {
                                                  "exec_partial_vs_absent":  "A Safeguard marked Partially Implemented has some of its elements in place, so the remaining work extends what has already begun. A Safeguard marked Not Implemented is not yet in place and has to be established. Closing a Not Implemented gap usually takes more effort and cost, because there is nothing in place to build on.",
                                                  "regulatory_stakes":  "The CIS Critical Security Controls are a widely used, prioritised set of safeguards. The chosen Implementation Group reflects the enterprise's risk profile, and IG1 is the baseline of essential cyber hygiene expected of every organisation. A cyber-insurance review, a payment-card assessment (PCI DSS) or a customer security questionnaire would focus on the Safeguards below the expected state.",
-                                                 "not_determination":  "This gap analysis is made against the CIS Safeguard descriptions. It is not a certified CIS Controls assessment or a CSAT result. The judgements are the consultant's and should be confirmed through the enterprise's own validation where required."
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the weakest Control is {weakestObjectiveName}.",
+                                                      "consultant_exposure_seed":  "",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note on the drivers for this assessment (cyber insurance, PCI DSS, customer requirements) and any specific exposure arising from the weakest Controls identified.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
                                                       "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this organisation.]"

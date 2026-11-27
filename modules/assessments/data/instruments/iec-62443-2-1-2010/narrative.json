@@ -8,30 +8,30 @@
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only; boilerplate VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. Order: verdict, scope + profile, gap-shape, conformance-method + stakes, path forward + confidence.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment finds that {clientName}'s cyber security management system {verdictPhrase} against ISA/IEC 62443-2-1:2010, with the weakest conformance in {weakestCategoryName}. The elements not yet in place are the focus of the roadmap in this report.",
+                                               "exec_verdict":  "This assessment finds that {clientName}'s cyber security management system {verdictPhrase} against ISA/IEC 62443-2-1:2010. {weakestCategoryLead}{weakestCategoryName}{weakestDetail}.",
                                                "exec_verdict_nogaps":  "This assessment finds that {clientName}'s cyber security management system {verdictPhrase} against ISA/IEC 62443-2-1:2010, with every applicable element In place or Largely in place.",
                                                "exec_scope":  "The assessment covered {answeredCount} applicable CSMS elements across the standard's three categories: Risk analysis, Addressing risk with the CSMS, and Monitoring and improving the CSMS.",
                                                "exec_profile":  "Of these, {inPlace} are In place, {largely} Largely in place, {partially} Partially in place and {notInPlace} Not in place.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} The weakest category is {weakestCategoryName}{weakestDetail}.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
                                                "exec_path_forward":  "The roadmap in this report takes account of OT operating constraints. It deals first with the elements that are Not in place, then works towards full conformance of the CSMS.",
-                                               "exec_confidence":  "These results are based on the {coveragePct} of applicable elements that could be assessed ({confidenceLabel}). The overall conformance index, {conformancePct}, is shown for context only. A Not-in-place element is reported separately as a floor finding, so the average cannot hide it.",
+                                               "exec_confidence":  "Coverage is {coveragePct} of the applicable elements ({confidenceLabel}). The overall conformance index, {conformancePct}, is shown for context only. A Not-in-place element is reported separately as a floor finding, so the average cannot hide it.",
                                                "verdictPhrases":  {
                                                                       "substantial":  "has substantial gaps in conformance",
                                                                       "recognised":  "is partly conformant",
                                                                       "strong":  "is largely conformant"
                                                                   },
                                                "gapConcentrationFragments":  {
-                                                                                 "notInPlace":  "{notInPlace} element(s) are Not in place, so the CSMS does not yet meet the standard for those elements.",
-                                                                                 "partially":  "{partially} element(s) are only Partially in place."
+                                                                                 "notInPlace":  "",
+                                                                                 "partially":  ""
                                                                              }
                                            },
                              "boilerplate":  {
                                                  "exec_conformance_method":  "ISA/IEC 62443-2-1:2010 defines a Cyber Security Management System as a set of elements in three categories. The first establishes why security matters and assesses the risk. The second addresses that risk through policy, organisation, countermeasures and implementation, and the third monitors and improves the system over time. Conformance is judged for each element, and there is no single grade. A CSMS can be strong in one area and missing in another, and a blended score would hide the gaps that most need attention.",
                                                  "stakes":  "An element that is Not in place is missing from the management system. Partially in place means the element exists but is incomplete, and Largely in place means it is close to conformant. The CSMS keeps OT security planned and maintained, so a gap in it makes it more likely that security lapses over time.",
-                                                 "not_determination":  "This is a conformance and gap analysis against ISA/IEC 62443-2-1:2010, informed by the operational technology context. It does not certify the CSMS, and it does not by itself establish conformance with the standard. The judgements reflect what could be demonstrated during the engagement and should be confirmed during remediation."
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the weakest conformance is in {weakestCategoryName}.{floorExposureClause}",
+                                                      "consultant_exposure_seed":  "",
                                                       "consultant_exposure_floor_clause":  " Not-in-place elements mean parts of the management system are absent, and the organisation is less prepared for an incident in those areas.",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note on what the weakest CSMS categories mean operationally for this organisation, and any safety or availability implications.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",

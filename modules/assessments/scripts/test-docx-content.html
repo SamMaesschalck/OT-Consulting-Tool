@@ -244,12 +244,12 @@ window.docx = (function () {
     check("FR7.why_it_matters appears verbatim", allText.indexOf(FN.FR7.why_it_matters) !== -1);
     // Executive summary scope line: 3 FRs assessed, 4 not.
     check("exec_scope composed correctly",
-      /The assessment covered 3 of the seven Foundational Requirements/.test(allText) &&
+      /The assessment covered 3 of the 7 Foundational Requirements/.test(allText) &&
       /\(4 Foundational Requirements were not assessed\)/.test(allText));
     // One requirement in this fixture has an unmet base item, so it is
     // floor-flagged. The untouched FRs contribute nothing to that count.
     check("floor count reflects only assessed requirements",
-      /1 requirement\(s\) are floor-flagged/.test(allText));
+      /1 requirement is floor-flagged/.test(allText));
 
     // Acceptance 6: named styles + brand colour
     section("Acceptance 6 - Named paragraph styles + brand colour");

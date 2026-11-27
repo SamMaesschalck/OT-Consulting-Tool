@@ -3076,7 +3076,7 @@
     main.appendChild(h("h1", { class: "page-title", text: "About" }));
     main.appendChild(card(V.product + " " + V.label, "version " + V.number, [
       h("p", { text: "The tool works offline. Review packs hold client data, so handle them as you would the project file." }),
-      h("p", { text: "It reads " + RC.packSchema() + " and writes " + RC.fileSchema() + "." })
+      h("p", { text: "It opens review packs and writes review files." })
     ]));
     main.appendChild(card("Keyboard", null, [keysList()]));
     main.appendChild(card("Copyright and licence", null, [h("p", { text: LEGAL_NOTICE }), h("div", { class: "rr-licence", text: (A.Data && A.Data.licence) || "" })]));

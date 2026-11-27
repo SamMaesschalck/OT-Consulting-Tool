@@ -120,7 +120,7 @@ window.docx = (function () {
     var t = document.getElementById("main").textContent;
     ok(t.indexOf(c.other) === -1, tag + ": the screen never names the OTHER standard");
     ok(!c.otherNoun.test(t), tag + ": nor uses the other instrument's noun");
-    ok(t.indexOf("Results by " + c.element) !== -1, tag + ": results are grouped by its own noun",
+    ok(t.indexOf("Results by " + R.mlNoun(inst, "elementNoun")) !== -1 && R.mlNoun(inst, "elementNoun").toLowerCase() === c.element.toLowerCase(), tag + ": results are grouped by its own noun",
        t.indexOf("Results by") >= 0 ? t.slice(t.indexOf("Results by"), t.indexOf("Results by") + 40) : "(none)");
     ml3Check(tag, c.id, t, "the screen");
 
@@ -139,9 +139,9 @@ window.docx = (function () {
           var hit = c.otherNoun.exec(txt);
           ok(!hit, tag + ": Word never uses the other instrument's noun",
              hit ? txt.slice(Math.max(0, hit.index - 60), hit.index + 60) : "");
-          ok(hs.indexOf("Results by " + c.element) !== -1, tag + ": Word groups results by its own noun",
+          ok(hs.indexOf("Results by " + R.mlNoun(inst, "elementNoun")) !== -1, tag + ": Word groups results by its own noun",
              hs.join(" | "));
-          ok(hs.indexOf("Findings by " + c.element) !== -1, tag + ": and findings too");
+          ok(hs.indexOf("Findings by " + R.mlNoun(inst, "elementNoun")) !== -1, tag + ": and findings too");
           ml3Check(tag, c.id, txt, "Word");
           // The glossary carries the same meaning, in its own words.
           var gl = (R.glossarySections(inst, E.state.taxonomy, narr) || []).map(function (s) { return JSON.stringify(s.rows || []); }).join(" ");

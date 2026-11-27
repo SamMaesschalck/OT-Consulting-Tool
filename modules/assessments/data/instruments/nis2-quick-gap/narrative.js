@@ -15,12 +15,12 @@ window.App.Data.instruments["nis2-quick-gap"].narrative = {
       "path_forward_and_confidence (exec_path_forward composed incl. consultant_top_priorities + exec_confidence composed + not_determination verbatim)"
     ],
     "templates": {
-      "exec_verdict": "This assessment finds that {clientName} has {verdictMaturityPhrase} against its obligations under NIS2, with significant gaps remaining in {weakestAreaName}. These gaps carry regulatory exposure, and the roadmap in this report addresses them.",
+      "exec_verdict": "This assessment finds that {clientName} has {verdictMaturityPhrase} against its obligations under NIS2. The weakest area is {weakestAreaName}, where {weakestAreaDetail}.",
       "exec_verdict_nogaps": "This assessment finds that {clientName} has {verdictMaturityPhrase} against its obligations under NIS2, with no applicable obligation assessed as Partially or Not Achieved.",
       "exec_scope": "The assessment covered {applicableCount} applicable NIS2 obligations drawn from the cybersecurity risk-management measures (Article 21) and the governance (Article 20) and incident-reporting (Article 23) duties of Directive (EU) 2022/2555.",
       "exec_profile": "Of these, {achievedCount} were assessed as Achieved, {partiallyCount} as Partially Achieved, and {notAchievedCount} as Not Achieved.",
-      "exec_gap_shape": "{gapConcentrationSentence} The weakest area is {weakestAreaName}, where {weakestAreaDetail}.",
-      "exec_path_forward": "The roadmap in this report sets out, in order of priority, the work to close the {gapTotal} obligations assessed as Partially or Not Achieved.",
+      "exec_gap_shape": "{gapConcentrationSentence}",
+      "exec_path_forward": "The roadmap in this report sets out, in order of priority, the work to close the {gapTotal|obligation|obligations} assessed as Partially or Not Achieved.",
       "exec_confidence": "These findings rest on answers for {coveragePct} of applicable obligations ({confidenceLabel}). The conformance figure of {conformancePct} is given for context and is not a pass mark or a grade.",
       "exec_exposure_classification": "{clientName} is classified as an {entityClassificationLabel} entity under NIS2.",
       "exec_exposure_authority": "The relevant competent authority is {competentAuthority}.",
@@ -40,8 +40,8 @@ window.App.Data.instruments["nis2-quick-gap"].narrative = {
       "not_determination": "This gap assessment is intended to support improvement and to prepare for engagement with the regulator. It is not a formal determination of NIS2 compliance, which only the relevant competent authority can make. The judgements are the consultant's, made against the obligations of the Directive."
     },
     "consultantBlocks": {
-      "consultant_exposure_seed": "For {clientName}, the weakest area identified is {weakestAreaName}.{repExposureClause}",
-      "consultant_exposure_rep_clause": " Incident-reporting obligations (REP) are currently assessed as Not Achieved, and these carry the statutory reporting deadlines noted above.",
+      "consultant_exposure_seed": "{repExposureClause}",
+      "consultant_exposure_rep_clause": "Some incident-reporting obligations (REP) are assessed as Not Achieved, and these carry the statutory reporting deadlines noted above.",
       "consultant_exposure": "[Consultant to add a short, client-specific note on regulatory exposure: the entity's classification (essential or important), the relevant competent authority, and any specific exposure arising from the weakest areas identified, particularly where incident-reporting obligations are Not Achieved.]",
       "consultant_top_priorities_seed": "The most urgent priorities are likely to be {autoTopPriorityHint}.",
       "consultant_top_priorities_placeholder": "[Consultant to confirm and refine the top one or two priorities for this client.]"

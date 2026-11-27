@@ -20,7 +20,7 @@ window.App.Data.instruments["ncsc-caf"].profileRegistry = {
     "profiles":  [
                      {
                          "id":  "caf-general",
-                         "name":  "General CAF (no regulator profile)",
+                         "name":  "General CAF (no regulator)",
                          "sectorRegulator":  "none",
                          "sectorRegulatorName":  "NCSC (General)",
                          "sector":  "general",

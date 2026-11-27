@@ -12,7 +12,7 @@ window.App.Data.instruments["risk-appetite"].narrative = {
 
     "about_instrument": "The assessment looks separately at the inherent exposure {clientShort} faces, which is largely outside its control, and at the appetite for cyber risk it shows in practice, which it chooses. The verdict describes how well the two fit.",
 
-    "series_context": "The assessment draws on how NIST SP 800-82 and the NIST Cybersecurity Framework frame risk, on the consequence-led approach of ISA/IEC 62443-3-2 and on the risk appetite terms of ISO 31000, but it is not an assessment against a published standard. Like the OT posture and supplier screeners, it is short and based on interviews, and it often helps decide which detailed assessment to commission next.",
+    "series_context": "The assessment draws on how NIST SP 800-82 and the NIST Cybersecurity Framework frame risk, on the consequence-led approach of ISA/IEC 62443-3-2 and on the risk appetite terms of ISO 31000, but it is not an assessment against a published standard. It often helps decide which detailed assessment to commission next.",
 
     "bands_source": "The band definitions and the sector baselines are SolutionsPT starting points, informed by the sources above. Every band in this report, and the verdict itself, is the assessor's own judgement.",
 

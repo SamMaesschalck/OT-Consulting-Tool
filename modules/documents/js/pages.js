@@ -801,7 +801,7 @@
     head(main, "About");
     main.appendChild(card((V.product || (A.Product && A.Product.name) || "") + " " + (V.label || ""), V.number ? "version " + V.number : null, [
       h("p", { text: "The tool works offline. Your document file holds client data." }),
-      h("p", { text: "It opens " + M().SCHEMA + " document files and Word files (.docx), and exports Word files in the SolutionsPT template." })
+      h("p", { text: "It opens its own document files and Word files (.docx), and exports Word files in the SolutionsPT template." })
     ], "dp-card-about"));
     var keys = [];
     KEYS.forEach(function (k) { keys.push(h("dt", { text: k[0] }), h("dd", { text: k[1] })); });

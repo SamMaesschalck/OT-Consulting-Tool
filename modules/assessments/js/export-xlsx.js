@@ -970,11 +970,9 @@ window.App.ExportXLSX = (function () {
     });
   }
 
-  function cafPrincipleNoun(instrument) {
-    var d = (instrument && instrument.display) || {};
-    if (d.principleNoun) return d.principleNoun.toLowerCase();
-    return (d.objectiveTitle === "Control families") ? "control family" : "principle";
-  }
+  function cafPrincipleNoun(instrument) { return window.App.ScoringCAF.vocab(instrument).principle; }
+  function cafVocab(instrument) { return window.App.ScoringCAF.vocab(instrument); }
+  function cafProfilePhrase(info) { return window.App.ScoringCAF.profilePhrase(info.name); }
 
   // True when the instrument carries a per-family OT lens; drives whether the
   // register/roadmap sheets show an "OT framing" column (a generic enterprise
@@ -987,10 +985,11 @@ window.App.ExportXLSX = (function () {
   function cafObjectivesSheet(scored, info, instrument) {
     var ss = cafXlsxStates(instrument);
     var hasAbove = ((scored.aboveBaseline || []).length > 0) && !info.placeholder;
-    var head = ["Objective", "Name"].concat(ss.map(function (s) { return s.label; })).concat(["Unknown"]).concat(hasAbove ? ["Above baseline"] : []).concat(["N/A", "Applicable"]);
+    var V = cafVocab(instrument);
+    var head = [cap(V.objective), "Name"].concat(ss.map(function (s) { return s.label; })).concat(["Unknown"]).concat(hasAbove ? ["Above baseline"] : []).concat(["N/A", "Applicable"]);
     if (!info.placeholder) head.push("Meeting expected", "Below expected");
     var rows = [
-      [styledCell("Outcome profile by objective for the " + info.name + " profile", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell(cap(V.unit) + " profile by " + V.objective + " for " + cafProfilePhrase(info), { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     scored.byObjective.forEach(function (obj) {
@@ -1015,10 +1014,11 @@ window.App.ExportXLSX = (function () {
     var noun = cafPrincipleNoun(instrument);
     var nounCap = noun.charAt(0).toUpperCase() + noun.slice(1);
     var hasAbove = ((scored.aboveBaseline || []).length > 0) && !info.placeholder;
-    var head = [nounCap, "Name", "Objective"].concat(ss.map(function (s) { return s.label; })).concat(["Unknown"]).concat(hasAbove ? ["Above baseline"] : []).concat(["N/A", "Applicable"]);
+    var V = cafVocab(instrument);
+    var head = [nounCap, "Name", cap(V.objective)].concat(ss.map(function (s) { return s.label; })).concat(["Unknown"]).concat(hasAbove ? ["Above baseline"] : []).concat(["N/A", "Applicable"]);
     if (!info.placeholder) head.push("Meeting expected", "Below expected");
     var rows = [
-      [styledCell("Outcome profile by " + noun + " for the " + info.name + " profile", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell(cap(V.unit) + " profile by " + noun + " for " + cafProfilePhrase(info), { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     scored.byPrinciple.forEach(function (p) {
@@ -1100,8 +1100,8 @@ window.App.ExportXLSX = (function () {
     var head = ["Objective", "Principle", unit.replace(/s$/i, ""), "Title", "State", "Captured evidence"]
       .concat(hasLens ? ["OT framing"] : []);
     var rows = [
-      [styledCell(achieved.length + " of " + (scored.perOutcome || []).length + " " + unit.toLowerCase() +
-        " assessed as achieved.",
+      [styledCell(achieved.length + " of " + ((scored.overall && scored.overall.total) || (scored.perOutcome || []).length) + " applicable " + cafVocab(instrument).units +
+        " assessed as " + cafVocab(instrument).achievedLabel + ".",
         { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
@@ -1120,7 +1120,7 @@ window.App.ExportXLSX = (function () {
     });
     if (!achieved.length) {
       rows.push([""].concat(Array(head.length - 1).fill("")));
-      rows[2][0] = "No " + unit.toLowerCase() + " were assessed as achieved.";
+      rows[2][0] = "No " + cafVocab(instrument).units + " were assessed as " + cafVocab(instrument).achievedLabel + ".";
     }
     var ws = aoaSheet(rows);
     ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { c: 0, r: 1 }, e: { c: head.length - 1, r: Math.max(2, rows.length - 1) } }) };
@@ -1133,7 +1133,7 @@ window.App.ExportXLSX = (function () {
       .concat(hasLens ? ["OT framing"] : [])
       .concat(["Business impact", "Recommended action", "Priority", "Relevant IEC 62443 guidance"]).concat(TRACKER_HEAD);
     var rows = [
-      [styledCell("Roadmap towards the expected outcomes for the " + info.name + " profile. It lists every outcome below expectation, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell(cafVocab(instrument).roadmapTitle + " for " + cafProfilePhrase(info) + ". It lists every " + cafVocab(instrument).unit + " below its expected state, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     (scored.roadmap || []).forEach(function (it, i) {
@@ -1174,21 +1174,24 @@ window.App.ExportXLSX = (function () {
     var scopeLine = disp.reportDescription
       ? (disp.reportDescription + ". This is an alignment and gap analysis. It is not a formal assessment or a regulatory submission. The judgements are the consultant's and should be confirmed through the organisation's formal process.")
       : "This workbook records an alignment and gap analysis against NCSC CAF 4.0. It is not a formal CAF assessment or a regulatory submission. The consultant made each judgement against the CAF indicators of good practice, taking account of the operational technology context. The judgements should be confirmed through the organisation's formal process.";
-    var unitNoun = (disp.outcomesTitle === "Controls") ? "control" : "outcome";
-    var profileProse = isBinary
-      ? ("  - There is no single grade. Results are reported as a profile of " + stateSlash + " by objective and " + cafPrincipleNoun(instrument) + ".")
-      : ("  - The CAF is outcome-based and gives no single grade. Results are reported as a profile of " + stateSlash + " by objective and principle.");
+    var V = cafVocab(instrument);
+    var unitNoun = V.unit;
+    var isCAF = /^ncsc-caf/.test(instrument.id || "");
+    var single = ((instrument.taxonomy && instrument.taxonomy.objectives) || []).length < 2;
+    var profileProse = "  - " + (isCAF ? "The CAF is outcome-based and gives no single grade" : "There is no single grade") +
+      ". Results are reported as a profile of " + stateSlash + " by " + (single ? V.principle : V.objective + " and " + V.principle) + ".";
+    var lowToHigh = stateList.slice().reverse();
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scope", { bold: true, fill: FILL.sub })],
       [scopeLine],
       [styledCell("Per " + unitNoun, { bold: true, fill: FILL.sub })],
       ["  - The consultant sets one state per " + unitNoun + ": " + stateOr + "."],
-      ["  - Unknown marks a " + unitNoun + " that could not be established. It lowers coverage and confidence and does not count as a failure."],
+      ["  - Unknown marks a" + (/^[aeiou]/i.test(unitNoun) ? "n " : " ") + unitNoun + " that could not be established. It lowers coverage and confidence" + (instrument.unknownIsFinding ? ", and it counts as a finding below the expected state." : " and does not count as a failure.")],
       ["  - N/A removes the " + unitNoun + " from both the score and the coverage count."],
       [styledCell("Profile", { bold: true, fill: FILL.sub })],
-      ["  - Selected profile: " + info.name + (info.placeholder ? ". The profile has no expected states, so meeting and below counts are not reported." : "")],
-      ["  - The states rank not, then partially, then achieved. An outcome meets expectation when its actual state ranks at or above the expected state."],
+      ["  - Selected " + V.profileNoun + ": " + info.name + (info.placeholder ? ". The profile has no expected states, so meeting and below counts are not reported." : "")],
+      ["  - The states rank " + lowToHigh.join(", then ") + ". A" + (/^[aeiou]/i.test(unitNoun) ? "n " : " ") + unitNoun + " meets expectation when its actual state ranks at or above the expected state."],
       [profileProse],
       [styledCell("Working tracker", { bold: true, fill: FILL.sub })],
       ["  - The Outcomes register has filters on every column and a frozen header row."],

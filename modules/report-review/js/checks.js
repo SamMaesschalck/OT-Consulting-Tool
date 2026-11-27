@@ -428,7 +428,10 @@
     { re: new RegExp("\\bthe (\\d+) " + UNIT + " below their expected state\\b", "i"), fact: "roadmapEntries", what: function (m) { return m[2].toLowerCase() + " below their expected state"; } },
     { re: /\bopen gaps moved from \d+ to (\d+)\b/i, fact: "roadmapEntries", what: function (m) { return gapWords(m[1]); } },
     { re: /\bthere (?:is|are) (\d+) open gaps?\b/i, fact: "roadmapEntries", what: function (m) { return gapWords(m[1]); } },
-    { re: new RegExp("\\b(\\d+) of \\d+ " + UNIT + " were assessed as achieved\\b", "i"), fact: "met", what: function (m) { return m[2].toLowerCase() + " achieved"; } }
+    // Each framework names its own top state: NIST controls are Satisfied and
+    // CIS Safeguards Implemented ("191 of 209 applicable controls were
+    // assessed as Satisfied").
+    { re: new RegExp("\\b(\\d+) of \\d+ " + UNIT + " (?:was|were) assessed as (?:achieved|satisfied|implemented)\\b", "i"), fact: "met", what: function (m) { return m[2].toLowerCase().replace(/^applicable /, "") + " achieved"; } }
   ];
   function figures(pack, out) {
     var facts = (pack.facts && pack.facts.perTarget) || [];

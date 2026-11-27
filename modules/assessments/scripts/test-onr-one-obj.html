@@ -74,10 +74,13 @@ H.test(function (ok, done) {
     ok(!/weakest Fundamental Security Principle/i.test(all), "cyber (one objective): no sentence names the weakest Fundamental Security Principle", all.slice(0, 600));
     ok(/(^|\n)In 7[^\n]*(partly demonstrated|not yet demonstrated)\./.test(all), "cyber: the rest of the gap-shape paragraph still prints", all);
     ok(!/\{weakestObjective/.test(all), "cyber: no template slot is left unfilled");
+    // A principle carries its objective's id too; the summary names the SyDP
+    // (7.1), never the objective number alone ("7 Effective Cyber ...").
+    ok(/\b7\.1 Effective Cyber/.test(all) && !/(^|[^.\d])7 Effective Cyber/.test(all), "cyber: the weakest area is named by its SyDP number", all.slice(0, 600));
     return build("onr-syaps-management", [["1.1.1", "not"], ["1.1.2", "partially"], ["1.1.3", "achieved"]]);
   }).then(function (paras) {
     var all = paras.join("\n");
-    ok(/The weakest Fundamental Security Principle is /.test(all), "management (five objectives): the weakest-objective sentence stays", all.slice(0, 600));
+    ok(/The weakest coverage is in 1 Leadership/.test(all), "management (five objectives): the summary names the weakest Fundamental Security Principle", all.slice(0, 600));
     done();
   });
 });

@@ -2440,7 +2440,7 @@ window.App.UI = (function () {
       case "caf-achieved":
         return "This assessment measures alignment with " + theRef + " for the selected profile and turns the gaps into a prioritised improvement roadmap. The review is advisory. It is not a formal audit and does not certify the organisation.";
       case "risk-appetite-coherence":
-        return "This assessment is led by interview. It compares the organisation's inherent risk exposure with its apparent risk appetite and records the assessor's judgement on how well the two fit. The review is advisory and does not measure the organisation against a standard.";
+        return "This interview-led assessment compares the organisation's inherent risk exposure with its apparent risk appetite and records the assessor's judgement on how well the two fit. The review is advisory and does not measure the organisation against a standard.";
       default:
         return "This assessment measures the gaps against " + theRef + " and turns them into a prioritised improvement roadmap. The review is advisory. It is not a formal audit and does not certify the organisation.";
     }
@@ -2566,7 +2566,7 @@ window.App.UI = (function () {
     "csms-conformance": "Each element of the management system is checked for conformance.",
     "caf-achieved": "Outcomes are compared with the states the selected profile expects.",
     // Not a gap analysis, and the fallback below would have said it was.
-    "risk-appetite-coherence": "An interview measures inherent exposure against risk appetite and how well the two fit."
+    "risk-appetite-coherence": "An interview compares inherent exposure with risk appetite and judges how well they fit."
   };
   function instrumentPurpose(inst) {
     var d = inst.display || {};
@@ -2578,6 +2578,9 @@ window.App.UI = (function () {
       if (first && first.length <= 200) return first;
     }
     if (inst.status === "placeholder") return inst.comingSoon || "This assessment is not available yet.";
+    // The CRA and the Machinery Regulation run on the CSMS engine, but they
+    // assess a product or a machine, not a management system.
+    if (inst.scoringFamily === "csms-conformance" && inst.family === "regulation") return "Each requirement of the regulation is checked for conformance and the gaps are listed.";
     return FAMILY_PURPOSE[inst.scoringFamily] || "The assessment finds the gaps against the published framework.";
   }
 

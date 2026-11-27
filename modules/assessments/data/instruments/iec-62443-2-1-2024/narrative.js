@@ -14,27 +14,27 @@ window.App.Data.instruments["iec-62443-2-1-2024"].narrative = {
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only; boilerplate VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. Order: verdict, scope + profile, gap-shape, profile-method + stakes, path forward + confidence. Works with or without the optional target-ML overlay.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment maps the maturity of {clientName}'s security programme against ISA/IEC 62443-2-1:2024. Of the Security Program Elements, maturity is lowest in {weakestElementName}. The roadmap in this report concentrates on the requirements that are not met or are at the lowest maturity.",
+                                               "exec_verdict":  "This assessment maps the maturity of {clientName}'s security programme against ISA/IEC 62443-2-1:2024. Of the Security Program Elements, {weakestElementName} {weakestIs} the weakest{weakestDetail}.",
                                                "exec_verdict_nogaps":  "This assessment maps the maturity of {clientName}'s security programme against ISA/IEC 62443-2-1:2024 and sets out the achieved-maturity profile across the Security Program Elements. Every requirement is met at some level.",
-                                               "exec_scope":  "The assessment covered {answeredCount} applicable security-programme requirements across {elementCount} Security Program Elements{notMetClause}.",
+                                               "exec_scope":  "The assessment rated {answeredCount} of the {applicableCount} applicable security-programme requirements across {elementCount} Security Program Elements.",
                                                "exec_profile":  "The achieved-maturity profile is {ml1} at ML1, {ml2} at ML2, {ml3} at ML3 and {ml4} at ML4, with {notMet} not met.",
                                                "exec_profile_targets":  "Against the target maturity, {meeting} of {compared} assessed requirements meet their target and {below} fall short.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} Maturity is uneven across the programme, and the weakest Security Program Element is {weakestElementName}{weakestDetail}.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
                                                "exec_path_forward":  "The roadmap in this report takes account of OT operating constraints. It deals first with the requirements that are not met, then raises the programme's maturity where the need is greatest.",
-                                               "exec_confidence":  "These findings are based on the {coveragePct} of applicable requirements that could be assessed ({confidenceLabel}). Mean maturity is shown for context only. A not-met requirement is reported separately as a floor finding, so the mean cannot hide it.",
+                                               "exec_confidence":  "Coverage is {coveragePct} of the applicable requirements ({confidenceLabel}). Mean maturity is shown for context only. A not-met requirement is reported separately as a floor finding, so the mean cannot hide it.",
                                                "gapConcentrationFragments":  {
-                                                                                 "notMet":  "{notMet} requirement(s) are not met, so those practices are not performed at any level.",
-                                                                                 "lowMaturity":  "Maturity clusters at the lower levels in {lowMaturityList}."
+                                                                                 "notMet":  "",
+                                                                                 "lowMaturity":  "The Security Program Elements with the most requirements not met or at ML1 are {lowMaturityList}."
                                                                              }
                                            },
                              "boilerplate":  {
                                                  "exec_profile_method":  "ISA/IEC 62443-2-1:2024 assesses each requirement independently at one maturity level (ML1 Initial, ML2 Managed, ML3 Defined / Practiced, ML4 Improving). The results form a maturity profile with no single grade, because a programme can be strong in one element and weak in another. An average would hide the gaps that most need attention, so the roadmap is built from specific requirements.",
-                                                 "stakes":  "Maturity describes how reliably a security programme practice is performed. ML1 is ad hoc, ML2 is documented and repeatable, ML3 is actively practised on the IACS, and ML4 is measured and improving. A requirement that is Not met is not performed at any level. Low-maturity and not-met requirements are the practices most likely to fail in day-to-day OT operation.",
-                                                 "not_determination":  "This is a maturity assessment of the security programme against ISA/IEC 62443-2-1:2024, set by the consultant against the ML anchors and informed by the OT context. It does not certify the programme, and it does not by itself establish conformance with the standard. The achieved maturity reflects what could be demonstrated during the engagement and should be confirmed during remediation."
+                                                 "stakes":  "Maturity describes how reliably a security programme practice is performed. A requirement that is Not met is not performed at any level. Low-maturity and not-met requirements are the practices most likely to fail in day-to-day OT operation.",
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the lowest programme maturity is in {weakestElementName}.{notMetExposureClause}",
-                                                      "consultant_exposure_notmet_clause":  " Where requirements are not met, parts of the security programme are not performed at all, and the organisation is least prepared for an incident in those areas.",
+                                                      "consultant_exposure_seed":  "{notMetExposureClause}",
+                                                      "consultant_exposure_notmet_clause":  "The organisation is least prepared for an incident in the areas where requirements are not met.",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note on what the weakest Security Program Elements mean operationally for this organisation, and any safety or availability implications.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
                                                       "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this programme.]"

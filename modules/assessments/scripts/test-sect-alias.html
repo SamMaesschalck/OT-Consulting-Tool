@@ -97,6 +97,45 @@ H.test(function (ok, done) {
     ok(title && !/at a glance$/i.test(title) && R.sectionKeyAlias(R.sectionKey(p[1], {})) === R.sectionKey(title, {}),
        p[0] + ": the old readiness heading's key maps to the heading the data now gives", title);
   });
+  // The caf-achieved engine printed CAF headings in the NIST, CIS and ONR
+  // reports. They now use each framework's own words, and the old keys move,
+  // but only for those instruments: the CAF keeps its headings and keys.
+  function instOf(id) { return A.Data.instruments[id].instrument; }
+  var byInst = [
+    ["nist-800-53", "Results by objective", "Results by control group"],
+    ["nist-800-53", "Roadmap towards expected outcomes", "Remediation roadmap"],
+    ["nist-800-53", "Roadmap toward expected outcomes", "Remediation roadmap"],
+    ["nist-800-53", "Controls achieved", "Controls satisfied"],
+    ["nist-800-53", "Outcome profile by objective", "Control profile by control group"],
+    ["nist-800-82", "Results by objective", "Results by control group"],
+    ["cis-controls-v8", "Roadmap towards expected outcomes", "Implementation roadmap"],
+    ["cis-controls-v8", "Safeguards achieved", "Safeguards implemented"],
+    ["cis-controls-v8", "Outcome profile by control", "Safeguard profile by Control"],
+    ["onr-syaps-cyber", "Roadmap towards expected outcomes", "Improvement roadmap"],
+    ["onr-syaps-cyber", "Outcome profile by security delivery principle", "Expectation profile by Security Delivery Principle"],
+    ["onr-syaps-full", "Results by objective", "Results by Fundamental Security Principle"],
+    ["iec-62443-2-4", "Maturity distribution by element", "Maturity distribution by functional area"],
+    ["iec-62443-4-1", "Maturity distribution by element", "Maturity distribution by practice"]
+  ];
+  byInst.forEach(function (p) {
+    var from = R.sectionKey(p[1], {}), to = R.sectionKey(p[2], {});
+    ok(from !== to && R.sectionKeyAlias(from, instOf(p[0])) === to, p[0] + ": old key " + from + " maps to " + to, R.sectionKeyAlias(from, instOf(p[0])));
+  });
+  // The headings the alias points at are the ones the reports print.
+  var VN = A.ScoringCAF.vocab(instOf("nist-800-53"));
+  ok("Results by " + VN.objective === "Results by control group" && VN.roadmapTitle === "Remediation roadmap" && VN.achievedLabel === "Satisfied",
+     "nist-800-53: the report's own nouns are the alias targets", JSON.stringify(VN));
+  ["results-by-objective", "roadmap-towards-expected-outcomes", "outcomes-achieved", "outcome-profile-by-objective"].forEach(function (k) {
+    ok(R.sectionKeyAlias(k, instOf("ncsc-caf")) === k, "ncsc-caf: its own heading keeps its key: " + k, R.sectionKeyAlias(k, instOf("ncsc-caf")));
+  });
+  ok(R.sectionKeyAlias("roadmap-toward-expected-outcomes", instOf("ncsc-caf")) === "roadmap-towards-expected-outcomes",
+     "ncsc-caf: the older roadmap key still lands on the CAF heading");
+  var nistStore = R.migrateSectionKeys({ "roadmap-towards-expected-outcomes": { title: "Agreed plan" }, "results-by-objective": { hidden: true } }, instOf("nist-800-53"));
+  ok(nistStore["remediation-roadmap"] && nistStore["remediation-roadmap"].title === "Agreed plan" &&
+     nistStore["results-by-control-group"] && nistStore["results-by-control-group"].hidden === true &&
+     !nistStore["roadmap-towards-expected-outcomes"] && !nistStore["results-by-objective"],
+     "nist-800-53: a saved customisation moves to the renamed headings", JSON.stringify(nistStore));
+
   ["status-of-this-assessment", "executive-summary", "terms-used-in-this-report", "results-by-layer", "how-to-read-this-report"].forEach(function (k) {
     ok(R.sectionKeyAlias(k) === k, "a current key is left alone: " + k);
   });

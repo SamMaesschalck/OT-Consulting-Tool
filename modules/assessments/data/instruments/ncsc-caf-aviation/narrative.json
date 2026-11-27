@@ -6,7 +6,7 @@
                         "about_caf":  "The CAF for Aviation is organised into four objectives, fourteen principles and a set of contributing outcomes. Each outcome is judged against indicators of good practice, grouped as Achieved, Partially Achieved and Not Achieved. The framework describes the outcomes to be achieved and leaves the means to the organisation, so assessing against it calls for expert judgement. This assessment reports the state of each outcome and gives no single score. The CAA assigns an expected profile for each tier at CAP1753 Stage 1.",
                         "ot_focus":  "Aviation operational and safety-related systems differ from corporate IT in ways that affect several outcomes. Availability and safety usually come before confidentiality, and legacy systems may be unable to meet an indicator as written. Some controls can only be applied through compensating measures. Where this affects a judgement, it is noted against the outcome.",
                         "how_to_read":  "Each contributing outcome is marked Achieved, Partially Achieved or Not Achieved. The results are reported for each objective and principle, with no overall grade. Outcomes whose state could not be established are marked unknown. They lower confidence in the result and are not counted as failures. Where the CAA tier profile sets an expected state for an outcome, the gap is measured from the actual state to the expected one. The roadmap lists every outcome not yet achieved, with the indicators still to be met and the recommended actions.",
-                        "series_context":  "The Cyber Assessment Framework is published by the UK National Cyber Security Centre. The aviation version carries the sector expectations set by the Civil Aviation Authority. The framework sets out the outcomes an organisation must achieve and leaves it to decide how. This report is an assessment against that framework. It is not a CAA submission and has no regulatory status."
+                        "series_context":  "The Cyber Assessment Framework is published by the UK National Cyber Security Centre. The aviation version carries the sector expectations set by the Civil Aviation Authority. This report is an assessment against that framework. It is not a CAA submission and has no regulatory status."
                     },
     "templates":  {
                       "profile_line":  "Objective {objId} {objName}: {achievedCount} achieved, {partiallyCount} partially achieved, {notCount} not achieved, of {totalCount} outcomes.",
@@ -17,12 +17,12 @@
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only; boilerplate verbatim; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. Order: verdict, scope_and_profile, gap_shape, regulatory_stakes, path_forward_and_confidence.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} profile of the CAF for Aviation, with the weakest alignment in {weakestObjectiveName}. The outcomes not yet at their expected state are the focus of the roadmap in this report.",
+                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} profile of the CAF for Aviation. The weakest alignment is in {weakestObjectiveName}, where {weakestObjectiveDetail}.",
                                                "exec_verdict_nogaps":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} profile of the CAF for Aviation, with every applicable outcome meeting its expected state.",
                                                "exec_scope":  "The assessment covered {applicableCount} applicable contributing outcomes across the framework's four objectives (A managing security risk, B protecting against cyber attack, C detecting cyber security events, D minimising the impact of incidents), judged against the {profileName} profile.",
-                                               "exec_profile":  "Of these, {achievedCount} were assessed as Achieved, {partiallyCount} as Partially Achieved and {notAchievedCount} as Not Achieved. {belowCount} outcome(s) sit below the expected state for the profile.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} The weakest objective is {weakestObjectiveName}, where {weakestObjectiveDetail}.",
-                                               "exec_path_forward":  "This report sets out a prioritised roadmap for addressing the {belowCount} outcomes below their expected state.",
+                                               "exec_profile":  "Of these, {achievedCount} were assessed as Achieved, {partiallyCount} as Partially Achieved and {notAchievedCount} as Not Achieved.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
+                                               "exec_path_forward":  "This report sets out a prioritised roadmap for the {belowCount|outcome below its|outcomes below their} expected state.",
                                                "exec_confidence":  "These findings rest on answers for {coveragePct} of applicable outcomes ({confidenceLabel}). There is no overall grade or pass mark.",
                                                "verdictPhrases":  {
                                                                       "foundations":  "has a sound level of alignment with the CAF for Aviation outcomes",
@@ -30,6 +30,7 @@
                                                                       "substantial":  "has substantial gaps in alignment with the CAF for Aviation outcomes"
                                                                   },
                                                "gapConcentrationFragments":  {
+                                                                                 "mostlyClause":  "most outcomes are achieved but some are not",
                                                                                  "partialClause":  "foundations exist but are not yet fully in place",
                                                                                  "absentClause":  "the outcomes are not yet established"
                                                                              }
@@ -37,11 +38,11 @@
                              "boilerplate":  {
                                                  "exec_partial_vs_absent":  "\"Partially Achieved\" means an outcome is recognised and some of its indicators of good practice are met. Closing the gap is improvement and evidence work that builds on what already exists. \"Not Achieved\" means the outcome's indicators are not yet met and the capability has to be established. Closing a Not Achieved gap usually takes more effort and cost, because there is nothing in place to build on.",
                                                  "regulatory_stakes":  "The CAA uses the CAF for Aviation to assess the cyber resilience of aviation organisations within the scope of the Aviation Security and ANO requirements and the NIS Regulations. The assigned tier profile reflects the alignment expected for the organisation's tier, so a CAA review would focus on any outcome that falls short of it. This report is intended to help the organisation prepare for that review.",
-                                                 "not_determination":  "This gap analysis is made against the CAF for Aviation indicators of good practice. It is not a formal CAA assessment, which rests with the responsible organisation and the CAA. The judgements are the consultant's and should be confirmed through the organisation's formal process."
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the weakest objective is {weakestObjectiveName}.{repExposureClause}",
-                                                      "consultant_exposure_rep_clause":  " Outcomes under objective D (minimising the impact of incidents) are below the expected state, which bears directly on CAA expectations for resilience and recovery.",
+                                                      "consultant_exposure_seed":  "{repExposureClause}",
+                                                      "consultant_exposure_rep_clause":  "Outcomes under objective D (minimising the impact of incidents) are below the expected state, which bears directly on CAA expectations for resilience and recovery.",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note on regulatory exposure: the assigned CAA tier, the basis for the selected profile, and any specific exposure arising from the weakest objectives identified.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
                                                       "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this organisation.]"

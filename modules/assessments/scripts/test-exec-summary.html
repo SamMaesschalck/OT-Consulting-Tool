@@ -48,17 +48,17 @@ window.docx = (function () {
 
   var CASES = [
     { id: "ncsc-caf", tour: A.TourCAF, client: "Northbridge Manufacturing",
-      must: ["This assessment finds that Northbridge Manufacturing", "Not Achieved", "Partially Achieved", "The weakest objective is", "four objectives", "weakest alignment in", "Outcome profile by objective"],
+      must: ["This assessment finds that Northbridge Manufacturing", "Not Achieved", "Partially Achieved", "The weakest alignment is in B Protecting against cyber attack", "four objectives", "outcomes are Partially Achieved or Not Achieved", "Outcome profile by objective"],
       mustNot: ["Other Than Satisfied", "Selected profile:"] },
     { id: "nist-800-53", tour: A.TourNIST, client: "Atlas Digital Services",
-      must: ["This assessment finds that Atlas Digital Services", "Other Than Satisfied", "the controls are not yet satisfied", "Technical, Operational and Management", "not a formal SP 800-53A control assessment", "The weakest area is", "Outcome profile by objective"],
-      mustNot: ["Not Achieved", "Partially Implemented", "Selected profile:"] },
+      must: ["This assessment finds that Atlas Digital Services", "Other Than Satisfied", "most controls are satisfied but some are not", "Technical, Operational and Management", "not a formal control assessment under NIST SP 800-53A", "The weakest coverage is in O Operational", "Control profile by control group"],
+      mustNot: ["Not Achieved", "Partially Implemented", "Selected profile:", "Results by objective", "Outcome profile by", "indicators of good practice", "assessed as achieved", "Roadmap towards expected outcomes"] },
     { id: "nist-800-82", tour: A.TourNIST82, client: "Riverbend Water Authority",
-      must: ["This assessment finds that Riverbend Water Authority", "OT Overlay", "Other Than Satisfied", "the controls are not yet satisfied", "OT-aware roadmap"],
+      must: ["This assessment finds that Riverbend Water Authority", "OT Overlay", "Other Than Satisfied", "most controls are satisfied but some are not", "OT-aware roadmap"],
       mustNot: ["Not Achieved", "Selected profile:"] },
     { id: "cis-controls-v8", tour: A.TourCIS, client: "Brightpath Retail Group",
       tweak: function (E) { E.setResponse(E.state.activeTargetId, "1.3", { applicable: true, state: "achieved" }); },
-      must: ["This assessment finds that Brightpath Retail Group", "Implemented", "Partially Implemented", "Not Implemented", "The weakest Control is", "18 CIS Controls", "Outcome profile by control", "Inventory and Control of Enterprise Assets", "Additional controls implemented beyond"],
+      must: ["This assessment finds that Brightpath Retail Group", "Implemented", "Partially Implemented", "Not Implemented", "The weakest coverage is in", "18 CIS Controls", "Safeguard profile by Control", "Inventory and Control of Enterprise Assets", "Additional controls implemented beyond"],
       mustNot: ["Other Than Satisfied", "Selected profile:", "Outcome profile by objective"] }
   ];
 

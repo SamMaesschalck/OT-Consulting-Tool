@@ -8,7 +8,7 @@
     "annex-iv": "critical"
   },
   "routeByClass": {
-    "default": "Internal control (Module A, Annex VIII Part I). The manufacturer self-assesses and no notified body is needed.",
+    "default": "The manufacturer self-assesses by internal control (Module A, Annex VIII Part I), and no notified body is needed.",
     "important-class-i": "The manufacturer may self-assess only if harmonised standards, common specifications or a substantial-level EU certification scheme are applied in full. Otherwise the route is EU-type examination (Module B) with conformity to type (Module C), or full quality assurance (Module H).",
     "important-class-ii": "A notified body is needed, through EU-type examination (Module B) with Module C, or full quality assurance (Module H). Self-assessment is not available.",
     "critical": "The route is the same as for Class II. The manufacturer may also need a European cybersecurity certificate under an EU scheme where a delegated act requires one."

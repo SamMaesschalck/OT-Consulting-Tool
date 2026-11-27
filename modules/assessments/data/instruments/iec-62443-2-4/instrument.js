@@ -50,8 +50,8 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                                              "name":  "Managed",
                                              "anchor":  "Written procedures or training describe how to manage and perform the process. Practice is repeatable and follows documented plans. ML2 is the first level that requires documentation.",
                                              "shortAnchor":  "Documented procedures or training, repeatable and managed to plan.",
-                                             "readAs":  "documented and repeatable",
-                                             "glossary":  "The process is documented and can be repeated. ML2 is the first level that requires documentation."
+                                             "readAs":  "documented, with staff shown to be capable",
+                                             "glossary":  "The process is documented, and the staff who perform it are shown to be trained or capable. ML2 is the first level that requires documentation."
                                          },
                                          {
                                              "id":  "ML3",

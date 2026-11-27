@@ -1203,7 +1203,7 @@ window.RiskExports = (function () {
         if (S.worst) {
           findRuns.push(run(" The highest unmitigated risk is "));
           findRuns.push(run(bandStyle(S.worst.risk).name, { bold: true, color: bandStyle(S.worst.risk).text }));
-          findRuns.push(run(", in " + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ". " + noStop(S.worst.t.statement) + "."));
+          findRuns.push(run(", in " + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + (S.worst.t.id ? ", from threat " + S.worst.t.id : "") + ": " + noStop(S.worst.t.statement) + "."));
         }
         children.push(asBody(para(findRuns), findRuns.map(function (r) { return r.__text; }).join("")));
         // The treatment position is the section above; an accepted risk not
@@ -1507,7 +1507,7 @@ window.RiskExports = (function () {
       var KS = rt.consequencesOf(p);
       if (KS.length) {
         children.push(h1("Consequences and how they could arise"));
-        children.push(body("Each consequence was worked back to the threat scenarios that could cause it. A scenario sits in the zone or conduit where it acts and is rated and decided as in the risk register. The Passes through column lists, in order, the zones and conduits it crosses to get there. Risk today is the current rating. Where none is given, it is the planned rating if the scenario has no planned countermeasures, otherwise the unmitigated rating."));
+        children.push(body("Each consequence was worked back to the threat scenarios that could cause it. A scenario sits in the zone or conduit where it acts and is rated and decided as in the risk register. The Passes through column lists, in order, the zones and conduits it crosses to get there. Risk today is the current rating. Where none is given and no countermeasures are planned for the scenario, the planned rating already describes the position today and is used. Otherwise the unmitigated rating is used."));
         var kw = [900, 1900, 1700, 2300, 2700, 1500, 1500, 1938];
         KS.forEach(function (k) {
           var kHead = h2(k.id + " " + (k.title || "Untitled consequence"));

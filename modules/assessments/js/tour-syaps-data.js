@@ -214,7 +214,7 @@ window.App.TourSyAPS = (function () {
   var management = {
     metadata: meta("Ravensmoor Licensed Site - security management review (FSyP 1 to 5)"),
     reportNarrative: {
-      regulatoryExposure: "Fenwick Nuclear Services reviews the management and organisational half of its security arrangements (FSyP 1 to 5) against the ONR Security Assessment Principles. This is an informal alignment and gap analysis to support the site security plan and is not an ONR assessment. The gaps cluster in security governance, assurance and supply-chain oversight, which are the organisational foundations ONR expects a licensee to demonstrate.",
+      regulatoryExposure: "Fenwick Nuclear Services reviews the management and organisational half of its security arrangements (FSyP 1 to 5) against the ONR Security Assessment Principles. The review supports the site security plan. The gaps cluster in security governance, assurance and supply-chain oversight, which are the organisational foundations ONR expects a licensee to demonstrate.",
       topPriorities: "The most urgent priorities are putting distinct, board-level security governance in place (SyDP 1.1) and funding the resilience improvements already identified in the security system (SyDP 5.1), followed by a risk-based security assurance programme (SyDP 1.5).",
       nextSteps:
         "Agree an owner and a target date for each finding, and reflect them in the site security plan\nSeparate security governance from safety governance at board level, with its own reporting line\nBuild the security assurance programme around the findings in this report so the two stay aligned\nBring supply-chain security oversight into the existing procurement assurance process\nRe-assess FSyP 1 to 5 in twelve months, ahead of the next ONR engagement"
@@ -225,7 +225,7 @@ window.App.TourSyAPS = (function () {
   var cyber = {
     metadata: meta("Ravensmoor Licensed Site - CS&IA review (FSyP 7)"),
     reportNarrative: {
-      regulatoryExposure: "Fenwick Nuclear Services reviews its Cyber Security and Information Assurance arrangements (FSyP 7) against the ONR Security Assessment Principles. This is an informal alignment and gap analysis. It is not an ONR assessment and contains no SNI. The gaps concentrate in OT characterisation, cyber risk treatment and incident readiness.",
+      regulatoryExposure: "Fenwick Nuclear Services reviews its Cyber Security and Information Assurance arrangements (FSyP 7) against the ONR Security Assessment Principles. The report contains no SNI. The gaps concentrate in OT characterisation, cyber risk treatment and incident readiness.",
       topPriorities: "The most urgent priorities are completing the characterisation of legacy operational technology so risk-informed controls can be applied (SyDP 7.3), resourcing and governing cyber risk treatment to closure (SyDP 7.1), and exercising the cyber incident response plan with OT and engineering involvement (SyDP 7.5).",
       nextSteps:
         "Agree an owner and a target date for each finding, and reflect them in the site security plan\nComplete the characterisation of legacy operational technology as the first piece of work, since the other actions depend on it\nResource cyber risk treatment so that identified risks are carried through to closure\nExercise the cyber incident response plan with OT and engineering staff taking part\nRe-assess FSyP 7 in twelve months"
@@ -236,7 +236,7 @@ window.App.TourSyAPS = (function () {
   var full = {
     metadata: meta("Ravensmoor Licensed Site - whole-of-security posture (all 10 FSyP)"),
     reportNarrative: {
-      regulatoryExposure: "Fenwick Nuclear Services assesses its whole-of-security posture against all ten Fundamental Security Principles of the ONR Security Assessment Principles. This is an informal alignment and gap analysis to support the site security plan. It is not an ONR assessment and contains no SNI or classified material. The most material gaps sit in cyber (OT characterisation and incident readiness), physical protection resilience, and security governance and assurance.",
+      regulatoryExposure: "Fenwick Nuclear Services assesses its whole-of-security posture against all ten Fundamental Security Principles of the ONR Security Assessment Principles. The review supports the site security plan, and the report contains no SNI or classified material. The most material gaps sit in cyber (OT characterisation and incident readiness), physical protection resilience, and security governance and assurance.",
       topPriorities: "Across all ten principles the leading priorities are completing OT characterisation and cyber risk treatment (FSyP 7), substantiating and resourcing physical protection resilience (FSyP 5 and 6), and establishing distinct security governance and a risk-based assurance programme (FSyP 1).",
       nextSteps:
         "Agree an owner and a target date for each finding, and reflect them in the site security plan\nStart with OT characterisation and cyber risk treatment under FSyP 7, which the other cyber actions depend on\nSubstantiate and fund the physical protection resilience improvements under FSyP 5 and 6\nStand up distinct security governance and a risk-based assurance programme under FSyP 1\nRe-assess the whole-of-security posture in twelve months, ahead of the next ONR engagement"

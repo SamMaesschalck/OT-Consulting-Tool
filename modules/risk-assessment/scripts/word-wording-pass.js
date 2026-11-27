@@ -126,7 +126,7 @@ window.RiskTestWordingPass = {
     "The approvals are recorded below. An approval covers the tolerable risk, the zones and conduits, the target security levels and the mandatory security countermeasures in this specification, within the scope given for it. It does not cover C1 and C3, deferred to a later assessment.",
     "IEC 62443-3-2, using the SolutionsPT default risk matrix and risk-to-SL mapping (house method)",
     "Findings",
-    "9 threats were registered. Z1 Unit 300 BPCS (remote access) has the most threats above tolerable risk (2). The highest unmitigated risk is High, in Z1 Unit 300 BPCS. An external attacker hijacks or rides the vendor remote access path to reach the DCS servers and issue control changes.",
+    "9 threats were registered. Z1 Unit 300 BPCS (remote access) has the most threats above tolerable risk (2). The highest unmitigated risk is High, in Z1 Unit 300 BPCS, from threat T1: An external attacker hijacks or rides the vendor remote access path to reach the DCS servers and issue control changes.",
     "Scope: All Unit 300 control, safety and engineering systems from the field controllers up to and including the plant DMZ are in scope, with the conduits that cross the boundary for historian replication, vendor remote access and corporate reporting. The corporate IT network beyond the DMZ firewall, the other process units and the terminal loading systems are out of scope. The loading systems are assessed separately.",
     "No engineering changes without MoC approval; Vendor sessions are activated per ticket and time-bounded",
     "All exchange between OT and corporate passes through the DMZ, with no direct paths; DMZ hosts are patched monthly in the IT window",

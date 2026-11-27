@@ -200,7 +200,7 @@ window.App.Data.index = {
                             "scoringFamily":  null,
                             "targetDimension":  "aviation-organisation",
                             "path":  "instruments/caa-tier3-assessment",
-                            "comingSoon":  "Controls-based (not outcome-based) tool for smaller Tier 3 aviation organisations (CAP1753 Section C). Separate CAA/NCSC artefact; needs its own source document."
+                            "comingSoon":  "A controls-based assessment for smaller Tier 3 aviation organisations, from CAP1753 Section C. It is not available yet."
                         },
                         {
                             "id":  "nist-800-53",

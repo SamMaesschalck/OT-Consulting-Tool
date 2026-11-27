@@ -136,7 +136,7 @@ H.test(function (ok) {
      inst2.map(function (r) { return r.textContent; }).join(" | "));
   ok(card && !/gaps against the published framework/.test(card.textContent),
      "and is not described as a gap analysis against a framework, which it is not");
-  ok(card && /exposure against risk appetite/i.test(card.textContent),
+  ok(card && /exposure with risk appetite/i.test(card.textContent),
      "but as what it is");
 
   // With the technical layer off, its five items are out of the assessment, so

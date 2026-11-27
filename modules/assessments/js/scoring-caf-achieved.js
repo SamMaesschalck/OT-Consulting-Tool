@@ -350,7 +350,50 @@ window.App.ScoringCAF = (function () {
     return Math.round(v * 100) + "%";
   }
 
+  // ---- the instrument's own words ----------------------------------------
+  // Five frameworks share this engine, and each has its own nouns: CAF
+  // objectives and outcomes, NIST control groups, families and controls, CIS
+  // Controls and Safeguards, ONR principles and expectations. The report text
+  // takes them from here, so no CAF term reaches a NIST, CIS or ONR report.
+  // Nouns the data gives are used as written (CIS and ONR capitalise theirs);
+  // the generic fallbacks are lower case.
+  function pluralNoun(s) {
+    s = String(s || "");
+    if (/[^aeiou]y$/i.test(s)) return s.slice(0, -1) + "ies";
+    if (/s$/i.test(s)) return s;
+    return s + "s";
+  }
+  function vocab(instrument) {
+    var d = (instrument && instrument.display) || {};
+    var unit = d.unitNoun || String(d.outcomesTitle || "Outcomes").replace(/s$/i, "").toLowerCase();
+    var objective = d.objectiveNoun || "objective";
+    var principle = d.principleNoun || (d.objectiveTitle === "Control families" ? "control family" : "principle");
+    var achieved = substantiveStates(instrument).filter(function (s) { return s.value === "achieved"; })[0];
+    var prof = String(d.profileTitle || "profile");
+    if (!/^Implementation Group$/.test(prof)) prof = prof.toLowerCase();
+    return {
+      profileNoun: prof,
+      unit: unit, units: pluralNoun(unit),
+      objective: objective, objectives: pluralNoun(objective),
+      principle: principle, principles: pluralNoun(principle),
+      achievedLabel: achieved ? achieved.label : "Achieved",
+      roadmapTitle: d.roadmapTitle || "Roadmap towards expected outcomes"
+    };
+  }
+  // "the Ofgem (Basic) profile", "the Moderate baseline (NIST SP 800-53B)",
+  // "Implementation Group 2": a profile name that already says what it is
+  // does not get "profile" added to it.
+  function profilePhrase(name) {
+    var n = String(name || "").trim();
+    if (/\b(baseline|overlay|catalog)\b/i.test(n)) return "the " + n;
+    if (/^(Implementation Group|Full \()/i.test(n)) return n;
+    return "the " + n + " profile";
+  }
+
   return {
+    vocab: vocab,
+    pluralNoun: pluralNoun,
+    profilePhrase: profilePhrase,
     STATE_RANK: STATE_RANK,
     rankOf: rankOf,
     meetsExpected: meetsExpected,

@@ -948,21 +948,55 @@ window.App.Report = (function () {
     [/^recommendations-conformance-gap-roadmap(.*)$/, "recommendations-and-gap-roadmap$1"],
     [/^(.+)s-side-by-side$/, "results-by-$1"]
   ];
-  function sectionKeyAlias(key) {
-    var k = String(key || "");
-    if (Object.prototype.hasOwnProperty.call(SECTION_KEY_ALIASES, k)) return SECTION_KEY_ALIASES[k];
-    for (var i = 0; i < SECTION_KEY_PATTERNS.length; i++) {
-      if (SECTION_KEY_PATTERNS[i][0].test(k)) return k.replace(SECTION_KEY_PATTERNS[i][0], SECTION_KEY_PATTERNS[i][1]);
+  // Renames that depend on the instrument. The caf-achieved engine printed CAF
+  // headings in every framework it carries; NIST, CIS and ONR now get their
+  // own ("Results by control group", "Remediation roadmap", "Controls
+  // satisfied"), while the CAF keeps its headings. So "results-by-objective"
+  // moves for a NIST assessment and stays put for a CAF one.
+  function instrumentKeyAliases(instrument) {
+    var out = {};
+    var C = window.App.ScoringCAF;
+    if (instrument && instrument.scoringFamily === "program-maturity-ml") {
+      var a = window.App.ReportSections.sectionKey("Maturity distribution by element", []);
+      var b = window.App.ReportSections.sectionKey("Maturity distribution by " + mlNoun(instrument, "elementNoun"), []);
+      if (a !== b) out[a] = b;
+      return out;
     }
-    return k;
+    if (!instrument || instrument.scoringFamily !== "caf-achieved" || !C || !C.vocab) return out;
+    var V = C.vocab(instrument), d = instrument.display || {};
+    function slug(t) { return window.App.ReportSections.sectionKey(t, []); }
+    function add(oldTitle, newTitle) { var a = slug(oldTitle), b = slug(newTitle); if (a && b && a !== b) out[a] = b; }
+    var oldPrinciple = d.principleNoun || (d.objectiveTitle === "Control families" ? "control family" : "principle");
+    add("Results by objective", "Results by " + V.objective);
+    add("Roadmap towards expected outcomes", V.roadmapTitle);
+    add((d.outcomesTitle || "Outcomes") + " achieved", cap(V.units) + " " + V.achievedLabel.toLowerCase());
+    add("Outcome profile by objective", cap(V.unit) + " profile by " + V.objective);
+    add("Outcome profile by " + oldPrinciple, cap(V.unit) + " profile by " + V.principle);
+    return out;
+  }
+  function activeInstrument() {
+    var E = window.App.Engine;
+    return (E && E.state && E.state.instrument) || null;
+  }
+  // instrument: the assessment the key belongs to; the open one when omitted.
+  function sectionKeyAlias(key, instrument) {
+    var k = String(key || "");
+    if (Object.prototype.hasOwnProperty.call(SECTION_KEY_ALIASES, k)) k = SECTION_KEY_ALIASES[k];
+    else {
+      for (var i = 0; i < SECTION_KEY_PATTERNS.length; i++) {
+        if (SECTION_KEY_PATTERNS[i][0].test(k)) { k = k.replace(SECTION_KEY_PATTERNS[i][0], SECTION_KEY_PATTERNS[i][1]); break; }
+      }
+    }
+    var byInst = instrumentKeyAliases(instrument || activeInstrument());
+    return Object.prototype.hasOwnProperty.call(byInst, k) ? byInst[k] : k;
   }
   // Moves every customisation saved under an old key to its new key, in place,
   // so the next save writes the new key. Where the new key already holds a
   // customisation, its own fields win and the old one only fills the gaps.
-  function migrateSectionKeys(store) {
+  function migrateSectionKeys(store, instrument) {
     if (!store || typeof store !== "object") return store;
     Object.keys(store).forEach(function (old) {
-      var to = sectionKeyAlias(old);
+      var to = sectionKeyAlias(old, instrument);
       if (!to || to === old) return;
       var from = store[old], cur = store[to];
       store[to] = (cur && typeof cur === "object" && from && typeof from === "object")
@@ -974,7 +1008,7 @@ window.App.Report = (function () {
 
   function reportCustom(opts) {
     var store = opts && opts.engagement && opts.engagement.reportCustom;
-    return store ? migrateSectionKeys(store) : {};
+    return store ? migrateSectionKeys(store, opts && opts.instrument) : {};
   }
   // A project is migrated as it loads, and each assessment as it is opened, so
   // the page's editors (which read the store through the engine) see the new
@@ -1371,30 +1405,37 @@ window.App.Report = (function () {
   function glossaryCAF(instrument, narrative) {
     var d = (instrument && instrument.display) || {};
     var C = window.App.ScoringCAF;
-    var objective  = d.objectiveTitle || "Objective";
-    var principle  = d.principleNoun || "Principle";
+    var V = C.vocab(instrument);
+    // NIST groups its families into control groups; its objectiveTitle names the
+    // families, which are the second level.
+    var objective  = cap(d.objectiveNoun || ((d.objectiveTitle && d.objectiveTitle !== "Control families") ? d.objectiveTitle : "objective"));
+    var principle  = cap(V.principle);
     var outcome    = (d.outcomesTitle || "Contributing outcomes").replace(/s$/, "");
     var profile    = d.profileTitle || "Profile";
-    function lbl(state, fallback) {
-      var s = C && C.stateLabelFor ? C.stateLabelFor(state, instrument) : null;
-      return s || fallback;
-    }
-    var states = [
-      [lbl("achieved", "Achieved"), "The " + outcome.toLowerCase() + " is in place and can be demonstrated."],
-      [lbl("partially", "Partially achieved"), "Some of what is expected is in place, but not all of it. It counts as a gap."],
-      [lbl("not", "Not achieved"), "What is expected is not in place."],
-      [COMMON_TERMS.unknown[0], COMMON_TERMS.unknown[1]],
-      [COMMON_TERMS.na[0], COMMON_TERMS.na[1]]
-    ];
+    // Only the states this framework uses: NIST has no Partially, and the old
+    // fixed list printed a row for it under the raw value "partially".
+    var sub = C.substantiveStates(instrument);
+    var hasPartial = sub.some(function (s) { return s.value === "partially"; });
+    var meaning = {
+      achieved: "The " + V.unit + " is in place and can be demonstrated.",
+      partially: "Some of what is expected is in place, but not all of it. It counts as a gap.",
+      not: hasPartial ? "What is expected is not in place." : "What is expected is not fully in place. It counts as a gap."
+    };
+    var states = sub.map(function (s) { return [s.label, meaning[s.value] || ""]; })
+      .concat([[COMMON_TERMS.unknown[0], COMMON_TERMS.unknown[1]], [COMMON_TERMS.na[0], COMMON_TERMS.na[1]]]);
+    // A common noun is lower case mid-sentence; a framework's own term
+    // (Fundamental Security Principle) keeps its capitals.
+    function mid(s) { return /^[A-Z][^A-Z]*$/.test(s) ? s.toLowerCase() : s; }
+    var isCAF = /^ncsc-caf/.test((instrument && instrument.id) || "");
     var structure = [
-      [objective, "The top-level grouping of the framework. Results are reported for each " + objective.toLowerCase() + " and are not combined into a single score."],
-      [principle, "A grouping within " + (/^[aeiou]/i.test(objective) ? "an " : "a ") + objective.toLowerCase() + ". Its result is a profile of the states beneath it."],
+      [objective, "The top-level grouping of the framework. Results are reported for each " + mid(objective) + " and are not combined into a single score."],
+      [principle, "A grouping within " + (/^[aeiou]/i.test(objective) ? "an " : "a ") + mid(objective) + ". Its result is a profile of the states beneath it."],
       [outcome, "The individual item assessed. The consultant records one state against each."],
-      [profile, "The set of expectations applied. It decides which items are in scope and what state each is expected to reach, so the same assessment read against a different " + profile.toLowerCase() + " can give a different result."],
-      ["Expected state", "The state the selected " + profile.toLowerCase() + " expects. An item meets it when the recorded state is at or above it, and items below it go on the roadmap."]
+      [profile, "The set of expectations applied. It decides which items are in scope and what state each is expected to reach, so the same assessment read against a different " + mid(profile) + " can give a different result."],
+      ["Expected state", "The state the selected " + mid(profile) + " expects. An item meets it when the recorded state is at or above it, and items below it go on the roadmap."]
     ];
     var terms = [
-      ["No single score", "The result is a profile, with no overall grade or percentage. The counts of items meeting and falling below expectation are reported for each " + objective.toLowerCase() + " and are not averaged into one number."],
+      ["No single score", "The result is a profile, with no overall grade or percentage. The counts of items meeting and falling below expectation are reported for each " + mid(objective) + " and are not averaged into one number."],
       COMMON_TERMS.coverage,
       COMMON_TERMS.notAssessed,
       COMMON_TERMS.roadmap,
@@ -1404,7 +1445,7 @@ window.App.Report = (function () {
       terms.splice(1, 0, ["OT context", "A note on what the requirement means in an operational technology setting, where availability and safety constraints change what counts as good practice. It is advisory and does not change the score."]);
     }
     return [
-      { heading: "How each item is judged", intro: "The consultant records one state per item, against the indicators of good practice for it.", rows: states },
+      { heading: "How each item is judged", intro: isCAF ? "The consultant records one state for each item, against the indicators of good practice for it." : "The consultant records one state for each item, based on the evidence gathered.", rows: states },
       { heading: "How the assessment is structured", rows: structure },
       { heading: "Terms used in the findings", rows: terms }
     ];
@@ -1424,7 +1465,7 @@ window.App.Report = (function () {
           ["Indicative", "The grade is an early read from a structured interview. It does not assess conformance with a standard and is not a regulatory determination. It shows where a detailed assessment should focus."]
         ] },
       { heading: "How the headline is set", rows: [
-          ["Headline grade", "The average of the graded " + noun + "s, with two limits. It can sit at most two grades above the weakest graded " + noun + ", and the top grade is given only when every " + noun + " reaches it. A single weak area therefore cannot be averaged away by strong ones, and an A means every " + noun + " is graded A."],
+          ["Headline grade", "The one indicative grade for the whole assessment, worked out from the " + noun + " grades as How to read this report explains."],
           ["Provisional", "A " + noun + " answered below the coverage threshold is reported as provisional and is excluded from the headline, because it could not be graded with confidence. It still counts against overall coverage."],
           COMMON_TERMS.coverage,
           COMMON_TERMS.unknown
@@ -1452,7 +1493,7 @@ window.App.Report = (function () {
            mlNoun(instrument, "elementNoun") + "."],
           ["Requirement", "The individual practice assessed. Each is placed at one maturity level, independently of the others."],
           ["Target maturity level", "The level the organisation is aiming at for that requirement. Results are read against it."],
-          ["No single grade", "Results are a profile across the elements. Maturity levels are not averaged into one programme score."]
+          ["No single grade", "Results are a profile across the " + mlNoun(instrument, "elementNounPlural") + ". Maturity levels are not averaged into one programme score."]
         ] },
       { heading: "Terms used in the findings",
         rows: [COMMON_TERMS.unknown, COMMON_TERMS.na, COMMON_TERMS.coverage, COMMON_TERMS.roadmap, COMMON_TERMS.basis] }
@@ -1487,26 +1528,36 @@ window.App.Report = (function () {
   // ---- csms-conformance: 62443-2-1:2010, EU CRA, EU Machinery ------------
   function glossaryCSMS(instrument, narrative) {
     var isLayered = !!(instrument && instrument.layers && instrument.layers.length);
-    var CS = window.App.ScoringCSMS;
-    function lbl(s, f) { return (CS && CS.stateLabelFor ? CS.stateLabelFor(s, null) : null) || f; }
-    var states = [
-      [lbl("in-place", "In place"), "It is fully in place and can be demonstrated."],
-      [lbl("largely", "Largely in place"), "Most of it is in place, with identified shortfalls."],
-      [lbl("partially", "Partially in place"), "Some of it is in place. It counts as a gap."],
-      [lbl("not", "Not in place"), "None of it is in place."],
-      [COMMON_TERMS.unknown[0], COMMON_TERMS.unknown[1]],
-      [COMMON_TERMS.na[0], COMMON_TERMS.na[1]]
-    ];
+    // The states this instrument scores on, with their labels: the CRA and the
+    // Machinery Regulation have three, 62443-2-1:2010 four. Without a profile
+    // the label lookup returned the raw values ("in-place", "largely").
+    var profiles = (window.App.Data && window.App.Data.shared && window.App.Data.shared.scoringProfiles) || {};
+    var prof = profiles[instrument && instrument.scoringProfileRef] || {};
+    var MEANING = {
+      "in-place": "It is fully in place and can be demonstrated.",
+      "largely": "Most of it is in place, with identified shortfalls.",
+      "partially": "Some of it is in place. It counts as a gap.",
+      "not-in-place": "None of it is in place."
+    };
+    var FALLBACK = [["in-place", "In place"], ["largely", "Largely in place"], ["partially", "Partially in place"], ["not-in-place", "Not in place"]];
+    var own = ((instrument && instrument.states) || prof.states || []).filter(function (s) { return s && MEANING[s.value]; });
+    own.sort(function (a, b) { return FALLBACK.map(function (f) { return f[0]; }).indexOf(a.value) - FALLBACK.map(function (f) { return f[0]; }).indexOf(b.value); });
+    var states = (own.length ? own.map(function (s) { return [s.label, MEANING[s.value]]; }) : FALLBACK.map(function (f) { return [f[1], MEANING[f[0]]]; }))
+      .concat([[COMMON_TERMS.unknown[0], COMMON_TERMS.unknown[1]], [COMMON_TERMS.na[0], COMMON_TERMS.na[1]]]);
     var structure = [
       ["Category", "The top-level grouping. Results are reported for each category and are not combined into a single score."],
       ["Element", "The individual requirement assessed. The consultant records one state against each."],
       ["Conformance percentage", "A figure shown for context only. It is not a pass mark and does not replace the profile of states."]
     ];
     if (isLayered) {
-      // Said once, in the executive summary (Word) or the banner (screen).
-      structure[0] = ["Category", "A grouping of requirements within a layer. Results are reported for each category."];
-      structure.unshift(["Layer", "One of the parts the assessment is split into. Each covers a different set of obligations: what the product must do, what the manufacturer's process must do, and what must be reported."]);
-      structure.push(["Classification", "The product class determines which requirements and which conformity route apply. The consultant sets it at the start of the assessment."]);
+      // A layer holds its requirements directly: there are no categories or
+      // elements in the CRA or the Machinery Regulation.
+      structure = [
+        ["Requirement", "The individual requirement assessed. The consultant records one state against each."],
+        ["Conformance index", "A figure for each layer, shown for context only. It is not a pass mark and does not replace the profile of states."]
+      ];
+      structure.unshift(["Layer", "One of the parts the assessment is split into. Each layer covers its own set of obligations and is reported on its own."]);
+      structure.push(["Classification", "The " + ((instrument.display && instrument.display.productNoun) || "product") + "'s classification decides which conformity route applies. The consultant sets it at the start of the assessment."]);
     }
     return [
       { heading: "How each item is judged", intro: "Each item is judged against full conformance. The consultant records one state per item.", rows: states },
@@ -2302,11 +2353,18 @@ window.App.Report = (function () {
     var outs = (scored && scored.outOfScopeElements) || [];
     if (!outs.length) return "";
     var noun = mlNoun(instrument, outs.length === 1 ? "elementNoun" : "elementNounPlural");
-    var named = outs.map(function (o) {
-      return o.elementId + " " + o.name + (o.note ? " (" + String(o.note).trim().replace(/[.\s]+$/, "") + ")" : "");
-    });
+    var named = outs.map(function (o) { return o.elementId + " " + o.name; });
+    // The consultant's reason is a sentence of its own after the main one; in
+    // brackets mid-sentence it read as a capitalised sentence inside another.
+    var reasons = outs.map(function (o) {
+      var n = String(o.note || "").trim();
+      if (!n) return "";
+      n = n.charAt(0).toUpperCase() + n.slice(1);
+      return (outs.length > 1 ? o.elementId + ": " : "") + (/[.!?]$/.test(n) ? n : n + ".");
+    }).filter(Boolean);
     return "The " + noun + " " + joinNames(named) + (outs.length === 1 ? " was" : " were") +
-      " out of scope for this assessment, so " + (outs.length === 1 ? "its" : "their") + " requirements were not assessed and are not counted in the results.";
+      " out of scope for this assessment, so " + (outs.length === 1 ? "its" : "their") + " requirements were not assessed and are not counted in the results." +
+      (reasons.length ? " " + reasons.join(" ") : "");
   }
 
   function pluralLower(s, instrument) {
@@ -2769,7 +2827,13 @@ window.App.Report = (function () {
   // results; the regulator profile name comes from the registry.
 
   function cafFill(tpl, vars) {
-    return (tpl || "").replace(/\{(\w+)\}/g, function (_, k) {
+    // {n|word|words} and {n?is|are}: the count-aware tokens the Word export
+    // reads too (export-docx.js pluralTokens).
+    return (tpl || "").replace(/\{(\w+)([|?])([^|{}]*)\|([^|{}]*)\}/g, function (m, k, mode, one, many) {
+      if (!vars || !Object.prototype.hasOwnProperty.call(vars, k)) return "";
+      var word = Number(vars[k]) === 1 ? one : many;
+      return mode === "?" ? word : String(vars[k]) + " " + word;
+    }).replace(/\{(\w+)\}/g, function (_, k) {
       return vars && Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : "";
     });
   }
@@ -2893,7 +2957,7 @@ window.App.Report = (function () {
 
     return h("div", { class: "kpi-row" }, [
       h("div", { class: "kpi" }, [
-        h("div", { class: "lbl", text: "Outcome profile (" + ss.map(function (s) { return s.label.toLowerCase(); }).join(" / ") + ")" }),
+        h("div", { class: "lbl", text: cap(window.App.ScoringCAF.vocab(opts && opts.instrument).unit) + " profile (" + ss.map(function (s) { return s.label.toLowerCase(); }).join(" / ") + ")" }),
         h("div", { class: "val", text: profileText })
       ]),
       meetsCell,
@@ -2902,7 +2966,7 @@ window.App.Report = (function () {
         coverageVal
       ]),
       h("div", { class: "kpi" }, [
-        h("div", { class: "lbl", text: "Outcomes (answered / applicable)" }),
+        h("div", { class: "lbl", text: cap(window.App.ScoringCAF.vocab(opts && opts.instrument).units) + " (answered / applicable)" }),
         h("div", { class: "val", text: ov.answered + " / " + ov.total })
       ])
     ]);
@@ -2962,7 +3026,8 @@ window.App.Report = (function () {
     var chart = window.App.Charts.cafStateBars(rows, { width: 620, labelWidth: 260, unknownSevere: unkFinding });
 
     var ss = cafSub(opts);
-    var head = h("thead", null, [h("tr", null, [h("th", null, ["Objective"])]
+    var V = window.App.ScoringCAF.vocab(opts && opts.instrument);
+    var head = h("thead", null, [h("tr", null, [h("th", null, [cap(V.objective)])]
       .concat(ss.map(function (s) { return h("th", { class: "center" }, [s.label]); }))
       .concat([ h("th", { class: "center" }, ["Unknown"]) ])
       .concat(hasAbove ? [ h("th", { class: "center" }, ["Above baseline"]) ] : [])
@@ -2986,14 +3051,14 @@ window.App.Report = (function () {
     chartWrap.appendChild(chart);
 
     return h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Results by objective" }), cafLegend(opts, hasAbove)]),
+      h("div", { class: "card-h" }, [h("h2", { text: "Results by " + V.objective }), cafLegend(opts, hasAbove)]),
       h("div", { class: "card-b" }, [
         chartWrap,
         // Each bar fills its own row, so bar length is the SHARE of outcomes in
         // that objective, not how many there are. Without saying so, an
         // objective holding nineteen outcomes and one holding five draw
         // identically. The counts beside each bar carry the magnitude.
-        h("div", { class: "muted", style: "margin-top:6px; font-size:12px;", text: "Bars show each state's share of the objective's outcomes. The figures beside them are the counts." }),
+        h("div", { class: "muted", style: "margin-top:6px; font-size:12px;", text: "Bars show each state's share of the " + V.objective + "'s " + V.units + ". The figures beside them are the counts." }),
         h("div", { class: "spacer-12" }),
         h("table", { class: "tbl" }, [head, body, foot])
       ])
@@ -3019,7 +3084,7 @@ window.App.Report = (function () {
       chartWrap = h("div", null, []);
       chartWrap.appendChild(window.App.Charts.cafStateBars(chartRows, { width: 640, labelWidth: 300, unknownSevere: unkFinding }));
     }
-    var head = h("thead", null, [h("tr", null, [h("th", null, [cafPrincipleNoun(opts)])]
+    var head = h("thead", null, [h("tr", null, [h("th", null, [cap(cafPrincipleNoun(opts))])]
       .concat(ss.map(function (s) { return h("th", { class: "center" }, [s.label]); }))
       .concat([ h("th", { class: "center" }, ["Unknown"]) ])
       .concat(hasAbove ? [ h("th", { class: "center" }, ["Above baseline"]) ] : [])
@@ -3062,17 +3127,13 @@ window.App.Report = (function () {
     if (chartWrap) { cardBody.push(chartWrap); cardBody.push(h("div", { class: "spacer-12" })); }
     cardBody.push(h("table", { class: "tbl" }, [head, h("tbody", null, rows), foot]));
     return h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Results by " + cafPrincipleNoun(opts).toLowerCase() })].concat(chartWrap ? [cafLegend(opts, hasAbove)] : [])),
+      h("div", { class: "card-h" }, [h("h2", { text: "Results by " + cafPrincipleNoun(opts) })].concat(chartWrap ? [cafLegend(opts, hasAbove)] : [])),
       h("div", { class: "card-b" }, cardBody)
     ]);
   }
 
   // "Principle" for the CAF; "Control family" for the NIST instruments.
-  function cafPrincipleNoun(opts) {
-    var d = (opts && opts.instrument && opts.instrument.display) || {};
-    if (d.principleNoun) return d.principleNoun;
-    return (d.objectiveTitle === "Control families") ? "Control family" : "Principle";
-  }
+  function cafPrincipleNoun(opts) { return window.App.ScoringCAF.vocab(opts && opts.instrument).principle; }
 
   // Column totals for a results table, summing the rendered group rows
   // (byObjective / byPrinciple) so the footer matches exactly what's above it.
@@ -3113,14 +3174,15 @@ window.App.Report = (function () {
 
   function cafRoadmapCard(scored, narrative, opts) {
     var instrument = opts.instrument;
+    var V = window.App.ScoringCAF.vocab(instrument);
     return remediationRoadmapCard({
-      title: "Roadmap towards expected outcomes",
+      title: V.roadmapTitle,
       scored: scored,
       planning: opts.planning,
-      emptyText: "Every applicable outcome meets the expected state for the selected profile.",
-      mainHead: "Outcome",
+      emptyText: "Every applicable " + V.unit + " meets the expected state for the selected " + V.profileNoun + ".",
+      mainHead: cap(V.unit),
       stateHead: "Current",
-      leadStatic: "The roadmap lists every outcome below its expected state for the selected profile. The consultant sets the priority, owner, business impact and recommended action.",
+      leadStatic: "The roadmap lists every " + V.unit + " below its expected state for the selected " + V.profileNoun + ". The consultant sets the priority, owner, business impact and recommended action.",
       mainCell: function (it) {
         return remediationMainCell(it, it.principleId + (it.hasExpected ? "  ·  expected " + cafStateLabel(it.expectedState, instrument) : ""));
       },
@@ -3323,7 +3385,7 @@ window.App.Report = (function () {
     body2.push(h("table", { class: "tbl" }, [head, body]));
     return h("div", { class: "card" }, [
       // titleText already carries the instrument's own word for a grouping.
-      h("div", { class: "card-h" }, [h("h2", { text: titleText === "Objective" ? "Results" : ("Results by " + (byKey === "byElement" ? titleText : "theme")) }), byKey === "byElement" ? mlLegend() : null]),
+      h("div", { class: "card-h" }, [h("h2", { text: titleText === "Objective" ? "Results" : ("Results by " + (byKey === "byElement" ? (/^[A-Z][^A-Z]*$/.test(titleText) ? titleText.charAt(0).toLowerCase() + titleText.slice(1) : titleText) : "theme")) }), byKey === "byElement" ? mlLegend() : null]),
       h("div", { class: "card-b" }, body2)
     ]);
   }
@@ -3368,7 +3430,7 @@ window.App.Report = (function () {
     });
     if (cards.length === 0) {
       cards.push(h("div", { class: "card" }, [
-        h("div", { class: "card-h" }, [h("h2", { text: "Findings by " + mlNoun(instrument, "elementNounTitle") })]),
+        h("div", { class: "card-h" }, [h("h2", { text: "Findings by " + mlNoun(instrument, "elementNoun") })]),
         h("div", { class: "card-b" }, [h("p", { class: "muted", text: "No not-met, below-target, or ML1 requirements were recorded." })])
       ]));
     }
@@ -3819,13 +3881,15 @@ window.App.Report = (function () {
   // A lower-case value landing at the start of a sentence is capitalised:
   // "the organisation" stands in for a missing name, and sometimes it opens one.
   function raFill(tpl, slots) {
-    return String(tpl || "").replace(/\{(\w+)\}/g, function (m, k, offset, whole) {
+    // "{clientName}'s" with a name that ends in s reads "Systems'", not "Systems's".
+    return String(tpl || "").replace(/\{(\w+)\}('s\b)?/g, function (m, k, poss, offset, whole) {
       if (!(slots && slots[k] != null)) return m;
       var val = String(slots[k]);
       var before = whole.slice(0, offset);
       if (/^[a-z]/.test(val) && (/^\s*$/.test(before) || /[.!?]\s+$/.test(before))) {
         val = val.charAt(0).toUpperCase() + val.slice(1);
       }
+      if (poss) val += /s$/i.test(val) ? "'" : "'s";
       return val;
     });
   }

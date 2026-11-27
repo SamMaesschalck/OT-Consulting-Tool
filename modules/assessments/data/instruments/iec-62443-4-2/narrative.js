@@ -19,46 +19,46 @@ window.App.Data.instruments["iec-62443-4-2"].narrative = {
     "templates":  {
                       "scope_assessed_line":  "{assessedCount} of 7 Foundational Requirements were assessed, and {notAssessedCount} were not assessed in this engagement.",
                       "default_target_flag":  "All Foundational Requirements were assessed against the default target of {targetSL}. No Foundational Requirement had a separate target.",
-                      "na_clause":  ", with {naCount} requirement(s) not applicable to this component type or scope",
-                      "fr_result_assessed":  "FR{frNum} {frName} achieved {achievedSL} against a target of {targetSL}, meeting {metCount} of {applicableCount} applicable requirement(s){naClause}.",
+                      "na_clause":  ", with {naCount|requirement|requirements} not applicable to this component type or scope",
+                      "fr_result_assessed":  "FR{frNum} {frName} achieved {achievedSL} against a target of {targetSL}, meeting {metCount} of {applicableCount|applicable requirement|applicable requirements}{naClause}.",
                       "fr_not_assessed":  "FR{frNum} {frName} was not assessed in this engagement.",
                       "fr_all_met":  "All applicable requirements in this Foundational Requirement met their target capability security level.",
                       "fr_shortfall_intro":  "The following component requirements fell short of the target capability security level:",
                       "fr_shortfall_item":  "{srCode} {srTitle}: achieved {achievedSL} against target {targetSL}.",
-                      "fr_floor_note":  "{floorCount} requirement(s) in this Foundational Requirement are floor-flagged and should be treated as priorities."
+                      "fr_floor_note":  "{floorCount|requirement in this Foundational Requirement is floor-flagged and is treated as a priority|requirements in this Foundational Requirement are floor-flagged and are treated as priorities}."
                   },
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only; boilerplate inserted VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment finds that the component assessed for {clientName} {verdictPhrase}, with the weakest capability in {weakestFRName}. The roadmap in this report concentrates on the component requirements that fall short of the target capability security level.",
+                                               "exec_verdict":  "This assessment finds that the component assessed for {clientName} {verdictPhrase}. The weakest capability is in {weakestFRName}, where {weakestFRDetail}.",
                                                "exec_verdict_nogaps":  "This assessment finds that the component assessed for {clientName} {verdictPhrase}.",
-                                               "exec_scope":  "The assessment covered {assessedFRCount} of the seven Foundational Requirements, across {answeredReqCount} applicable component requirements{notAssessedClause}, each judged against the target capability security level for the environment.",
+                                               "exec_scope":  "The assessment covered {assessedFRCount} of the 7 Foundational Requirements, across {answeredReqCount} applicable component requirements{notAssessedClause}, each judged against the target capability security level for the environment.",
                                                "exec_profile":  "Of the assessed Foundational Requirements, {metFRCount} met the target capability security level and {belowFRCount} fell short; {floorClause}.",
                                                "exec_profile_partly":  "Of the assessed Foundational Requirements, {metFRCount} met the target capability security level, {belowFRCount} fell short and {partlyFRCount} ({partlyFRList}) {partlyFRVerb} not yet fully assessed, with nothing short so far; {floorClause}.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} The weakest Foundational Requirement is {weakestFRName}, where {weakestFRDetail}.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
                                                "exec_path_forward":  "The roadmap in this report deals with the floor findings first, then raises each Foundational Requirement to its target in an order that fits OT operating constraints. A gap that lies in the product itself and cannot be closed by configuration needs a change on the product supplier's roadmap or compensating controls in the surrounding system.",
-                                               "exec_confidence":  "These findings are based on the {coveragePct} of applicable requirements that could be assessed ({confidenceLabel}). Overall closeness to target across the assessed Foundational Requirements is {closenessPct}. The achieved capability security level is set by the weakest applicable requirement, so closeness is given for context and does not count towards meeting the target.",
+                                               "exec_confidence":  "Coverage is {coveragePct} of the applicable requirements ({confidenceLabel}). Overall closeness to target across the assessed Foundational Requirements is {closenessPct}. The achieved capability security level is set by the weakest applicable requirement, so closeness is given for context and does not count towards meeting the target.",
                                                "verdictPhrases":  {
                                                                       "met":  "meets the target capability security level across all assessed Foundational Requirements",
                                                                       "close":  "is approaching the target capability security level but does not yet meet it across all Foundational Requirements",
                                                                       "short":  "falls short of the target capability security level"
                                                                   },
                                                "floorFragments":  {
-                                                                      "some":  "{floorCount} requirement(s) are floor-flagged (at SL 0 against a positive target, or two or more levels below it) and are treated as priorities",
+                                                                      "some":  "{floorCount|requirement is|requirements are} floor-flagged (at SL 0 against a positive target, or two or more levels below it) and treated as {floorCount?a priority|priorities}",
                                                                       "none":  "no requirements are floor-flagged"
                                                                   },
                                                "gapConcentrationFragments":  {
-                                                                                 "nearClause":  "requirements fall one capability security level short of the target",
-                                                                                 "floorClause":  "requirements are floor-flagged and offer little or no capability where it is required"
+                                                                                 "nearClause":  "the shortfall is one capability security level",
+                                                                                 "floorClause":  "at least one requirement is floor-flagged"
                                                                              }
                                            },
                              "boilerplate":  {
                                                  "exec_weakest_link":  "The achieved capability security level for a Foundational Requirement is set by its weakest applicable requirement. Levels are not averaged, so one requirement at a low level holds the whole Foundational Requirement down. For this reason the roadmap works at the level of individual component requirements, and a few product changes can be enough to raise an achieved level.",
                                                  "stakes":  "Capability security levels describe the strength of attacker the component is expected to withstand, from casual or coincidental violation at SL 1 to sophisticated attacks with extended resources at SL 4. A Foundational Requirement below its target provides capability against a weaker class of threat than the environment calls for. A floor-flagged requirement offers little or no capability where it is required.",
-                                                 "not_determination":  "This assessment measures the capability of an individual component against ISA/IEC 62443-4-2. It does not certify the component and is not an ISASecure or comparable conformity assessment. On its own, it does not establish conformance with the standard. The achieved capability security levels reflect what could be demonstrated during the engagement and should be confirmed during remediation."
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the weakest capability is in {weakestFRName}.{floorExposureClause}",
+                                                      "consultant_exposure_seed":  "",
                                                       "consultant_exposure_floor_clause":  " Floor-flagged requirements mean the component currently offers little or no capability against the threat class the target capability security level assumes.",
                                                       "consultant_exposure":  "[Consultant to add a short note on this client's exposure: where the component sits in the architecture, what a shortfall in its capability means for the zone it serves, and any safety or availability implications.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",

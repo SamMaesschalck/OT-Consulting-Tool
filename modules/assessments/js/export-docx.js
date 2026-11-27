@@ -134,9 +134,24 @@ window.App.ExportDOCX = (function () {
       return seen.indexOf(sentenceKeys(s)[0]) === -1;
     }).join(" ").trim();
   }
+  // Count-aware tokens, so a sentence agrees with its number:
+  //   {n|requirement is|requirements are} prints "1 requirement is" or
+  //   "3 requirements are"; {n?is|are} prints the word alone.
+  // A token whose count is missing is left as it is (nis2Fill) or makes the
+  // whole template missing (interp), as a plain {n} would.
+  var PLURAL_TOKEN = /\{(\w+)([|?])([^|{}]*)\|([^|{}]*)\}/g;
+  function pluralTokens(tpl, vals, onMissing) {
+    return String(tpl).replace(PLURAL_TOKEN, function (m, k, mode, one, many) {
+      var v = vals ? vals[k] : null;
+      if (v === null || v === undefined) return onMissing ? onMissing(m) : m;
+      var word = Number(v) === 1 ? one : many;
+      return mode === "?" ? word : String(v) + " " + word;
+    });
+  }
   function interp(template, vals) {
     if (template == null) return null;
     var missing = false;
+    template = pluralTokens(template, vals, function () { missing = true; return ""; });
     var s = template.replace(/\{(\w+)\}/g, function (_, k) {
       var v = vals[k];
       if (v === null || v === undefined) { missing = true; return ""; }
@@ -1228,7 +1243,9 @@ window.App.ExportDOCX = (function () {
         " no shortfall so far but still " + (partlyFRs.length === 1 ? "has" : "have") + " items to assess.";
     }
     children.push(body(nis2Fill(T.exec_scope, slots) + " " + profileText + partlySentence));
-    if (hasGaps && gapConcentrationSentence) children.push(body(nis2Fill(T.exec_gap_shape, slots)));
+    // With every short Foundational Requirement floor-flagged, the bucket only
+    // repeats the profile sentence; it says something when the shortfalls differ.
+    if (hasGaps && gapConcentrationSentence && nearAreas.length) children.push(body(nis2Fill(T.exec_gap_shape, slots)));
     if (B.exec_weakest_link) children.push(body(B.exec_weakest_link));
     if (B.stakes) children.push(body(B.stakes));
 
@@ -1933,8 +1950,63 @@ window.App.ExportDOCX = (function () {
     ]
   };
 
+  // The layered EU instruments (CRA, Machinery Regulation) score on the
+  // csms-conformance engine, but they have requirements and layers, and three
+  // states. The 62443-2-1:2010 block above speaks of elements, categories and
+  // Largely in place, none of which exists in them.
+  function layeredMethodLines(instrument) {
+    var labels = (instrument.states || []).filter(function (s) { return s && s.value !== "unknown" && s.value !== "na" && s.id !== "unknown" && s.id !== "na"; })
+      .map(function (s) { return s.label; }).filter(Boolean);
+    if (labels.length < 2) labels = ["In place", "Partially in place", "Not in place"];
+    return [
+      { kind: "head", text: "What is reported" },
+      { kind: "body", text: "Each requirement is judged in one of " + labels.length + " conformance states: " + nis2ListJoin(labels).replace(/ and ([^,]+)$/, " or $1") + ". Each layer is reported on its own, and the layers are not combined into a single score." },
+      { kind: "head", text: "Per requirement" },
+      { kind: "bullet", text: "The consultant sets exactly one state for each requirement." },
+      { kind: "bullet", text: "Not applicable requirements are left out of the profile and the coverage figure. Unknown lowers coverage and confidence." },
+      { kind: "head", text: "Per layer" },
+      { kind: "bullet", text: "Results are reported as a conformance profile, with the number of requirements in each state for each layer." },
+      { kind: "bullet", text: "A conformance index, which takes account of the order of the states, is given for each layer for context. It is not a pass mark." },
+      { kind: "head", text: "Roadmap" },
+      { kind: "bullet", text: "The gap roadmap lists every applicable requirement that is Not in place or Partially in place, across the layers in scope. Not in place is treated as a floor finding." }
+    ];
+  }
+
+  // The caf-achieved engine carries five frameworks, so its appendix is written
+  // in the instrument's own nouns and states (CAF outcomes, NIST controls, CIS
+  // Safeguards, ONR expectations).
+  function cafMethodLines(instrument) {
+    var C = window.App.ScoringCAF;
+    var v = C.vocab(instrument);
+    var ss = C.substantiveStates(instrument).map(function (s) { return s.label; });
+    var orList = function (a) { return nis2ListJoin(a).replace(/ and ([^,]+)$/, " or $1"); };
+    var gapStates = C.substantiveStates(instrument).filter(function (s) { return s.value !== "achieved"; }).map(function (s) { return s.label; });
+    var isCAF = /^ncsc-caf/.test((instrument && instrument.id) || "");
+    var single = (((instrument && instrument.taxonomy && instrument.taxonomy.objectives) || []).length < 2);
+    var groups = single ? v.principle : (v.objective + " and " + v.principle);
+    var prof = v.profileNoun;
+    return [
+      { kind: "head", text: "What is reported" },
+      { kind: "body", text: "Each " + v.unit + " is judged in one state, " + orList(ss) + (isCAF ? ", against the indicators of good practice" : "") + ". The report gives no single grade. Results are reported as a profile of states and, for the selected " + prof + ", as meeting or below the expected state." },
+      { kind: "head", text: "Per " + v.unit },
+      { kind: "bullet", text: "The consultant sets exactly one state for each " + v.unit + "." },
+      { kind: "bullet", text: "Not applicable " + v.units + " are left out of the profile and the coverage figure, as are " + v.units + " that the selected " + prof + " does not include." },
+      { kind: "bullet", text: (instrument && instrument.unknownIsFinding)
+          ? "Unknown means the position could not be established. It counts as a finding below the expected state and lowers coverage and confidence."
+          : "Unknown means the position could not be established. It is not counted as a state or as a failure, but it lowers coverage and confidence." },
+      { kind: "head", text: "Against the selected " + prof },
+      { kind: "bullet", text: (ss.length > 1 ? "The states run from " + ss[ss.length - 1] + " up to " + ss[0] + ". " : "") + "A" + (/^[aeiou]/i.test(v.unit) ? "n " : " ") + v.unit + " meets expected when its state is at or above the expected state for the " + prof + "." },
+      { kind: "bullet", text: "Meeting and below expected are reported as counts for each " + groups + " and are not combined into a score." },
+      { kind: "bullet", text: "Where " + (/^[aeiou]/i.test(prof) ? "an " : "a ") + prof + " sets no expected states, meeting and below are not reported." },
+      { kind: "head", text: "Roadmap" },
+      { kind: "bullet", text: "The roadmap lists every applicable " + v.unit + " that is below its expected state" + (gapStates.length ? ", or that is " + orList(gapStates) + " where no expectation applies" : "") + "." }
+    ];
+  }
+
   function methodologyLinesFor(instrument) {
     var fam = (instrument && instrument.scoringFamily) || "capability-sl";
+    if (fam === "caf-achieved" && window.App.ScoringCAF && window.App.ScoringCAF.vocab) return cafMethodLines(instrument);
+    if (fam === "csms-conformance" && instrument && (instrument.layers || []).length) return layeredMethodLines(instrument);
     return METHODOLOGY[fam] || METHODOLOGY["capability-sl"];
   }
 
@@ -3219,10 +3291,13 @@ window.App.ExportDOCX = (function () {
     // objective instrument like CIS carries its shape on the Controls).
     var objGroups = (scored.byObjective || []).filter(function (o) { return (o.total || 0) > 0; });
     var useObjectives = objGroups.length >= 2;
-    var groupNoun = useObjectives ? "objectives"
-      : (((instrument.display && instrument.display.principleNoun) ? instrument.display.principleNoun.toLowerCase() : "area") + "s");
+    var V = N.vocab(instrument);
+    var groupNoun = useObjectives ? V.objectives : V.principles;
+    // A principle carries its objective's id as well as its own, so the id is
+    // chosen by level: read objectiveId first and ONR SyAPs cyber printed
+    // "7 Effective Cyber ..." for SyDP 7.1.
     var groups = (useObjectives ? (scored.byObjective || []) : (scored.byPrinciple || [])).map(function (g) {
-      return { id: (g.objectiveId != null ? g.objectiveId : g.principleId), name: g.name, counts: g.counts, total: g.total };
+      return { id: (useObjectives ? g.objectiveId : g.principleId), name: g.name, counts: g.counts, total: g.total };
     });
 
     var ranked = groups.slice().filter(function (o) { return (o.total || 0) > 0; });
@@ -3236,26 +3311,34 @@ window.App.ExportDOCX = (function () {
       weakestObjectiveName = w0.id + " " + w0.name;
       var wc = w0.counts, wgaps = wc.partially + wc.not;
       weakestObjectiveDetail = (wc.achieved === 0 && wc.partially === 0)
-        ? "all " + wc.not + " applicable " + unitNoun + " are " + notLabel
-        : wgaps + " of " + w0.total + " " + unitNoun + " are " + gapWord;
+        ? (wc.not === 1 ? "its one applicable " + V.unit + " is " + notLabel : "all " + wc.not + " applicable " + V.units + " are " + notLabel)
+        : wgaps + " of " + w0.total + " " + (w0.total === 1 ? V.unit : V.units) + (wgaps === 1 ? " is " : " are ") + gapWord;
     } else {
       weakestObjectiveName = "no single area";
-      weakestObjectiveDetail = "no " + unitNoun + " are below the expected state";
+      weakestObjectiveDetail = "no " + V.units + " are below the expected state";
     }
 
-    var partialAreas = [], absentAreas = [];
+    // Absent means nothing in the group is in place, not merely more Not than
+    // Partially: a NIST family with 11 of 12 controls Satisfied was reported
+    // as "the controls are not yet satisfied", because a two-state scale has
+    // no Partially to outweigh the one gap.
+    // "Mostly" when at least half the group is in place, so a family with 11
+    // of 12 controls Satisfied is not described as partly implemented. A
+    // pack without a mostlyClause keeps the two buckets.
+    var partialAreas = [], absentAreas = [], mostlyAreas = [];
     groups.forEach(function (o) {
       var oc = o.counts;
       if ((o.total || 0) === 0 || (oc.partially + oc.not) === 0) return;
       if (oc.achieved === 0 && oc.partially === 0) absentAreas.push(o.id + " " + o.name);
-      else if (oc.partially >= oc.not) partialAreas.push(o.id + " " + o.name);
-      else absentAreas.push(o.id + " " + o.name);
+      else if (frags.mostlyClause && oc.achieved * 2 >= (oc.achieved + oc.partially + oc.not)) mostlyAreas.push(o.id + " " + o.name);
+      else partialAreas.push(o.id + " " + o.name);
     });
     function bucket(names, clause) {
       if (names.length <= 3) return "In " + nis2ListJoin(names) + ", " + clause + ".";
       return "Across " + names.length + " " + groupNoun + ", " + clause + ".";
     }
     var gcParts = [];
+    if (mostlyAreas.length) gcParts.push(bucket(mostlyAreas, frags.mostlyClause));
     if (partialAreas.length) gcParts.push(bucket(partialAreas, frags.partialClause || ""));
     if (absentAreas.length) gcParts.push(bucket(absentAreas, frags.absentClause || ""));
     var gapConcentrationSentence = gcParts.join(" ");
@@ -3290,9 +3373,12 @@ window.App.ExportDOCX = (function () {
       applicableCount: ov.total, achievedCount: a, partiallyCount: p, notAchievedCount: n, belowCount: belowCount,
       unknownCount: c.unknown,
       gapConcentrationSentence: gapConcentrationSentence,
-      coveragePct: N.formatPct(ov.coverage), confidenceLabel: ov.confidenceLevel || "confidence not rated",
+      coveragePct: N.formatPct(ov.coverage), confidenceLabel: ov.confidenceLevel ? String(ov.confidenceLevel).toLowerCase() : "confidence not rated",
       autoTopPriorityHint: autoTopPriorityHint
     };
+    // Said only when there is something to say: "and 0 could not be verified"
+    // was printed on every report with no Unknown answer.
+    slots.unknownSentence = (c.unknown > 0 && T.exec_unknown) ? " " + nis2Fill(T.exec_unknown, slots) : "";
 
     children.push(body(nis2Fill(hasGaps ? T.exec_verdict : T.exec_verdict_nogaps, slots)));
     children.push(body(nis2Fill(T.exec_scope, slots) + " " + nis2Fill(T.exec_profile, slots)));
@@ -3312,7 +3398,9 @@ window.App.ExportDOCX = (function () {
     if (expo) children.push(body(expo));
     else if (CB.consultant_exposure) children.push(placeholderPara(CB.consultant_exposure, NARR_EXPOSURE));
     var topPri = (rn.topPriorities || "").trim();
-    children.push(body(nis2Fill(T.exec_path_forward, slots) + (topPri ? "" : " " + nis2Fill(CB.consultant_top_priorities_seed, slots))));
+    // With nothing below expected there is no roadmap to describe.
+    var pathFwd = (hasGaps ? nis2Fill(T.exec_path_forward, slots) : "") + (topPri ? "" : " " + nis2Fill(CB.consultant_top_priorities_seed, slots));
+    if (pathFwd.trim()) children.push(body(pathFwd.trim()));
     if (topPri) children.push(body(topPri));
     else if (CB.consultant_top_priorities_placeholder) children.push(placeholderPara(CB.consultant_top_priorities_placeholder, NARR_PRIORITIES));
     children.push(body(nis2Fill(T.exec_confidence, slots)));
@@ -3398,7 +3486,8 @@ window.App.ExportDOCX = (function () {
   function cafObjectiveResultsSection(scored, info, chartBuf, instrument, totalW, secNo) {
     var TableRow = window.docx.TableRow;
     var ss = cafDocStates(instrument);
-    var children = [ h1n(secNo || "2", "Results by objective") ];
+    var V = window.App.ScoringCAF.vocab(instrument);
+    var children = [ h1n(secNo || "2", "Results by " + V.objective) ];
     if (chartBuf) {
       children.push(new window.docx.Paragraph({
         style: "BodyText",
@@ -3407,7 +3496,7 @@ window.App.ExportDOCX = (function () {
           transformation: { width: 540, height: Math.max(140, 28 * scored.byObjective.length + 30) }
         }) ]
       }));
-      children.push(caption("Outcome profile by objective for the " + info.name + " profile (" + ss.map(function (s) { return s.label.toLowerCase(); }).join(" / ") + ")."));
+      children.push(caption(cap(V.unit) + " profile by " + V.objective + " for " + window.App.ScoringCAF.profilePhrase(info.name) + " (" + ss.map(function (s) { return s.label.toLowerCase(); }).join(" / ") + ")."));
     }
 
     var hasAbove = ((scored.aboveBaseline || []).length > 0) && !info.placeholder;
@@ -3415,7 +3504,7 @@ window.App.ExportDOCX = (function () {
     var cw = cafResultsColWidths(ss, { totalW: TOTAL, hasNA: true, hasAbove: hasAbove, placeholder: info.placeholder });
     var stateW = cw.stateW, unkW = cw.unkW, naW = cw.naW, aboveW = cw.aboveW, appW = cw.appW, meetW = cw.meetW, labelW = cw.labelW;
     var widths = [labelW].concat(ss.map(function () { return stateW; })).concat([unkW, naW]);
-    var headers = ["Objective"].concat(ss.map(function (s) { return s.label; })).concat(["Unknown", "N/A"]);
+    var headers = [cap(V.objective)].concat(ss.map(function (s) { return s.label; })).concat(["Unknown", "N/A"]);
     if (hasAbove) { widths.push(aboveW); headers.push("Above baseline"); }
     widths.push(appW); headers.push("Applicable");
     if (!info.placeholder) { widths.push(meetW); headers.push("Meeting expected"); }
@@ -3446,8 +3535,7 @@ window.App.ExportDOCX = (function () {
   function cafPrincipleResultsSection(scored, info, instrument, totalW, secNo) {
     var TableRow = window.docx.TableRow;
     var ss = cafDocStates(instrument);
-    var noun = (instrument && instrument.display && instrument.display.principleNoun) ? instrument.display.principleNoun.toLowerCase()
-      : ((instrument && instrument.display && instrument.display.objectiveTitle === "Control families") ? "control family" : "principle");
+    var noun = window.App.ScoringCAF.vocab(instrument).principle;
     var children = [ h1n(secNo || "3", "Results by " + noun) ];
 
     var hasAbove = ((scored.aboveBaseline || []).length > 0) && !info.placeholder;
@@ -3523,14 +3611,16 @@ window.App.ExportDOCX = (function () {
   // state).
   function cafRoadmapSection(scored, info, instrument, secNo) {
     var TableRow = window.docx.TableRow;
-    var children = [ h1n(secNo || "4", "Roadmap towards expected outcomes") ];
+    var V = window.App.ScoringCAF.vocab(instrument);
+    var PP = window.App.ScoringCAF.profilePhrase(info.name);
+    var children = [ h1n(secNo || "4", V.roadmapTitle) ];
 
     if (!scored.roadmap || scored.roadmap.length === 0) {
-      children.push(body("Every applicable outcome meets the expected state for the " + info.name + " profile."));
+      children.push(body("Every applicable " + V.unit + " meets the expected state for " + PP + "."));
       return children;
     }
 
-    children.push(body("The roadmap lists every outcome below its expected state for the " + info.name + " profile, in the consultant's priority order."));
+    children.push(body("The roadmap lists every " + V.unit + " below its expected state for " + PP + ", in the consultant's priority order."));
 
     scored.roadmap.forEach(function (it, i) {
       var curBand = cafBandColour(it.state);
@@ -3548,7 +3638,7 @@ window.App.ExportDOCX = (function () {
           run(cafStateLabelD(it.state, instrument), { bold: true, color: curBand.text }),
           run("    Expected: ", { bold: true }),
           run(it.hasExpected ? cafStateLabelD(it.expectedState, instrument) : "not set"),
-          run("    Principle: ", { bold: true }),
+          run("    " + cap(V.principle) + ": ", { bold: true }),
           run(it.principleId || "")
         ]
       }));
@@ -3560,7 +3650,7 @@ window.App.ExportDOCX = (function () {
       if (requires) children.push(nis2Field("What this requires", requires));
       if (it.rationale) children.push(nis2Field("Why this matters", it.rationale));
       if (lensFraming) children.push(nis2Field("OT context", lensFraming));
-      children.push(nis2Field("Captured evidence", it.evidence || "No evidence was captured for this outcome."));
+      children.push(nis2Field("Captured evidence", it.evidence || "No evidence was captured for this " + V.unit + "."));
       children.push(nis2Field("Business impact", it.impact, planWhere(it, "impact")));
       children.push(nis2Field("Recommended action", it.action, planWhere(it, "action")));
       children.push(nis2Field("Owner", it.owner || "To be assigned"));
@@ -3585,7 +3675,7 @@ window.App.ExportDOCX = (function () {
     var box = cust["status-of-this-assessment"] || cust["not-a-formal-assessment"] || {};
     var boxHidden = !!box.hidden;
     if (bp.not_formal_caveat && boxHidden) children.push(body(bp.not_formal_caveat));
-    children.push(body("This report uses the " + info.name + " profile." + (info.placeholder ? " Expected states are not available for this profile, so meeting and below counts are not reported." : "")));
+    children.push(body("This report uses " + window.App.ScoringCAF.profilePhrase(info.name) + "." + (info.placeholder ? " Expected states are not available for this profile, so meeting and below counts are not reported." : "")));
     return children;
   }
 
@@ -3649,9 +3739,10 @@ window.App.ExportDOCX = (function () {
     // (the 18 Controls), so the "by objective" visuals group by principle instead.
     var singleObj=(scored.byObjective||[]).length<2;
     var groups=singleObj?(scored.byPrinciple||[]):scored.byObjective;
-    function gid(g){return (g.objectiveId!=null?g.objectiveId:g.principleId);}
-    var groupSingular=singleObj?(((instrument&&instrument.display&&instrument.display.principleNoun)?instrument.display.principleNoun:"principle")):"objective";
-    var groupNoun=singleObj?(groupSingular.toLowerCase()+"s"):((instrument&&instrument.display&&instrument.display.objectiveTitle==="Control families")?"control families":"objectives");
+    function gid(g){return (singleObj?g.principleId:g.objectiveId);}
+    var V=window.App.ScoringCAF.vocab(instrument);
+    var groupSingular=singleObj?V.principle:V.objective;
+    var groupNoun=singleObj?V.principles:V.objectives;
     var tot={meeting:0,below:0};
     barStates.forEach(function(s){tot[s.value]=0;});
     scored.byObjective.forEach(function(o){barStates.forEach(function(s){tot[s.value]+=(o.counts[s.value]||0);});tot.meeting+=(o.meeting||0);tot.below+=(o.below||0);});
@@ -3667,9 +3758,9 @@ window.App.ExportDOCX = (function () {
     tileCells.push(gp());
     tileCells.push(tile((info.placeholder||compared===0)?"-":(tot.meeting+" / "+compared),COLOR.navy,"Meeting expected","F5F8FA"));
     children.push(new window.docx.Table({width:{size:100,type:WT.PERCENTAGE},borders:TBL_NONE,rows:[new TR({children:tileCells})]}));
-    children.push(body("The tiles and bars count the outcome states across the assessed "+groupNoun+" for the "+info.name+" profile. The report gives no single grade.",{color:COLOR.muted,spacing:{before:180,after:0}}));
+    children.push(body("The tiles and bars count the "+V.units+" in each state across the assessed "+groupNoun+", for "+window.App.ScoringCAF.profilePhrase(info.name)+". The report gives no single grade.",{color:COLOR.muted,spacing:{before:180,after:0}}));
     // Full-width stacked bars per group (objective, or principle when single-objective)
-    children.push(h2("Outcome profile by "+groupSingular.toLowerCase()));
+    children.push(h2(cap(V.unit)+" profile by "+groupSingular));
     var barW=6026;
     // One table with one row per group (NOT N adjacent tables - Word merges
     // back-to-back tables and only the first renders).
@@ -3695,7 +3786,7 @@ window.App.ExportDOCX = (function () {
     var foc=groups.slice().sort(function(a,b){return useBelow?((b.below||0)-(a.below||0)):(b.counts.not-a.counts.not);}).filter(function(o){return useBelow?((o.below||0)>0):(o.counts.not>0);}).slice(0,3);
     if(foc.length){
       children.push(h2("Where to focus first"));
-      children.push(body("These "+groupSingular.toLowerCase()+"s are furthest from the "+info.name+" profile, measured by "+((instrument&&instrument.display&&instrument.display.outcomesTitle)?instrument.display.outcomesTitle.toLowerCase():"outcomes")+" below expected.",{color:COLOR.muted,spacing:{after:40}}));
+      children.push(body("These "+groupNoun+" are furthest from "+window.App.ScoringCAF.profilePhrase(info.name)+", measured by the number of "+V.units+" below the expected state.",{color:COLOR.muted,spacing:{after:40}}));
       foc.forEach(function(o,i){
         var tag=useBelow?(o.below+" of "+(o.meeting+o.below)+" below expected"):(o.counts.not+" "+gapState.label.toLowerCase());
         children.push(new window.docx.Table({width:{size:100,type:WT.PERCENTAGE},layout:TLT.FIXED,columnWidths:[620,5800,2606],borders:TBL_NONE,rows:[new TR({children:[
@@ -3733,13 +3824,18 @@ window.App.ExportDOCX = (function () {
       prinObj[p.id] = p.objectiveId; prinName[p.id] = p.name;
     });
 
-    var children = [ h1n(secNo, unit + " achieved") ];
+    // In the instrument's own words: NIST controls are Satisfied and CIS
+    // Safeguards Implemented. The count is of the applicable items, as in the
+    // executive summary; the whole catalogue made it 191 of 300, not of 209.
+    var V = window.App.ScoringCAF.vocab(instrument);
+    var achLabel = V.achievedLabel;
+    var children = [ h1n(secNo, cap(V.units) + " " + achLabel.toLowerCase()) ];
     if (!per.length) {
-      children.push(body("No " + unit.toLowerCase() + " were assessed as achieved. The roadmap that follows covers every " + unitOne.toLowerCase() + " assessed."));
+      children.push(body("No " + V.units + " were assessed as " + achLabel + ". The roadmap that follows covers every " + V.unit + " assessed."));
       return children;
     }
-    children.push(body(per.length + " of " + (scored.perOutcome || []).length + " " +
-      unit.toLowerCase() + " were assessed as achieved. Each is listed with the evidence recorded against it."));
+    var applicable = (scored.overall && scored.overall.total) || (scored.perOutcome || []).length;
+    children.push(body(per.length + " of " + applicable + " applicable " + (applicable === 1 ? V.unit : V.units) + (per.length === 1 ? " was" : " were") + " assessed as " + achLabel + ". Each is listed with the evidence recorded against it."));
 
     var widths = [1500, 4200, 3326];
     var byObj = {};
@@ -3753,7 +3849,7 @@ window.App.ExportDOCX = (function () {
         spacing: { before: 200, after: 60 },
         children: [ run((oid !== "-" ? oid + " " : "") + (objName[oid] || "")) ]
       }));
-      var rows = [ buildHeaderRow([unitOne, "Title", "Evidence recorded"], widths) ];
+      var rows = [ buildHeaderRow([cap(V.unit), "Title", "Evidence recorded"], widths) ];
       byObj[oid].forEach(function (it) {
         rows.push(new window.docx.TableRow({ children: [
           cellDxa(body(it.outcomeId, { bold: true }), widths[0]),
@@ -3997,19 +4093,24 @@ window.App.ExportDOCX = (function () {
     var weakestDetail = "";
     if (w0) {
       var bits = [];
-      if (w0.counts.notMet > 0) bits.push(w0.counts.notMet + " requirement(s) not met");
+      if (w0.counts.notMet > 0) bits.push(w0.counts.notMet + (w0.counts.notMet === 1 ? " requirement" : " requirements") + " not met");
       if (w0.meanMl !== null && w0.meanMl !== undefined) bits.push("mean maturity " + ML.formatMean(w0.meanMl));
-      if (bits.length) weakestDetail = ", with " + nis2ListJoin(bits);
+      if (bits.length) weakestDetail = (worst.length > 1 ? ", each with " : ", with ") + nis2ListJoin(bits);
     }
     var roadmap = scored.roadmap || [];
     var hasGaps = roadmap.length > 0;
 
+    // The three with the most requirements not met or at ML1, not the first
+    // three in the standard's order.
+    var lowCount = function (el) { return (el.counts.notMet || 0) + (el.counts.ML1 || 0); };
     var lowMaturity = (scored.byElement || []).filter(function (el) {
-      return el.total > 0 && (el.counts.notMet > 0 || el.counts.ML1 > 0);
-    }).slice(0, 3).map(function (el) { return el.elementId + " " + el.name; });
+      return el.total > 0 && lowCount(el) > 0;
+    }).sort(function (a, b) { return lowCount(b) - lowCount(a); }).slice(0, 3).map(function (el) { return el.elementId + " " + el.name; });
     var gcParts = [];
-    if (c.notMet > 0) gcParts.push(nis2Fill(gcFrags.notMet, { notMet: c.notMet }));
-    if (lowMaturity.length) gcParts.push(nis2Fill(gcFrags.lowMaturity, { lowMaturityList: nis2ListJoin(lowMaturity) }));
+    // An empty fragment is left out: the not-met count is already in the
+    // profile sentence, and a third mention only repeated it.
+    if (c.notMet > 0 && gcFrags.notMet) gcParts.push(nis2Fill(gcFrags.notMet, { notMet: c.notMet }));
+    if (lowMaturity.length && gcFrags.lowMaturity) gcParts.push(nis2Fill(gcFrags.lowMaturity, { lowMaturityList: nis2ListJoin(lowMaturity) }));
     var gapConcentrationSentence = gcParts.join(" ");
 
     var topHint = roadmap.slice(0, 2).map(function (r) { return r.code + " " + r.title; });
@@ -4018,7 +4119,8 @@ window.App.ExportDOCX = (function () {
 
     var slots = {
       clientName: clientName, weakestElementName: weakestElementName, weakestDetail: weakestDetail,
-      answeredCount: ov.scored, elementCount: (scored.byElement || []).length,
+      weakestIs: worst.length > 1 ? "are" : "is",
+      answeredCount: ov.scored, applicableCount: ov.total, elementCount: (scored.byElement || []).length,
       notMetClause: c.notMet > 0 ? (", of which " + c.notMet + " are not met") : "",
       ml1: c.ML1, ml2: c.ML2, ml3: c.ML3, ml4: c.ML4, notMet: c.notMet,
       meeting: ov.meeting, below: ov.below, compared: compared,
@@ -4037,7 +4139,8 @@ window.App.ExportDOCX = (function () {
     if (B.stakes) children.push(body(B.stakes));
 
     slots.notMetExposureClause = c.notMet > 0 ? (CB.consultant_exposure_notmet_clause || "") : "";
-    if (CB.consultant_exposure_seed) children.push(body(nis2Fill(CB.consultant_exposure_seed, slots)));
+    var mlSeed = CB.consultant_exposure_seed ? nis2Fill(CB.consultant_exposure_seed, slots).trim() : "";
+    if (mlSeed) children.push(body(mlSeed));
     var expo = (rn.regulatoryExposure || "").trim();
     if (expo) children.push(body(expo));
     else if (CB.consultant_exposure) children.push(placeholderPara(CB.consultant_exposure, NARR_EXPOSURE));
@@ -4091,17 +4194,17 @@ window.App.ExportDOCX = (function () {
   function mlResultsByElementSection(scored, chartBuf, wDxa, instrument) {
     var ML = window.App.ScoringProgramML;
     var TableRow = window.docx.TableRow;
-    var children = [ h1n("2", "Results by " + window.App.Report.mlNoun(instrument, "elementNounTitle")) ];
+    var children = [ h1n("2", "Results by " + window.App.Report.mlNoun(instrument, "elementNoun")) ];
     if (chartBuf) {
       children.push(new window.docx.Paragraph({ style: "BodyText", children: [ new window.docx.ImageRun({
         data: chartBuf, transformation: { width: 540, height: Math.max(140, 28 * scored.byElement.length + 30) }
       }) ] }));
-      children.push(caption("Maturity distribution per element: Not met / ML1 / ML2 / ML3 / ML4."));
+      children.push(caption("Maturity distribution per " + window.App.Report.mlNoun(instrument, "elementNoun") + ": Not met / ML1 / ML2 / ML3 / ML4."));
     }
     var withTargets = scored.anyTargets;
     var headers = withTargets
-      ? ["Element", "Not met", "ML1", "ML2", "ML3", "ML4", "Unknown", "Mean ML", "Meets target"]
-      : ["Element", "Not met", "ML1", "ML2", "ML3", "ML4", "Unknown", "Mean ML"];
+      ? [window.App.Report.mlNoun(instrument, "elementNounTitle"), "Not met", "ML1", "ML2", "ML3", "ML4", "Unknown", "Mean ML", "Meets target"]
+      : [window.App.Report.mlNoun(instrument, "elementNounTitle"), "Not met", "ML1", "ML2", "ML3", "ML4", "Unknown", "Mean ML"];
     // Size each column to fit its header on one line; Element (label) takes the rest.
     var widths = fitHeaderWidths(headers, wDxa);
     var rows = [ buildHeaderRow(headers, widths) ];
@@ -4152,7 +4255,7 @@ window.App.ExportDOCX = (function () {
   }
 
   function mlFindingsSection(scored, instrument) {
-    var children = [ h1n("4", "Findings by " + window.App.Report.mlNoun(instrument, "elementNounTitle")) ];
+    var children = [ h1n("4", "Findings by " + window.App.Report.mlNoun(instrument, "elementNoun")) ];
     var any = false;
     scored.byElement.forEach(function (el) {
       var notMet = el.requirements.filter(function (r) { return r.isNotMet; });
@@ -4256,7 +4359,7 @@ window.App.ExportDOCX = (function () {
       {t:String(c2.ML4),color:COLOR.blue,label:"ML4",fill:COLOR.metBg,size:40}
     ]));
     children.push(body("The profile covers "+scored.overall.total+" applicable requirements, assessed against "+window.App.Report.standardRef(instrument)+".",{color:COLOR.muted,spacing:{before:180,after:0}}));
-    children.push(h2("Maturity distribution by element"));
+    children.push(h2("Maturity distribution by " + window.App.Report.mlNoun(instrument, "elementNoun")));
     children.push(sbStackTable(scored.byElement.map(function(el){ return sbStackRow(el.elementId+" "+el.name,[{n:el.counts.notMet,color:COLOR.gap},{n:el.counts.ML1,color:COLOR.soft},{n:el.counts.ML2,color:COLOR.near},{n:el.counts.ML3,color:COLOR.met},{n:el.counts.ML4,color:COLOR.blue}]); })));
     children.push(sbLegend([{color:COLOR.gap,label:"Not met"},{color:COLOR.soft,label:"ML1"},{color:COLOR.near,label:"ML2"},{color:COLOR.met,label:"ML3"},{color:COLOR.blue,label:"ML4"}]));
     var foc=scored.byElement.slice().sort(function(a,b){return (a.meanMl||0)-(b.meanMl||0);}).slice(0,3);
@@ -5121,7 +5224,12 @@ window.App.ExportDOCX = (function () {
 
   // Slot-substitution only - replaces {key} with slots[key]; never free-writes.
   function nis2Fill(tpl, slots) {
-    return String(tpl == null ? "" : tpl).replace(/\{(\w+)\}/g, function (m, k) {
+    // "{clientName}'s" with a name that ends in s reads "Systems'", not "Systems's".
+    return pluralTokens(tpl == null ? "" : tpl, slots).replace(/\{(\w+)\}'s\b/g, function (m, k) {
+      if (slots[k] == null) return m;
+      var v = String(slots[k]);
+      return /s$/i.test(v) ? v + "'" : v + "'s";
+    }).replace(/\{(\w+)\}/g, function (m, k) {
       return (slots[k] != null) ? String(slots[k]) : m;
     });
   }
@@ -5169,8 +5277,8 @@ window.App.ExportDOCX = (function () {
       weakestAreaName = nis2ListJoin(worst.map(function (w) { return w.name; }));
       var w0 = worst[0], wc = w0.counts || {};
       weakestAreaDetail = ((wc.achieved || 0) === 0 && (wc.partially || 0) === 0 && (wc.not || 0) > 0)
-        ? "all " + wc.not + " applicable obligations are Not Achieved"
-        : w0.gaps + " of " + w0.total + " obligations are Partially or Not Achieved";
+        ? (wc.not === 1 ? "its one applicable obligation is Not Achieved" : "all " + wc.not + " applicable obligations are Not Achieved")
+        : w0.gaps + " of " + w0.total + (w0.total === 1 ? " obligation" : " obligations") + (w0.gaps === 1 ? " is" : " are") + " Partially or Not Achieved";
     } else {
       weakestAreaName = "no single area";
       weakestAreaDetail = "no obligations are Partially or Not Achieved";
@@ -5182,9 +5290,9 @@ window.App.ExportDOCX = (function () {
     (scored.byCategory || []).forEach(function (g) {
       var gc = g.counts || {};
       if ((g.total || 0) === 0 || ((gc.partially || 0) + (gc.not || 0)) === 0) return;
+      // Absent only when nothing in the area is in place (as for the CAF family).
       if ((gc.achieved || 0) === 0 && (gc.partially || 0) === 0) absentAreas.push(g.name);
-      else if ((gc.partially || 0) >= (gc.not || 0)) partialAreas.push(g.name);
-      else absentAreas.push(g.name);
+      else partialAreas.push(g.name);
     });
     // Name areas individually when three or fewer share a bucket; otherwise
     // summarise by count (the per-area detail lives in the scorecard and results).
@@ -5215,7 +5323,7 @@ window.App.ExportDOCX = (function () {
       weakestAreaName: weakestAreaName, weakestAreaDetail: weakestAreaDetail,
       applicableCount: ov.total, achievedCount: c.achieved, partiallyCount: c.partially, notAchievedCount: c.not,
       gapConcentrationSentence: gapConcentrationSentence, gapTotal: ov.gaps,
-      coveragePct: N.formatPct(ov.coverage), confidenceLabel: ov.confidenceLevel || "confidence not rated",
+      coveragePct: N.formatPct(ov.coverage), confidenceLabel: ov.confidenceLevel ? String(ov.confidenceLevel).toLowerCase() : "confidence not rated",
       conformancePct: pctText(N.formatPct(ov.conformance)), autoTopPriorityHint: autoTopPriorityHint
     };
 
@@ -5236,7 +5344,8 @@ window.App.ExportDOCX = (function () {
     if (B.regulatory_stakes) children.push(body(B.regulatory_stakes));
     var repNotAchieved = (scored.roadmap || []).some(function (it) { return it.categoryId === "REP" && it.state === "not"; });
     slots.repExposureClause = repNotAchieved ? (CB.consultant_exposure_rep_clause || "") : "";
-    if (CB.consultant_exposure_seed) children.push(body(nis2Fill(CB.consultant_exposure_seed, slots)));
+    var nisSeed = CB.consultant_exposure_seed ? nis2Fill(CB.consultant_exposure_seed, slots).trim() : "";
+    if (nisSeed) children.push(body(nisSeed));
     var cls = rn.entityClassification, auth = (rn.competentAuthority || "").trim(), expo = (rn.regulatoryExposure || "").trim();
     if ((cls === "essential" || cls === "important") || auth || expo) {
       var sent = [];
@@ -6057,10 +6166,10 @@ window.App.ExportDOCX = (function () {
     var worst = scored.worstCategories || [];
     var weakestCategoryName = worst.length ? nis2ListJoin(worst.map(function (w) { return w.name; })) : "no single category";
     var w0 = worst[0];
-    var weakestDetail = w0 ? (", where " + w0.gaps + " of " + w0.total + " elements are Not in place or Partially in place") : "";
+    var weakestDetail = (w0 && worst.length === 1) ? (", where " + w0.gaps + " of " + w0.total + (w0.total === 1 ? " element" : " elements") + (w0.gaps === 1 ? " is" : " are") + " Not in place or Partially in place") : "";
     var gcParts = [];
-    if (c.notInPlace > 0) gcParts.push(nis2Fill(gcFrags.notInPlace, { notInPlace: c.notInPlace }));
-    if (c.partially > 0) gcParts.push(nis2Fill(gcFrags.partially, { partially: c.partially }));
+    if (c.notInPlace > 0 && gcFrags.notInPlace) gcParts.push(nis2Fill(gcFrags.notInPlace, { notInPlace: c.notInPlace }));
+    if (c.partially > 0 && gcFrags.partially) gcParts.push(nis2Fill(gcFrags.partially, { partially: c.partially }));
     var gapConcentrationSentence = gcParts.join(" ");
     var topHint = (scored.roadmap || []).slice(0, 2).map(function (r) { return r.code + " " + r.title; });
     var autoTopPriorityHint = topHint.length ? nis2ListJoin(topHint) : "the highest-priority elements in the roadmap";
@@ -6068,6 +6177,7 @@ window.App.ExportDOCX = (function () {
     var slots = {
       clientName: clientName, verdictPhrase: verdictPhrase,
       weakestCategoryName: weakestCategoryName, weakestDetail: weakestDetail,
+      weakestCategoryLead: worst.length > 1 ? "The weakest categories are " : "The weakest category is ",
       answeredCount: ov.answered, inPlace: c.inPlace, largely: c.largely, partially: c.partially, notInPlace: c.notInPlace,
       gapConcentrationSentence: gapConcentrationSentence,
       coveragePct: C.formatPct(ov.coverage), conformancePct: pctText(C.formatPct(ov.conformance)),
@@ -6352,7 +6462,11 @@ window.App.ExportDOCX = (function () {
     var gaps = craSortedRoadmap(scored);
     var children = [ h1n("1", "Executive summary") ];
 
-    children.push(body(clientName + " commissioned a gap assessment of " + product + " against " + pk.regName + ". The " + pk.noun + " is classified as " + (cls.classLabel || pk.defaultClassLabel) + (cls.route ? (", for which the required conformity route is " + cls.route + "") : "") + ". " + pk.layersSentence));
+    // The route is one or more whole sentences in the classification data, so
+    // it follows the class sentence instead of being spliced into it.
+    var routeText = String(cls.route || "").trim();
+    if (routeText && !/[.!?]$/.test(routeText)) routeText += ".";
+    children.push(body(clientName + " commissioned a gap assessment of " + product + " against " + pk.regName + ". The " + pk.noun + " is classified as " + String(cls.classLabel || pk.defaultClassLabel).replace(/\.$/, "") + ". " + (routeText ? routeText + " " : "") + pk.layersSentence));
 
     layers.forEach(function (l) {
       var c = l.overall.counts;
@@ -6366,7 +6480,7 @@ window.App.ExportDOCX = (function () {
       var nBlock = p3.overall.counts.notInPlace;
       children.push(body([
         run("The conformity layer is the main gap. ", { bold: true }),
-        run("With " + nBlock + " conformity obligation" + (nBlock === 1 ? "" : "s") + " not in place, the " + pk.noun + pk.blockerTail)
+        run("With " + nBlock + " conformity obligation" + (nBlock === 1 ? "" : "s") + " not in place, the " + pk.noun + (nBlock === 1 ? pk.blockerTail.replace("until those obligations are met", "until that obligation is met") : pk.blockerTail))
       ]));
     } else if (layers.length) {
       var worst = layers.slice().sort(function (a, b) {
@@ -6381,7 +6495,9 @@ window.App.ExportDOCX = (function () {
       }
     }
 
-    children.push(body(pk.keyDatesNote));
+    // Said once: the critical caveats box under the summary gives the dates
+    // where the instrument lists them.
+    if (!/11 September 2026|Article 14/.test((scored.criticalCaveats || []).join(" "))) children.push(body(pk.keyDatesNote));
 
     if (cls.misclassification) {
       children.push(body([run(pk.misclassFinding, { bold: true, color: COLOR.gap })]));
@@ -6416,7 +6532,7 @@ window.App.ExportDOCX = (function () {
     // The classification-driven caveats only exist once the product has been
     // classified. A report produced before that is the one most in need of
     // saying what it is not, so the standing statement is always present.
-    caveats.push("This gap analysis supports preparation for conformity. It is not a conformity assessment or a determination by a notified body or market surveillance authority, and it confers no presumption of conformity.");
+    if (!/determine or certify|not a conformity assessment/.test(caveats.join(" "))) caveats.push("This gap analysis supports preparation for conformity. It is not a conformity assessment or a determination by a notified body or market surveillance authority, and it confers no presumption of conformity.");
     if (!caveats.length) return [];
     var TableRow = window.docx.TableRow, WidthType = window.docx.WidthType, Table = window.docx.Table, ShadingType = window.docx.ShadingType, TableCell = window.docx.TableCell;
     var paras = [ new window.docx.Paragraph({ style: "BodyText", children: [run("Critical caveats", { bold: true, color: COLOR.gap })] }) ];
@@ -6486,8 +6602,9 @@ window.App.ExportDOCX = (function () {
     var sc4830 = seriesContextOf(instrument, typeof narrative !== "undefined" ? narrative : null); if (sc4830) out.push(body(sc4830));
     out = out.concat(attributionParas(instrument, !!instrument.framing));
     out.push(h1("How to read this report"));
+    // How to read already names the scale; the instrument's scoringNote said
+    // it again in the next paragraph.
     out.push(body(pk.howToRead));
-    if (instrument.scoringNote) out.push(body(instrument.scoringNote, { color: COLOR.muted }));
     return out;
   }
 
@@ -6609,7 +6726,9 @@ window.App.ExportDOCX = (function () {
     if (it.isFloor) priChildren.push(run("   floor finding", { bold: true, color: COLOR.gap }));
     children.push(new window.docx.Paragraph({ style: "BodyText", indent: { left: 360 }, spacing: { after: 60 }, children: priChildren }));
 
-    if (it.requirement) children.push(nis2Field("Requirement (paraphrased)", it.requirement));
+    // Annex I items quote the Regulation; the conformity obligations span
+    // several Articles and are phrased by the assessor (scoring-cra.js).
+    if (it.requirement) children.push(nis2Field(it.requirementVerbatim ? "Requirement (text of the Regulation)" : "Requirement (paraphrased)", it.requirement));
     if (it.rationale) children.push(nis2Field("Why this matters", it.rationale));
     children.push(nis2Field("Captured evidence", it.evidence || "No evidence was captured for this requirement."));
     children.push(nis2Field("Business impact", it.impact, planWhere(it, "impact")));
@@ -6705,7 +6824,7 @@ window.App.ExportDOCX = (function () {
       ]));
     }
 
-    children.push(body(pk.keyDatesNote));
+    if (!/11 September 2026|Article 14/.test(((perT[0] && perT[0].result.criticalCaveats) || []).join(" "))) children.push(body(pk.keyDatesNote));
 
     perT.forEach(function (pt) {
       var cls = pt.result.classification || {};

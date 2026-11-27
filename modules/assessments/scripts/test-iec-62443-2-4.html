@@ -293,7 +293,7 @@ H.test(function (ok, done) {
   ok(/111 \/ 111/.test(document.getElementById("sidebar").textContent), "progress counts the 111 rows in scope, not 123",
      (document.getElementById("sidebar").textContent.match(/\d+ \/ \d+/) || [""])[0]);
   var scr = document.getElementById("main").textContent;
-  ok(scr.indexOf("Results by Functional area") !== -1, "the screen report renders");
+  ok(scr.indexOf("Results by functional area") !== -1, "the screen report renders");
   ok(count(scr, "The functional area SP05 SIS") === 1 && scr.indexOf("was out of scope for this assessment") !== -1, "the screen names SP05 out of scope once");
   ok(scr.indexOf("SP05 SIS") === scr.lastIndexOf("SP05 SIS"), "and nowhere else");
 

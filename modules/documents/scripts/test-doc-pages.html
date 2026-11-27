@@ -503,7 +503,7 @@
     draw(P.about);
     ok(main.textContent.indexOf(A.Product.name + " " + A.Version.label) !== -1 && main.textContent.indexOf("version " + A.Version.number) !== -1, "About shows the product and its version");
     ok(main.querySelector(".dp-licence") && main.querySelector(".dp-licence").textContent.length > 200, "and the licence");
-    ok(main.querySelectorAll(".dp-keys dt").length >= 15 && /spt-document\/1\.0/.test(main.textContent), "the keyboard map and the file format it reads");
+    ok(main.querySelectorAll(".dp-keys dt").length >= 15 && /It opens its own document files and Word files \(\.docx\)/.test(main.textContent) && !/spt-document\//.test(main.textContent), "the keyboard map and the files it reads, in words and not as a schema id");
     ok(wordingProblems().length === 0, "about: no uppercase labels and no dashes", wordingProblems().join(" | "));
   });
 

@@ -71,7 +71,7 @@
     ok(/handle it as you would the project file/.test(main(w).textContent), "it says a pack holds client data");
     d.querySelector('.nav-item[data-page="about"]').click();
     ok(/Copyright and licence/.test(main(w).textContent) && /PROPRIETARY LICENCE/.test(main(w).textContent) && main(w).textContent.indexOf(w.App.Version.product + " " + w.App.Version.label) !== -1, "the About page carries the licence and the version");
-    ok(/spt-review-pack\/1\.0/.test(main(w).textContent) && /spt-review\/1\.0/.test(main(w).textContent), "and the contracts it reads and writes");
+    ok(/It opens review packs and writes review files\./.test(main(w).textContent) && !/spt-review/.test(main(w).textContent), "and says what it reads and writes, in words and not as schema ids");
     return load("?tour=1");
   }).then(function (w) {
     W = w; R = w.ReviewTool;

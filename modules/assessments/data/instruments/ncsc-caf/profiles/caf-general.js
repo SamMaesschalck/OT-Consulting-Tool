@@ -7,7 +7,7 @@ window.App.Data.instruments["ncsc-caf"] = window.App.Data.instruments["ncsc-caf"
 window.App.Data.instruments["ncsc-caf"].profiles = window.App.Data.instruments["ncsc-caf"].profiles || {};
 window.App.Data.instruments["ncsc-caf"].profiles["caf-general"] = {
   "id": "caf-general",
-  "name": "General CAF (no regulator profile)",
+  "name": "General CAF (no regulator)",
   "appliesToInstrument": "ncsc-caf",
   "sectorRegulator": "none",
   "sectorRegulatorName": "NCSC (General)",

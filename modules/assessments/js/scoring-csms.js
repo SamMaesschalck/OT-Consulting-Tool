@@ -98,6 +98,7 @@ window.App.ScoringCSMS = (function () {
       categoryId: el.categoryId,
       elementGroupId: el.elementGroupId || null,
       requirement: el.verbatimText || "",
+      requirementVerbatim: el.verbatim === undefined ? !!el.verbatimText : !!el.verbatim,
       rationale: el.rationale || "",
       hint: el.hint || "",
       otLens: el.otLens || null,

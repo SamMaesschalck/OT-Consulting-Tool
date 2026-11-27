@@ -26,7 +26,10 @@
                     "objectiveTitle":  "Fundamental Security Principle",
                     "principleNoun":  "Security Delivery Principle",
                     "outcomesTitle":  "Expectations",
-                    "about":  "This is an informal gap assessment against FSyP 7, Cyber Security and Information Assurance, of the ONR Security Assessment Principles (SyAPs). It covers cyber and information risk management, information security, protection of nuclear technology and operations, physical protection of information, and incident preparation and response. The dutyholder\u0027s arrangements are compared with the published regulatory expectations, and the gaps are set out in a prioritised improvement roadmap. The assessment is advisory. It is not an ONR assessment or a determination of NISR compliance, and it neither constitutes nor approves a security plan.",
+                    "unitNoun":  "expectation",
+                    "objectiveNoun":  "Fundamental Security Principle",
+                    "roadmapTitle":  "Improvement roadmap",
+                    "about":  "This is an informal gap assessment against FSyP 7, Cyber Security and Information Assurance, of the ONR Security Assessment Principles (SyAPs). It covers cyber and information risk management, information security, protection of nuclear technology and operations, physical protection of information, and incident preparation and response. The dutyholder\u0027s arrangements are compared with the published regulatory expectations, and the gaps are set out in a prioritised improvement roadmap. The assessment is advisory.",
                     "gettingStarted":  {
                                            "cardTitle":  "How this assessment works",
                                            "intro":  "This is an informal gap assessment against the ONR Security Assessment Principles (SyAPs). Each regulatory expectation is judged Achieved, Partially achieved or Not achieved. It is not an ONR assessment and does not approve a security plan.",

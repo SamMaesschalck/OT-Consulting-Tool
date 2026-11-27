@@ -13,46 +13,46 @@
     "templates":  {
                       "scope_assessed_line":  "{assessedCount} of 7 Foundational Requirements were assessed, and {notAssessedCount} were not assessed in this engagement.",
                       "default_target_flag":  "All Foundational Requirements were assessed against the default target of {targetSL}. No Foundational Requirement had a separate target.",
-                      "na_clause":  ", with {naCount} requirement(s) not applicable",
-                      "fr_result_assessed":  "FR{frNum} {frName} achieved {achievedSL} against a target of {targetSL}, meeting {metCount} of {applicableCount} applicable requirement(s){naClause}.",
+                      "na_clause":  ", with {naCount|requirement|requirements} not applicable",
+                      "fr_result_assessed":  "FR{frNum} {frName} achieved {achievedSL} against a target of {targetSL}, meeting {metCount} of {applicableCount|applicable requirement|applicable requirements}{naClause}.",
                       "fr_not_assessed":  "FR{frNum} {frName} was not assessed in this engagement.",
                       "fr_all_met":  "All applicable requirements in this Foundational Requirement met their target Security Level.",
                       "fr_shortfall_intro":  "The following requirements fell short of the target Security Level:",
                       "fr_shortfall_item":  "{srCode} {srTitle}: achieved {achievedSL} against target {targetSL}.",
-                      "fr_floor_note":  "{floorCount} requirement(s) in this Foundational Requirement are floor-flagged and should be treated as priorities."
+                      "fr_floor_note":  "{floorCount|requirement in this Foundational Requirement is floor-flagged and is treated as a priority|requirements in this Foundational Requirement are floor-flagged and are treated as priorities}."
                   },
     "executiveSummary":  {
                              "_note":  "Composed by slot-substitution only; boilerplate inserted VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. SL aim: the Security Level each Foundational Requirement achieves against its target, set by the weakest applicable requirement, with floor findings as priorities. Order: verdict, scope_and_profile, gap_shape, weakest-link + stakes, path_forward + confidence.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment finds that the control system at {clientName} {verdictPhrase}, with the weakest protection in {weakestFRName}. The roadmap in this report concentrates on the requirements that fall short of the target Security Level.",
+                                               "exec_verdict":  "This assessment finds that the control system at {clientName} {verdictPhrase}. The weakest protection is in {weakestFRName}, where {weakestFRDetail}.",
                                                "exec_verdict_nogaps":  "This assessment finds that the control system at {clientName} {verdictPhrase}.",
-                                               "exec_scope":  "The assessment covered {assessedFRCount} of the seven Foundational Requirements, across {answeredReqCount} applicable system requirements{notAssessedClause}, each judged against the target Security Level for the environment.",
+                                               "exec_scope":  "The assessment covered {assessedFRCount} of the 7 Foundational Requirements, across {answeredReqCount} applicable system requirements{notAssessedClause}, each judged against the target Security Level for the environment.",
                                                "exec_profile":  "Of the assessed Foundational Requirements, {metFRCount} met the target Security Level and {belowFRCount} fell short; {floorClause}.",
                                                "exec_profile_partly":  "Of the assessed Foundational Requirements, {metFRCount} met the target Security Level, {belowFRCount} fell short and {partlyFRCount} ({partlyFRList}) {partlyFRVerb} not yet fully assessed, with nothing short so far; {floorClause}.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} The weakest Foundational Requirement is {weakestFRName}, where {weakestFRDetail}.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
                                                "exec_path_forward":  "The roadmap in this report deals with the floor findings first, then raises each Foundational Requirement to its target in an order that fits OT operating constraints.",
-                                               "exec_confidence":  "These findings are based on the {coveragePct} of applicable requirements that could be assessed ({confidenceLabel}). Overall closeness to target across the assessed Foundational Requirements is {closenessPct}. The achieved Security Level is set by the weakest applicable requirement, so closeness is given for context and does not count towards meeting the target.",
+                                               "exec_confidence":  "Coverage is {coveragePct} of the applicable requirements ({confidenceLabel}). Overall closeness to target across the assessed Foundational Requirements is {closenessPct}. The achieved Security Level is set by the weakest applicable requirement, so closeness is given for context and does not count towards meeting the target.",
                                                "verdictPhrases":  {
                                                                       "met":  "meets the target Security Level across all assessed Foundational Requirements",
                                                                       "close":  "is approaching the target Security Level but does not yet meet it across all Foundational Requirements",
                                                                       "short":  "falls short of the target Security Level"
                                                                   },
                                                "floorFragments":  {
-                                                                      "some":  "{floorCount} requirement(s) are floor-flagged (at SL 0 against a positive target, or two or more levels below it) and are treated as priorities",
+                                                                      "some":  "{floorCount|requirement is|requirements are} floor-flagged (at SL 0 against a positive target, or two or more levels below it) and treated as {floorCount?a priority|priorities}",
                                                                       "none":  "no requirements are floor-flagged"
                                                                   },
                                                "gapConcentrationFragments":  {
-                                                                                 "nearClause":  "requirements fall one Security Level short of the target",
-                                                                                 "floorClause":  "requirements are floor-flagged and offer little or no protection where it is required"
+                                                                                 "nearClause":  "the shortfall is one Security Level",
+                                                                                 "floorClause":  "at least one requirement is floor-flagged"
                                                                              }
                                            },
                              "boilerplate":  {
                                                  "exec_weakest_link":  "The achieved Security Level for a Foundational Requirement is set by its weakest applicable requirement. Levels are not averaged, so one requirement at a low level holds the whole Foundational Requirement down. For this reason the roadmap works at the level of individual requirements, and a few fixes can be enough to raise an achieved Security Level.",
                                                  "stakes":  "Security Levels describe the strength of attacker the system is expected to withstand, from casual or coincidental violation at SL 1 to sophisticated attacks with extended resources at SL 4. A Foundational Requirement below its target is protected against a weaker class of threat than the environment calls for. A floor-flagged requirement offers little or no protection where protection is required.",
-                                                 "not_determination":  "This assessment measures the system as configured and operated against ISA/IEC 62443-3-3. It does not certify the system, and it does not on its own establish conformance with the standard. The achieved Security Levels reflect what could be demonstrated during the engagement and should be confirmed during remediation."
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the weakest protection is in {weakestFRName}.{floorExposureClause}",
+                                                      "consultant_exposure_seed":  "",
                                                       "consultant_exposure_floor_clause":  " Floor-flagged requirements mean parts of the control system currently offer little or no protection against the threat class the target Security Level assumes.",
                                                       "consultant_exposure":  "[Consultant to add a short note on this client's exposure: the threat environment behind the chosen target Security Level, what the weakest Foundational Requirements mean for this process, and any safety or availability implications.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",

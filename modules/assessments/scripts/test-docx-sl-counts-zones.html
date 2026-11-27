@@ -112,7 +112,7 @@ H.test(function (ok, done) {
 
   word(eOut, "z1").then(function (d) {
     var es = sec(d, /Executive summary$/);
-    ok(/covered 1 of the seven Foundational Requirements.*\(5 Foundational Requirements were not assessed and 1 was out of scope\)/.test(es.text),
+    ok(/covered 1 of the 7 Foundational Requirements.*\(5 Foundational Requirements were not assessed and 1 was out of scope\)/.test(es.text),
        "exec summary: 1 assessed, 5 not assessed and 1 out of scope, as the tile counts", (es.text.match(/The assessment covered[^\n]*/) || [""])[0]);
     ok(es.text.indexOf("(6 Foundational Requirements were not assessed)") === -1, "exec summary: never 6 not assessed");
     // 2. The caveat is its own sentence; the verdict is "so far".
@@ -141,7 +141,7 @@ H.test(function (ok, done) {
     return word(eng(one, {}, responsesFor(inst, "z1", 2, ["FR1"]).concat(naResp)), "z1");
   }).then(function (d) {
     var es = sec(d, /Executive summary$/);
-    ok(/covered 2 of the seven Foundational Requirements.*\(5 Foundational Requirements were not assessed\)/.test(es.text),
+    ok(/covered 2 of the 7 Foundational Requirements.*\(5 Foundational Requirements were not assessed\)/.test(es.text),
        "an all-N/A FR counts as assessed: 2 covered, 5 not", (es.text.match(/The assessment covered[^\n]*/) || [""])[0]);
     var sm = sec(d, /Scope and method$/);
     ok(/Foundational Requirements assessed: 2 of 7\./.test(sm.text) && !/not assessed: [^\n]*FR2 /.test(sm.text),

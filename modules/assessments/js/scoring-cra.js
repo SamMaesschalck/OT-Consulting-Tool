@@ -46,7 +46,7 @@ window.App.ScoringCRA = (function () {
     { id: "critical", label: "Critical (Annex IV)" }
   ];
   var FALLBACK_ROUTES = {
-    "default": "Internal control (Annex VIII, Module A). The manufacturer self-assesses and no notified body is needed.",
+    "default": "The manufacturer self-assesses by internal control (Module A, Annex VIII Part I), and no notified body is needed.",
     "important-class-i": "Self-assessment by internal control (Module A) is allowed only if a relevant harmonised standard, common specification or European cybersecurity certification scheme is applied in full. Otherwise a notified body is needed, through EU-type examination (Module B) with Module C, or full quality assurance (Module H).",
     "important-class-ii": "A notified body is needed, through EU-type examination (Module B) with conformity to type (Module C), or full quality assurance (Module H). Self-assessment is not available.",
     "critical": "The Class II route applies, through a notified body. A European cybersecurity certificate under an EU scheme may also be needed where a delegated act requires one."
@@ -182,6 +182,9 @@ window.App.ScoringCRA = (function () {
           categoryId: layer.id,
           elementGroupId: null,
           verbatimText: it.verbatimText || it.requirement || "",
+          // Whether that text is the Regulation's own, for the label the
+          // roadmap gives it.
+          verbatim: !!it.verbatimText,
           rationale: it.rationale || "",
           hint: it.hint || "",
           otLens: it.otLens || null,

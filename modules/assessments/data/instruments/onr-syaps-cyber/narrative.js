@@ -20,12 +20,13 @@ window.App.Data.instruments["onr-syaps-cyber"].narrative = {
     "executiveSummary":  {
                              "_note":  "Composed by slot substitution. Objectives = Fundamental Security Principles; 3-band Achieved / Partially achieved / Not achieved.",
                              "templates":  {
-                                               "exec_verdict":  "This assessment covers the Cyber Security and Information Assurance principle (FSyP 7) of the ONR Security Assessment Principles (SyAPs). Against the {profileName} profile, {clientName} {verdictPhrase}, with the weakest coverage in {weakestObjectiveName}. The roadmap concentrates on the expectations that are not yet achieved.",
+                                               "exec_verdict":  "This assessment covers the Cyber Security and Information Assurance principle (FSyP 7) of the ONR Security Assessment Principles (SyAPs). Against the {profileName} profile, {clientName} {verdictPhrase}. The weakest coverage is in {weakestObjectiveName}, where {weakestObjectiveDetail}.",
                                                "exec_verdict_nogaps":  "This assessment covers the Cyber Security and Information Assurance principle (FSyP 7) of the ONR Security Assessment Principles (SyAPs). Against the {profileName} profile, {clientName} {verdictPhrase}, and every in-scope expectation was assessed as Achieved.",
                                                "exec_scope":  "For the {profileName} profile, {applicableCount} regulatory expectations applied under FSyP 7.",
-                                               "exec_profile":  "Of these, {achievedCount} were assessed as Achieved, {partiallyCount} as Partially achieved and {notAchievedCount} as Not achieved, and {unknownCount} could not be verified (Unknown). The {belowCount} expectations below the expected state make up the roadmap.",
-                                               "exec_gap_shape":  "{gapConcentrationSentence} The weakest Fundamental Security Principle is {weakestObjectiveName}, where {weakestObjectiveDetail}.",
-                                               "exec_path_forward":  "This report sets out a prioritised roadmap for closing the {belowCount} expectations below the expected state, with reference to the relevant Technical Assessment Guides.",
+                                               "exec_profile":  "Of these, {achievedCount} were assessed as Achieved, {partiallyCount} as Partially achieved and {notAchievedCount} as Not achieved.{unknownSentence} {belowCount|expectation below the expected state makes|expectations below the expected state make} up the roadmap.",
+                                               "exec_unknown":  "{unknownCount|expectation|expectations} could not be verified and {unknownCount?is|are} marked Unknown.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence}",
+                                               "exec_path_forward":  "This report sets out a prioritised roadmap for closing these gaps, with reference to the relevant Technical Assessment Guides.",
                                                "exec_confidence":  "These findings rest on answers for {coveragePct} of applicable expectations ({confidenceLabel}). SyAPs does not produce a single grade, so the results are reported as counts of Achieved, Partially achieved and Not achieved expectations for each Fundamental Security Principle.",
                                                "verdictPhrases":  {
                                                                       "foundations":  "demonstrates strong alignment with the expectations",
@@ -33,6 +34,7 @@ window.App.Data.instruments["onr-syaps-cyber"].narrative = {
                                                                       "substantial":  "has substantial gaps"
                                                                   },
                                                "gapConcentrationFragments":  {
+                                                                                 "mostlyClause":  "most expectations are achieved but some are not",
                                                                                  "partialClause":  "expectations are partly demonstrated",
                                                                                  "absentClause":  "the expectations are not yet demonstrated"
                                                                              }
@@ -40,10 +42,10 @@ window.App.Data.instruments["onr-syaps-cyber"].narrative = {
                              "boilerplate":  {
                                                  "exec_partial_vs_absent":  "An expectation marked Partially achieved has some elements in place, so closing it extends work already begun. An expectation marked Not achieved has not yet been demonstrated and needs new arrangements, which usually take more time and money.",
                                                  "regulatory_stakes":  "ONR uses the Security Assessment Principles to judge the effectiveness of a dutyholder's security arrangements under the Nuclear Industries Security Regulations 2003. ONR engagement, a security plan review or internal assurance would focus on the expectations below the expected state.",
-                                                 "not_determination":  "This is an informal gap analysis against the published SyAPs expectations. It is not an ONR assessment or a determination of NISR compliance. The judgements are the consultant's and should be confirmed through the dutyholder's own arrangements and, where required, with ONR."
+                                                 "not_determination":  ""
                                              },
                              "consultantBlocks":  {
-                                                      "consultant_exposure_seed":  "For {clientName}, the weakest Fundamental Security Principle is {weakestObjectiveName}.",
+                                                      "consultant_exposure_seed":  "",
                                                       "consultant_exposure":  "[Consultant to add a short, client-specific note on the drivers for this assessment (regulatory engagement, security plan development, incident, re-categorisation) and any specific exposure arising from the weakest areas identified.]",
                                                       "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
                                                       "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this dutyholder.]"
