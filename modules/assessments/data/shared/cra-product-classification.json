@@ -11,7 +11,7 @@
     "default": "Internal control (Module A, Annex VIII Part I). The manufacturer self-assesses and no notified body is needed.",
     "important-class-i": "The manufacturer may self-assess only if harmonised standards, common specifications or a substantial-level EU certification scheme are applied in full. Otherwise the route is EU-type examination (Module B) with conformity to type (Module C), or full quality assurance (Module H).",
     "important-class-ii": "A notified body is needed, through EU-type examination (Module B) with Module C, or full quality assurance (Module H). Self-assessment is not available.",
-    "critical": "As for Class II. The manufacturer may also need a European cybersecurity certificate under an EU scheme where a delegated act requires one."
+    "critical": "The route is the same as for Class II. The manufacturer may also need a European cybersecurity certificate under an EU scheme where a delegated act requires one."
   },
   "categories": {
     "annex-iii-class-i": [
@@ -126,8 +126,8 @@
     ]
   },
   "classifierFlags": [
-    "If the product matches BOTH a Class I/II and an Annex IV category, the higher (critical) classification governs.",
+    "If the product matches both a Class I or II category and an Annex IV category, the higher (critical) classification applies.",
     "Flag it clearly where a product the manufacturer assumed was Default appears in Annex III or IV. This misclassification is common, and it changes the conformity route.",
-    "A component integrated into a larger product may itself be an important/critical product; classify the product being placed on the market."
+    "A component built into a larger product may itself be an important or critical product. Classify the product that is being placed on the market."
   ]
 }

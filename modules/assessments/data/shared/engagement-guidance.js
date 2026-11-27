@@ -18,7 +18,7 @@ window.App.Data.shared.engagementGuidance = {
     "oftenForgotten": [
       "Vendor support contracts and remote-access agreements",
       "Organisation chart showing who administers what",
-      "Records of backup restore tests, as well as the backup policy",
+      "Records of backup restore tests",
       "Management-of-change records for the control system",
       "List of third parties with any access to OT"
     ],
@@ -35,7 +35,7 @@ window.App.Data.shared.engagementGuidance = {
       "commonDocuments": [
         "Network architecture and zone/conduit (segmentation) diagrams",
         "Asset inventory with OS/firmware versions",
-        "Firewall / boundary device rulesets",
+        "Firewall and boundary device rule sets",
         "Remote access architecture and account arrangements",
         "AD / domain design and account management procedures",
         "Patch management process and deployment records",
@@ -49,7 +49,7 @@ window.App.Data.shared.engagementGuidance = {
         "Time synchronisation (NTP) design, which several SRs depend on",
         "Certificate and cryptographic key inventory",
         "Historian / DMZ replication configuration and data flows",
-        "Details of the risk assessment that set the target SLs (or the spt-risk-context export from the risk tool)"
+        "Details of the risk assessment that set the target SLs (or the risk context file exported from the risk tool)"
       ],
       "keyStakeholders": [
         "Control systems / DCS engineer",
@@ -75,7 +75,7 @@ window.App.Data.shared.engagementGuidance = {
         "Code-signing key handling and release integrity controls",
         "External vulnerability handling / PSIRT and disclosure process",
         "Product end-of-life / end-of-support policy",
-        "Records showing the process is followed, as well as the process document"
+        "Records that show the process is followed in practice"
       ],
       "keyStakeholders": [
         "Engineering / development manager",
@@ -128,7 +128,7 @@ window.App.Data.shared.engagementGuidance = {
         "Exception / waiver register with expiry and ownership",
         "HR security process (joiners / movers / leavers for OT access)",
         "How the CSMS applies at each site compared with head office",
-        "Records showing procedures are carried out, as well as written down"
+        "Records that show procedures are carried out"
       ],
       "keyStakeholders": [
         "Senior management sponsor for the CSMS",
@@ -141,7 +141,7 @@ window.App.Data.shared.engagementGuidance = {
     },
     "iec-62443-2-1-2024": {
       "commonDocuments": [
-        "Security program documentation mapped to the SPEs",
+        "Security programme documentation mapped to the SPEs",
         "OT risk assessment methodology and results",
         "Policy and procedure set with review dates",
         "Training and competence records for OT security roles",
@@ -150,16 +150,16 @@ window.App.Data.shared.engagementGuidance = {
         "Internal audit / self-assessment results"
       ],
       "oftenForgotten": [
-        "Evidence that each documented process is practised, since maturity depends on practice",
+        "Evidence that each documented process is practised",
         "KPI / metrics reporting to management",
-        "Management-of-change records for the security program itself",
+        "Management-of-change records for the security programme",
         "Improvement plans from previous assessments and their status",
-        "Which sites follow the program in practice"
+        "Which sites follow the programme in practice"
       ],
       "keyStakeholders": [
-        "Security program owner",
+        "Security programme owner",
         "Asset owner senior management (accountability and budget)",
-        "Site OT leads (where the program is put into practice)",
+        "Site OT leads (where the programme is put into practice)",
         "IT/OT integration lead",
         "Internal audit / compliance function"
       ]
@@ -178,7 +178,7 @@ window.App.Data.shared.engagementGuidance = {
         "Regulator correspondence (designation, previous CAF submissions, improvement plans)",
         "Staff awareness and training records",
         "Physical security arrangements for sites supporting the essential function",
-        "Resilience evidence: single points of failure analysis, failover tests",
+        "Resilience evidence, such as single point of failure analysis and failover test records",
         "The boundary decisions behind how 'supporting systems' were scoped"
       ],
       "keyStakeholders": [
@@ -334,7 +334,7 @@ window.App.Data.shared.engagementGuidance = {
       "oftenForgotten": [
         "Sub-supplier / fourth-party dependencies behind the product",
         "What remote access the supplier holds today",
-        "Whether certifications cover the product you buy or a different scope",
+        "Whether the certifications cover the product the client buys or a different scope",
         "Escrow / continuity arrangements if the supplier fails"
       ],
       "keyStakeholders": [

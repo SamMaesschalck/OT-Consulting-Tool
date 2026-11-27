@@ -233,7 +233,7 @@ H.test(function (ok, done) {
      document.getElementById("sidebar").textContent.slice(0, 600));
   A.UI.go("engagement");
   var eng = main.textContent;
-  ok(eng.indexOf("How the service provider security program assessment works") !== -1, "the getting-started card names the service provider program");
+  ok(eng.indexOf("How the service provider security programme assessment works") !== -1, "the getting-started card names the service provider program");
   ok(eng.indexOf("should come from the contract with the asset owner") !== -1 && eng.indexOf("62443-3-2") === -1,
      "and says a target ML comes from the contract, not 62443-3-2");
   ok(eng.indexOf("by functional area and theme") !== -1 && !/\bby SPE\b/.test(eng), "and profiles by functional area, not SPE");

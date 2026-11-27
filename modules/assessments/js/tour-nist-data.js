@@ -31,7 +31,7 @@ window.App.TourNIST = (function () {
     regulatoryExposure:
       "Atlas Digital Services operates a multi-tenant SaaS platform and assesses its corporate and production information systems against the NIST SP 800-53 Rev 5 Moderate baseline to satisfy customer security requirements and support its SOC 2 and ISO 27001 programmes. This is an alignment and gap analysis. It is not a formal SP 800-53A assessment or an authorization decision. The controls that are Other Than Satisfied cluster around vulnerability management, monitoring and least privilege, which is where an assessor or a customer security review is most likely to focus.",
     topPriorities:
-      "The two most urgent priorities are standing up continuous vulnerability scanning with tracked remediation (RA-5), so that known weaknesses are found and fixed on a schedule, and establishing security monitoring and log review across the production estate (SI-4, AU-6), so that malicious activity is detected and acted on. Closing least-privilege gaps (AC-6) and testing contingency and incident plans (CP-4, IR-3) follow close behind."
+      "The two most urgent priorities are continuous vulnerability scanning with tracked remediation (RA-5) and security monitoring with log review across the production estate (SI-4, AU-6). The first gets known weaknesses found and fixed on a schedule, and the second gets malicious activity detected and acted on. Closing least-privilege gaps (AC-6) and testing contingency and incident plans (CP-4, IR-3) follow close behind."
   };
 
   // Curated gaps (Other Than Satisfied) with remediation. All are in the
@@ -45,7 +45,7 @@ window.App.TourNIST = (function () {
       rem: { rank: 2, band: "High", owner: "SOC Manager",
         action: "Consolidate security telemetry into the SIEM and build prioritised detection use cases for the production platform.",
         impact: "Without monitoring, an intrusion can progress undetected until it affects customer data or availability." } },
-    { id: "AU-6", ev: "Logs are collected centrally but are only reviewed reactively during incidents; there is no routine review or alerting.",
+    { id: "AU-6", ev: "Logs are collected centrally but are only reviewed reactively during incidents, with no routine review or alerting.",
       rem: { rank: 3, band: "High", owner: "SOC Manager",
         action: "Define scheduled log review and automated alerting for security-relevant events with documented triage ownership.",
         impact: "Collected logs that no one reviews provide evidence after the fact but no timely detection." } },
@@ -68,7 +68,7 @@ window.App.TourNIST = (function () {
     { id: "CM-8", ev: "A cloud asset inventory exists but is not complete or authoritative for ephemeral and third-party-hosted components.",
       rem: { rank: 8, band: "Medium", owner: "Platform Engineering Lead",
         action: "Automate discovery so the component inventory is complete and authoritative, including ephemeral and SaaS-hosted assets.",
-        impact: "Incomplete inventory undermines vulnerability, monitoring and configuration management." } },
+        impact: "An incomplete inventory weakens vulnerability management, monitoring and configuration management." } },
     { id: "SC-7", ev: "Network boundaries are enforced at the perimeter, but internal segmentation between tenants and tiers is limited.",
       rem: { rank: 9, band: "Medium", owner: "Security Engineering Lead",
         action: "Introduce internal segmentation and egress control between tiers and sensitive data stores.",
@@ -79,13 +79,13 @@ window.App.TourNIST = (function () {
         impact: "Long-lived, unrotated service-account secrets are a high-value target." } },
     { id: "CP-9", ev: "Backups run automatically, but restore has not been tested and one data store's backups are not held in an isolated copy.",
       rem: { rank: 11, band: "Medium", owner: "Platform Engineering Lead",
-        action: "Add an isolated/immutable backup copy and test full restore of a representative system on a defined cycle.",
+        action: "Add an isolated, immutable backup copy and test full restore of a representative system on a defined cycle.",
         impact: "Untested or non-isolated backups may not survive a ransomware or destructive event." } },
     { id: "SA-11", ev: "Code review and SAST run in CI, but there is no regular independent security testing of the developed platform.",
       rem: { rank: 12, band: "Medium", owner: "Head of Engineering",
         action: "Introduce periodic independent security testing (DAST and a scoped penetration test) into the release lifecycle.",
         impact: "Automated checks miss logic and design flaws that manual testing finds." } },
-    { id: "AC-2", ev: "Joiner/leaver processes are reliable for staff, but dormant contractor and service accounts were found during the assessment.",
+    { id: "AC-2", ev: "Joiner and leaver processes are reliable for staff, but dormant contractor and service accounts were found during the assessment.",
       rem: { rank: 13, band: "Medium", owner: "IAM Lead",
         action: "Bring contractor and service accounts into the periodic access review and disable dormant accounts automatically.",
         impact: "Orphaned accounts accumulate as unmonitored entry points." } },
@@ -97,7 +97,7 @@ window.App.TourNIST = (function () {
       rem: { rank: 15, band: "Medium", owner: "Vendor Risk Lead",
         action: "Introduce supply-chain security requirements (assessment, vulnerability disclosure, incident notification) into supplier contracts and onboarding.",
         impact: "Third parties with access or embedded components are a growing breach vector." } },
-    { id: "AT-3", ev: "General security awareness is delivered to all staff; there is no role-based training for engineers and administrators.",
+    { id: "AT-3", ev: "All staff receive general security awareness training, but there is no role-based training for engineers and administrators.",
       rem: { rank: 16, band: "Low", owner: "Security Manager",
         action: "Introduce role-based training for engineering and administrative roles (secure development, privileged access, incident recognition).",
         impact: "General training does not equip high-privilege roles for the threats specific to them." } },
@@ -125,7 +125,7 @@ window.App.TourNIST = (function () {
         E.setResponse(tid, o.id, { applicable: true, state: "not", evidence: g.ev,
           priorityRank: g.rem.rank, priorityBand: g.rem.band, owner: g.rem.owner, action: g.rem.action, impact: g.rem.impact });
       } else {
-        E.setResponse(tid, o.id, { applicable: true, state: "achieved", evidence: o.title + " - implemented; evidence reviewed during the assessment." });
+        E.setResponse(tid, o.id, { applicable: true, state: "achieved", evidence: "The control is implemented, and the evidence was reviewed during the assessment." });
       }
     });
     if (E.setReportNarrative) E.setReportNarrative(reportNarrative);

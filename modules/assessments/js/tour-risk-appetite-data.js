@@ -56,12 +56,12 @@ window.App.TourRiskAppetite = (function () {
     verdictRationale:
       "The appetite described by leadership is not the appetite the estate reveals. The board believes it is " +
       "managing cyber risk cautiously, and on the governance evidence alone that is a fair description of its " +
-      "intent. The technical review shows something different: firmware years behind, a flat process network " +
+      "intent. The technical review found firmware years behind, a flat process network " +
       "behind a single DMZ, no monitoring of the control systems, shared engineering credentials and backups " +
       "that have never been restored. Wearvale is an essential service where a compromise could harm public " +
       "health, and the sector draws credible state-level interest. Against that exposure, the organisation is " +
-      "carrying materially more risk than it believes it is. It has drifted into carrying that risk, and the board " +
-      "never took a decision it would recognise as its own. The finding is recorded as under-protected on that " +
+      "carrying materially more risk than it believes it is. It has drifted into carrying that risk without " +
+      "any decision the board would recognise as its own. The finding is recorded as under-protected on that " +
       "basis."
   };
 
@@ -71,7 +71,7 @@ window.App.TourRiskAppetite = (function () {
   var exposure = [
     { id: "EXP1", band: "severe",
       evidence: "Interview with H. Nakamura (COO); NIS/CAF self-assessment return CAF-WV-2025.",
-      notes: "Regional water and wastewater undertaker serving 1.4m people; drinking-water treatment and sludge " +
+      notes: "Wearvale is a regional water and wastewater undertaker serving 1.4m people. Drinking-water treatment and sludge " +
              "handling are safety-relevant, and the company is a designated essential service." },
     { id: "EXP2", band: "severe",
       evidence: "Interview with D. Oyelaran (Head of IT Security); national threat reporting for the UK water sector.",
@@ -80,21 +80,21 @@ window.App.TourRiskAppetite = (function () {
              "interest extends to it." },
     { id: "EXP3", band: "high",
       evidence: "Interview with D. Oyelaran; national threat reporting for the UK water sector.",
-      notes: "No overseas operations or contested-region exposure, but the sector as a whole is named in " +
+      notes: "Wearvale has no overseas operations or contested-region exposure, but the sector as a whole is named in " +
              "national threat reporting as a target of interest in a deteriorating geopolitical picture." },
     { id: "EXP4", band: "severe",
       evidence: "Interview with G. Whitcombe (Control Systems Manager); Northburn treatment works control room walkthrough.",
-      notes: "Worst credible case is a treatment or dosing compromise with public-health consequence, alongside " +
+      notes: "The worst credible case is a treatment or dosing compromise with public-health consequence, alongside " +
              "loss of supply to a large population. Environmental consequence from a wastewater release is " +
              "serious and regulator-reportable in its own right." },
     { id: "EXP5", band: "high",
       evidence: "NIS/CAF self-assessment return and DWI correspondence (CAF-WV-2025); AMP8 resilience investment case (AMP8-RES-07).",
-      notes: "NIS Regulations, DWI oversight and CAF assessment, plus Ofwat's interest in resilience spend. " +
-             "Obligation weight is heavy, though short of the nuclear regime." },
+      notes: "Wearvale is subject to the NIS Regulations, DWI oversight and CAF assessment, and Ofwat takes an interest in its resilience spend. " +
+             "The obligations are heavy, though lighter than the nuclear regime." },
     { id: "EXP6", band: "severe",
       evidence: "Interview with S. Patel (maintenance and integrator liaison); network diagram walkthrough with IT security.",
-      notes: "Several hundred remote sites on a shared telemetry network, a large integrator and maintainer " +
-             "estate with standing access, and downstream dependency from other utilities on continuity of " +
+      notes: "Wearvale has several hundred remote sites on a shared telemetry network and a large integrator " +
+             "and maintainer estate with standing access. Other utilities depend on its continuity of " +
              "supply." }
   ];
 
@@ -108,20 +108,20 @@ window.App.TourRiskAppetite = (function () {
     { id: "APP2", band: "cautious",
       evidence: "AMP8 resilience investment case, security lines (AMP8-RES-07); interview with H. Nakamura.",
       notes: "A ring-fenced OT security budget exists and survived the last AMP settlement. Spend has gone to " +
-             "governance, assessment and the corporate estate; OT capital has been deferred twice." },
+             "governance, assessment and the corporate estate, and OT capital has been deferred twice." },
     { id: "APP3", band: "cautious",
       evidence: "OT security remediation register (OT-REM-2026); interview with D. Oyelaran.",
       notes: "IT findings are remediated to defined SLAs. OT findings are managed on a separate register where " +
-             "dates move with outage windows. Leadership sees this as prudent sequencing and does not regard it as delay." },
+             "dates move with outage windows. Leadership regards this as prudent sequencing." },
     { id: "APP4", band: "open",
-      evidence: "Board risk register (BRR-2026-Q2) and OT remediation register (OT-REM-2026): no recorded acceptances in either. Confirmed in interview with J. Beattie.",
-      notes: "Risk acceptance is informal: no documented acceptances, no expiry dates, no board sign-off on " +
-             "carrying a specific OT risk. Where risk is accepted, it happens because a date is deferred, and nobody " +
-             "records a decision." },
+      evidence: "Board risk register (BRR-2026-Q2) and OT remediation register (OT-REM-2026), neither of which records any acceptances. J. Beattie confirmed this in interview.",
+      notes: "Risk acceptance is informal. There are no documented acceptances, no expiry dates and no board " +
+             "sign-off for carrying a specific OT risk. In practice, risk is accepted when a remediation date " +
+             "is deferred, and no decision is recorded." },
     { id: "APP5", band: "cautious",
       evidence: "Interview with G. Whitcombe; OT remediation register (OT-REM-2026), dates tied to outage windows.",
       notes: "Availability comes first, as it must for a water undertaker, but security work is scheduled into " +
-             "planned outages and is not refused. The constraint is real and reasonably handled." },
+             "planned outages and still gets done. The constraint is real and reasonably handled." },
     { id: "APP6", band: "cautious",
       evidence: "Interviews with H. Nakamura and G. Whitcombe.",
       notes: "Safety culture is strong and cyber is now named in the safety case as a contributing hazard. The " +
@@ -140,26 +140,26 @@ window.App.TourRiskAppetite = (function () {
     // certification. But nothing compensates for it and nobody tracks it, so it
     // is an unmanaged constraint, and an unmanaged constraint counts as appetite.
     { id: "TECH1", band: "tolerant", disposition: "accepted",
-      evidence: "Northburn control room walkthrough: HMI builds and PLC firmware levels reviewed with G. Whitcombe.",
+      evidence: "Northburn control room walkthrough, reviewing HMI builds and PLC firmware levels with G. Whitcombe.",
       notes: "Treatment PLC firmware is between four and nine years behind, and several Windows-based HMIs are " +
-             "on unsupported builds. There is no OT patch cycle; updates happen when a vendor attends for " +
+             "on unsupported builds. There is no OT patch cycle, and updates happen when a vendor attends for " +
              "another reason. The engineers pointed to the DCS vendor's certification as the reason firmware is " +
              "held back, which is fair. Nothing compensates for the gap and it is not tracked, so it is counted " +
              "as appetite and not as a managed constraint." },
     { id: "TECH2", band: "tolerant", disposition: "accepted",
       evidence: "Firewall rule review and network diagram walkthrough of the IT/OT boundary with IT security.",
-      notes: "One DMZ separates IT from OT, and behind it the process network is flat: telemetry, treatment " +
+      notes: "One DMZ separates IT from OT, and behind it the process network is flat. Telemetry, treatment " +
              "control and the maintenance estate share address space with no internal zoning." },
     { id: "TECH3", band: "open", disposition: "accepted",
-      evidence: "Corporate SOC: monitored sources and alert history reviewed; no OT-originated telemetry found.",
-      notes: "Corporate SOC coverage is credible and 24/7. It sees nothing below the DMZ: no OT network " +
-             "monitoring, no controller change alerting, and no OT events in the SIEM." },
+      evidence: "The corporate SOC's monitored sources and alert history were reviewed, and no OT-originated telemetry was found.",
+      notes: "Corporate SOC coverage is credible and 24/7. It sees nothing below the DMZ. There is no OT network " +
+             "monitoring, no controller change alerting and no OT events in the SIEM." },
     { id: "TECH4", band: "tolerant", disposition: "accepted",
-      evidence: "Engineering workstation account observed in use at Northburn; integrator VPN described by S. Patel.",
+      evidence: "The engineering workstation account was observed in use at Northburn, and S. Patel described the integrator VPN.",
       notes: "Engineering workstations use shared local accounts with a password unchanged since commissioning. " +
              "Integrator remote access is a standing VPN into the process network with no per-session approval." },
     { id: "TECH5", band: "tolerant", disposition: "accepted",
-      evidence: "Controller backup store and the engineer's local copies inspected; no restore evidence could be produced.",
+      evidence: "The controller backup store and the engineer's local copies were inspected, and no restore evidence could be produced.",
       notes: "Controller configurations are backed up ad hoc to an engineer's laptop and a network share. No " +
              "restore has ever been tested, and there is no documented recovery time for a treatment site." }
   ];
@@ -187,10 +187,10 @@ window.App.TourRiskAppetite = (function () {
       "The shared engineering credentials, the standing integrator VPN and the untested backups do not need to wait " +
       "for that decision. All three can be dealt with inside current budgets.",
     nextSteps:
-      "Put the stated-vs-revealed gap to the board as a single decision: accept this level of risk explicitly, or fund closing it\n" +
+      "Put the gap between stated and revealed appetite to the board as one decision, to accept this level of risk explicitly or to fund closing it\n" +
       "Commission an IEC 62443-3-3 assessment of one treatment site to turn this characterisation into specific, costed work\n" +
-      "Close the three findings that need no capital programme: shared engineering credentials, standing integrator VPN, untested backups\n" +
-      "Record any risk the board chooses to carry as a dated, owned acceptance with an expiry, and stop using deferred remediation dates in its place\n" +
+      "Close the three findings that need no capital programme, which are the shared engineering credentials, the standing integrator VPN and the untested backups\n" +
+      "Record any risk the board chooses to carry as a dated, owned acceptance with an expiry, so that a deferred remediation date no longer stands in for the decision\n" +
       "Re-characterise appetite in twelve months, once the OT capital deferred through two AMP cycles has either landed or been consciously declined"
   };
 
@@ -210,10 +210,10 @@ window.App.TourRiskAppetite = (function () {
       { title: "Post-incident review, corporate ransomware event", reference: "PIR-2024-11", date: "2024-12-03" }
     ],
     observations: [
-      { name: "Northburn treatment works control room", method: "walkthrough with the control systems manager; reviewed HMI builds, PLC firmware levels and the engineering workstation account in use" },
+      { name: "Northburn treatment works control room", method: "walkthrough with the control systems manager, reviewing HMI builds, PLC firmware levels and the engineering workstation account in use" },
       { name: "IT/OT boundary and DMZ", method: "firewall rule review and network diagram walkthrough with IT security" },
       { name: "Corporate SOC", method: "reviewed monitored sources and alert history for any OT-originated telemetry" },
-      { name: "Controller backup store", method: "inspected the share and the engineer's local copies; asked for the most recent restore evidence" }
+      { name: "Controller backup store", method: "inspected the share and the engineer's local copies, and asked for the most recent restore evidence" }
     ]
   };
 
@@ -242,19 +242,19 @@ window.App.TourRiskAppetite = (function () {
       { id: "EXP2", band: "high",
         notes: "Commodity ransomware was the working assumption. State-aligned interest in UK water was discussed, but not yet treated as applying to Wearvale." },
       { id: "APP1", band: "open",
-        notes: "Cyber reached the board after the annual audit and not otherwise. Ownership sat with the Head of IT." },
+        notes: "Cyber reached the board only after the annual audit. Ownership sat with the Head of IT." },
       { id: "APP2", band: "open",
-        notes: "No dedicated OT security budget. Spending was argued case by case against other capital." },
+        notes: "There was no dedicated OT security budget. Spending was argued case by case against other capital." },
       { id: "APP3", band: "open",
         notes: "Findings were logged, but OT dates moved freely and a backlog from 2021 was accepted as normal." },
       { id: "APP4", band: "tolerant",
-        notes: "No acceptance process at all. Nobody could say which OT risks had been accepted, or by whom." },
+        notes: "There was no acceptance process. Nobody could say which OT risks had been accepted, or by whom." },
       { id: "APP6", band: "open",
         notes: "Cyber was not in the safety case. Safety engineers saw it as an IT matter." },
       { id: "APP7", band: "open",
-        notes: "A 2023 phishing incident was cleaned up locally; nothing changed across the organisation." },
+        notes: "A 2023 phishing incident was cleaned up locally, and nothing changed across the organisation." },
       { id: "TECH3", band: "tolerant", disposition: "accepted",
-        notes: "No SOC and no monitoring of any kind below the corporate firewall." }
+        notes: "There was no SOC and no monitoring of any kind below the corporate firewall." }
     ]
   };
 

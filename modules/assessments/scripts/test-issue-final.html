@@ -183,7 +183,7 @@ H.test(function (ok, done) {
     return wait(checked);
   }).then(function () {
     ok(finalBtn().hasAttribute("disabled"), "with something still to write, Final stays shut");
-    ok(/Final is not available yet: 1 thing is still to write/.test(noteText()), "and the dialog says why", noteText());
+    ok(/Final is not available yet. 1 item is still to write/.test(noteText()), "and the dialog says why", noteText());
     var link = Array.prototype.filter.call(dialog().querySelectorAll("button"), function (b) { return b.textContent === "See what is left"; })[0];
     ok(!!link, "with a link to the check");
     link.click();

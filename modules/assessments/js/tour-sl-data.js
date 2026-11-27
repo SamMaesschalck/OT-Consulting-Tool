@@ -89,8 +89,8 @@ window.App.TourSL = (function () {
       { title: "Remote access procedure and vendor access log",        reference: "OPS-RA-06 v3.0",     date: "2026-05-01" }
     ],
     observations: [
-      { name: "BPCS operator consoles and engineering workstation", method: "Observed at the console with the control systems manager; account, session and logging behaviour demonstrated live" },
-      { name: "SIS engineering station",                            method: "Observed with the functional safety engineer; local account use and change workflow walked through" },
+      { name: "BPCS operator consoles and engineering workstation", method: "Observed at the console with the control systems manager, who demonstrated account, session and logging behaviour live" },
+      { name: "SIS engineering station",                            method: "Observed with the functional safety engineer, who walked through local account use and the change workflow" },
       { name: "IT/OT firewall and DMZ jump host",                   method: "Rule set and session policy reviewed on screen with the OT infrastructure lead" },
       { name: "Plant historian replica in the DMZ",                  method: "Data path and authentication demonstrated" },
       { name: "Control room and rack rooms",                        method: "Physical walkthrough, including port and media controls on the cabinets" }
@@ -104,9 +104,9 @@ window.App.TourSL = (function () {
     nextSteps:
       "Agree an owner and a target date for each action in the roadmap, keeping the site-wide work separate from the zone-specific work\nScope continuous monitoring of the control network (SR 6.2) as one project covering all three zones\nDecide with the safety authority how the SIS engineering station will be brought under named-account control\nConfirm and document the IT/OT firewall rule set that FR5 currently depends on\nRe-assess the zones once monitoring is in service",
     regulatoryExposure:
-      "Acme operates Plant A as an upper-tier COMAH petrochemical site, where a cyber compromise of the basic process control or safety-related systems carries process-safety as well as availability consequences. The site was divided into three zones under 62443-3-2 and assessed against a target of SL 2, with the safety instrumented system held to SL 3 for identification and for system integrity because a change to a protective function has to be attributable and provably intact. Most Foundational Requirements reach only SL 1 in every zone. The control system is therefore protected against casual or coincidental violation, but it is not protected against someone acting deliberately with simple means. The safety zone stands out in two ways. Its integrity controls are strong, but its identification is on the floor at SL 0, because the SIS engineering station sits outside the site directory on a shared local account.",
+      "Acme operates Plant A as an upper-tier COMAH petrochemical site, where a cyber compromise of the basic process control or safety-related systems carries process-safety as well as availability consequences. The site was divided into three zones under 62443-3-2 and assessed against a target of SL 2, with the safety instrumented system held to SL 3 for identification and for system integrity because a change to a protective function has to be attributable and provably intact. Most Foundational Requirements reach only SL 1 in every zone. The control system is therefore protected against casual or coincidental violation, but it is not protected against someone acting deliberately with simple means. In the safety zone, integrity controls are strong but identification is at SL 0, because the SIS engineering station sits outside the site directory on a shared local account.",
     topPriorities:
-      "Two of the priorities are single pieces of work that resolve all three zones at once, because the controls behind them are implemented once for the site. The first is continuous monitoring of the control network (SR 6.2), so that an intrusion can be detected where undetected manipulation has safety consequences. The second is authentication of software processes and devices (SR 1.2), so that a component is not trusted just because it is on the network, which would let a rogue or spoofed device in. The third priority is specific to one zone. The SIS engineering station should be brought into the directory, or given named local accounts if the safety case forbids that, so that a change to a protective function can be attributed to a person. FR5 meets its target only because the IT/OT firewall blocks person-to-person communication, and the control system does not block it itself. If that rule set lapses, FR5 falls below target."
+      "Two of the priorities are single pieces of work that resolve all three zones at once, because the controls behind them are implemented once for the site. The first is continuous monitoring of the control network (SR 6.2), so that an intrusion can be detected where undetected manipulation has safety consequences. The second is authentication of software processes and devices (SR 1.2), so that a rogue or spoofed component is not trusted just because it is on the network. The third priority is specific to one zone. The SIS engineering station should be brought into the directory, or given named local accounts if the safety case forbids that, so that a change to a protective function can be attributed to a person. FR5 meets its target only because the IT/OT firewall blocks person-to-person communication. The control system does not block it. If that rule set lapses, FR5 falls below target."
   };
 
   // Row shapes:
@@ -141,42 +141,42 @@ window.App.TourSL = (function () {
     // identity across the site, so the base item is met everywhere at once.
     // What is missing - unique identification on the shared consoles - is
     // missing everywhere too, which is what makes it a single piece of work.
-    { id: "SR1.1", sl: 1, ev: "Individual human identity comes from the corporate Active Directory, which reaches the DCS consoles and the engineering workstations through a one-way trust; joiners and leavers are processed within one working day. Shared operator logins remain in use on the console desks themselves, so identity is established for the workstation but not for the person at it.",
+    { id: "SR1.1", sl: 1, ev: "Individual human identity comes from the corporate Active Directory, which reaches the DCS consoles and the engineering workstations through a one-way trust. Joiners and leavers are processed within one working day. Shared operator logins remain in use on the console desks themselves, so identity is established for the workstation but not for the person at it.",
       rem: { rank: 3, band: "High", owner: "OT Security Lead",
-        action: "Move to individual authentication at the operator consoles where the DCS supports it; where it does not, apply logged kiosk sessions and physical access control as compensating measures.",
+        action: "Move to individual authentication at the operator consoles where the DCS supports it. Where it does not, apply logged kiosk sessions and physical access control as compensating measures.",
         impact: "Shared logins prevent attribution and make credential misuse impossible to trace on a safety-critical console." } },
-    { id: "SR1.2", sl: 0, ev: "Devices and software processes connect to the control network without authentication; trust is based on network location only.",
+    { id: "SR1.2", sl: 0, ev: "Devices and software processes connect to the control network without authentication, and trust is based on network location alone.",
       rem: { rank: 2, band: "High", owner: "OT Security Lead",
-        action: "Introduce device/process authentication (certificates or keyed identities) for controllers and engineering tools, starting at the most critical conduits.",
+        action: "Introduce device and process authentication (certificates or keyed identities) for controllers and engineering tools, starting at the most critical conduits.",
         impact: "Any component on the network is trusted without authentication, so a rogue or spoofed device would be accepted." } },
     { id: "SR1.3", sl: 2, ev: "An account-management process exists and is applied to OT accounts, including joiners and leavers." },
     { id: "SR1.4", sl: 2, ev: "Identifiers are managed and unique across OT systems." },
-    { id: "SR1.5", sl: 2, ev: "Authenticators are managed for OT: vendor defaults are changed at commissioning, shared secrets are held in the site vault, and changes go through the same request process as accounts. Authenticators are held in software only; nothing is backed by a hardware token or module.",
+    { id: "SR1.5", sl: 2, ev: "Authenticators are managed for OT. Vendor defaults are changed at commissioning, shared secrets are held in the site vault, and changes go through the same request process as accounts. Authenticators are held in software only, and none is backed by a hardware token or module.",
       rem: { rank: 11, band: "Medium", owner: "OT Security Lead",
         action: "Where the safety zone's SL 3 target applies, back engineering authenticators with hardware (smartcard or token) as well as the software secret.",
         impact: "A software-only authenticator for the safety engineering station can be copied without the holder knowing." } },
     { id: "SR1.6", na: true, note: "No wireless networking is used in the control environment." },
-    { id: "SR1.7", sl: 2, ev: "Password strength is enforced by the directory for everything joined to it; the handful of legacy devices that cannot meet it are listed, and their exception is reviewed annually. Password lifetime and generation are left to the user within that policy.",
+    { id: "SR1.7", sl: 2, ev: "Password strength is enforced by the directory for everything joined to it. The handful of legacy devices that cannot meet it are listed, and their exception is reviewed annually. Password lifetime and generation are left to the user within that policy.",
       rem: { rank: 12, band: "Medium", owner: "OT Security Lead",
         action: "Where the safety zone's SL 3 target applies, enforce password generation and lifetime for human users, so that neither is left to the account holder.",
-        impact: "A password that never changes on a safety engineering account outlives every person who has known it." } },
+        impact: "A password that never changes on a safety engineering account stays valid for everyone who has ever known it." } },
     { id: "SR1.8", na: true, note: "No public key infrastructure is deployed in the control environment." },
     { id: "SR1.9", na: true, note: "No public-key authentication is used in the control environment." },
     { id: "SR1.10", sl: 2, ev: "Authenticator feedback is obscured on control interfaces." },
     { id: "SR1.11", sl: 2, ev: "Unsuccessful login attempts are limited and logged." },
     { id: "SR1.12", sl: 2, ev: "A system-use notification is presented at login on management interfaces." },
-    { id: "SR1.13", sl: 1, ev: "Remote access is via VPN to a jump host, but multifactor authentication is not enforced for all remote OT access.",
+    { id: "SR1.13", sl: 1, ev: "Remote access runs over VPN to a jump host, but multifactor authentication is not enforced for all remote OT access.",
       rem: { rank: 7, band: "High", owner: "IT/OT Network Team",
         action: "Enforce MFA for all remote access into the OT environment and restrict it to brokered, logged jump-host sessions.",
         impact: "Remote access without MFA is a primary external route into the control system." } },
 
     // ---- FR2  Use control ----------------------------------------------
-    { id: "SR2.1", sl: 1, ev: "Role-based authorization is partial; some accounts retain broad privileges beyond their role.",
+    { id: "SR2.1", sl: 1, ev: "Role-based authorization is only partly in place, and some accounts retain broad privileges beyond their role.",
       rem: { rank: 8, band: "High", owner: "OT Security Lead",
         action: "Define and enforce least-privilege roles on the control system and remove standing broad privileges.",
         impact: "Broad privileges mean one compromised account can change logic, setpoints or safety parameters." } },
     { id: "SR2.2", na: true, note: "No wireless networking is used in the control environment." },
-    { id: "SR2.3", sl: 2, ev: "Removable media is blocked by default on OT endpoints and released only by documented exception; portable engineering devices are issued from a managed pool and their use is logged." },
+    { id: "SR2.3", sl: 2, ev: "Removable media is blocked by default on OT endpoints and released only by documented exception. Portable engineering devices are issued from a managed pool and their use is logged." },
     { id: "SR2.4", sl: 2, ev: "Mobile code is restricted on control systems." },
     { id: "SR2.5", sl: 2, ev: "Session lock is enforced on engineering and operator workstations." },
     { id: "SR2.6", sl: 2, ev: "Remote sessions terminate on timeout and on disconnect." },
@@ -196,9 +196,9 @@ window.App.TourSL = (function () {
         impact: "Without attribution, neither accidental nor malicious change can be traced to an actor." } },
 
     // ---- FR3  System integrity -----------------------------------------
-    { id: "SR3.1", sl: 0, ev: "Control protocols run without integrity protection; reliance is on network segmentation.",
+    { id: "SR3.1", sl: 0, ev: "Control protocols run without integrity protection and rely on network segmentation.",
       rem: { rank: 4, band: "High", owner: "Controls Engineering Team",
-        action: "Enable integrity-protected protocol options where devices support them; otherwise strengthen segmentation and monitoring and document the residual risk.",
+        action: "Enable integrity-protected protocol options where devices support them. Where they do not, strengthen segmentation and monitoring and document the residual risk.",
         impact: "Unprotected control messages can be altered in transit by an attacker on the OT network, affecting process integrity." } },
     // Likewise: endpoint protection needs a host to run on. It covers the
     // Windows-based DCS and DMZ estate and cannot reach the safety
@@ -208,48 +208,48 @@ window.App.TourSL = (function () {
     { id: "SR3.3", sl: 0, ev: "Security functions are not routinely verified after changes or maintenance.",
       rem: { rank: 14, band: "Medium", owner: "Controls Engineering Team",
         action: "Add post-change verification of security functions to the maintenance procedure.",
-        impact: "Security controls can silently fail or be disabled during maintenance and go unnoticed." } },
+        impact: "Security controls can fail or be disabled during maintenance without anyone noticing." } },
     // sl 0, not 1: the base requirement IS the ability to detect unauthorised
     // changes, and the evidence says there is none. SR 3.4 selects nothing
     // between SL 1 and SL 3 (RE1 is an SL 3 selection), so authoring 1 here made
     // the requirement come out met at the SL 2 target - beside this evidence and
     // a plan to fix it. See test-tour-sl.html.
-    { id: "SR3.4", sl: 0, ev: "There is no systematic verification of firmware/software integrity; updates are applied on vendor advice without integrity checks.",
+    { id: "SR3.4", sl: 0, ev: "There is no systematic verification of firmware or software integrity, and updates are applied on vendor advice without integrity checks.",
       rem: { rank: 9, band: "Medium", owner: "Controls Engineering Team",
-        action: "Introduce integrity verification (signing/hashing) for firmware and application updates, behind a change-control gate.",
+        action: "Introduce integrity verification (signing or hashing) for firmware and application updates as a step in change control.",
         impact: "Unverified updates can introduce tampered or unapproved code into controllers." } },
     { id: "SR3.5", sl: 2, ev: "Input validation is implemented in application interfaces." },
-    { id: "SR3.6", sl: 2, ev: "Deterministic / fail-safe output behaviour is designed into the control logic." },
+    { id: "SR3.6", sl: 2, ev: "Deterministic, fail-safe output behaviour is designed into the control logic." },
     { id: "SR3.7", sl: 2, ev: "Error handling avoids leaking sensitive information." },
     { id: "SR3.8", sl: 1, ev: "Session integrity protections are limited on the legacy control protocols in use.",
       rem: { rank: 22, band: "Low", owner: "Controls Engineering Team",
-        action: "Enable session integrity options where supported; compensate with segmentation elsewhere.",
+        action: "Enable session integrity options where they are supported, and compensate with segmentation elsewhere.",
         impact: "Session hijacking or command injection on the control network could alter commands." } },
     { id: "SR3.9", sl: 1, ev: "Audit logs are not protected against modification or deletion on the devices that hold them.",
       rem: { rank: 15, band: "Medium", owner: "SOC Manager",
-        action: "Protect audit data: forward it off-device promptly, restrict access, and integrity-protect it where supported.",
+        action: "Protect audit data by forwarding it off the device promptly, restricting access to it and protecting its integrity where the device supports that.",
         impact: "Unprotected logs can be altered by an attacker to hide activity." } },
 
     // ---- FR4  Data confidentiality -------------------------------------
     { id: "SR4.1", sl: 2, ev: "Information-confidentiality controls protect engineering and process data at rest." },
-    { id: "SR4.2", sl: 2, ev: "Information persistence is managed; sensitive data is cleared from reused media." },
-    { id: "SR4.3", sl: 2, ev: "Cryptography follows the site standard: TLS on the IT-facing links, the vendor's authenticated protocol within the control network, and keys held in the corporate key store." },
+    { id: "SR4.2", sl: 2, ev: "Information persistence is managed, and sensitive data is cleared from reused media." },
+    { id: "SR4.3", sl: 2, ev: "Cryptography follows the site standard, with TLS on the IT-facing links, the vendor's authenticated protocol within the control network and keys held in the corporate key store." },
 
     // ---- FR5  Restricted data flow (meets target) ----------------------
-    { id: "SR5.1", sl: 2, ev: "The control system is segmented into zones with a documented zone/conduit model." },
-    { id: "SR5.2", sl: 2, ev: "Zone boundaries are protected by firewalls/conduits with restricted rule sets." },
+    { id: "SR5.1", sl: 2, ev: "The control system is segmented into zones with a documented zone and conduit model." },
+    { id: "SR5.2", sl: 2, ev: "Zone boundaries are protected by firewalls on the conduits, with restricted rule sets." },
     // Satisfied by a compensating countermeasure rather than natively: the
     // demo needs one so the second SL-A vector (compensating measures stripped
     // out) and the "held by compensating" flag are both visible in the report.
-    { id: "SR5.3", comp: ["base"], sl: 2, ev: "The control system itself does not restrict general-purpose person-to-person communication. It is restricted instead at the IT/OT firewall, where mail, messaging and web egress are blocked for every OT subnet, and this rule set is reviewed quarterly. Recorded as a compensating countermeasure: it delivers the outcome but sits outside the control system." },
+    { id: "SR5.3", comp: ["base"], sl: 2, ev: "The control system itself does not restrict general-purpose person-to-person communication. It is restricted instead at the IT/OT firewall, where mail, messaging and web egress are blocked for every OT subnet, and this rule set is reviewed quarterly. It is recorded as a compensating countermeasure because it delivers the outcome from outside the control system." },
     { id: "SR5.4", sl: 3, ev: "Applications are partitioned with strong separation between the safety system and basic process control." },
 
     // ---- FR6  Timely response to events --------------------------------
     { id: "SR6.1", sl: 1, partial: true, ev: "OT logs are held locally with short retention and are not centrally accessible for analysis.",
       rem: { rank: 10, band: "Medium", owner: "SOC Manager",
-        action: "Forward OT logs to a protected collector/SIEM with retention that supports investigation.",
+        action: "Forward OT logs to a protected collector or SIEM with retention that supports investigation.",
         impact: "Locally held, short-retention logs rarely survive long enough to investigate an incident." } },
-    { id: "SR6.2", sl: 0, ev: "There is no continuous security monitoring of the OT network; only local device logs exist, with no aggregation or analysis.",
+    { id: "SR6.2", sl: 0, ev: "There is no continuous security monitoring of the OT network. Only local device logs exist, with no aggregation or analysis.",
       rem: { rank: 1, band: "High", owner: "SOC Manager",
         action: "Deploy passive, ICS-aware network monitoring on the control network, baseline normal traffic, and route anomalies to a monitored queue.",
         impact: "Without monitoring, manipulation of the process or a foothold on the control network can go undetected until it causes a safety or availability event." } },
@@ -257,16 +257,16 @@ window.App.TourSL = (function () {
     // ---- FR7  Resource availability ------------------------------------
     { id: "SR7.1", sl: 2, ev: "Denial-of-service protections are in place at the network boundary." },
     { id: "SR7.2", sl: 2, ev: "Resource management prevents exhaustion of critical control resources." },
-    { id: "SR7.3", sl: 1, ev: "Controller configs and HMI projects are backed up, but restore has not been tested and some backups sit on engineering laptops.",
+    { id: "SR7.3", sl: 1, ev: "Controller configurations and HMI projects are backed up, but restore has not been tested and some backups sit on engineering laptops.",
       rem: { rank: 5, band: "High", owner: "Controls Engineering Team",
-        action: "Centralise and protect OT backups (offline/immutable copies) and test full restore of a representative system on a defined cycle.",
-        impact: "Untested backups give false assurance; recovery after a destructive incident could be slow or fail." } },
-    { id: "SR7.4", sl: 0, ev: "Recovery depends on individual engineers and vendor support; there is no documented reconstitution procedure.",
+        action: "Centralise and protect OT backups (offline, immutable copies) and test full restore of a representative system on a defined cycle.",
+        impact: "Untested backups give false assurance, and recovery after a destructive incident could be slow or fail." } },
+    { id: "SR7.4", sl: 0, ev: "Recovery depends on individual engineers and vendor support, and there is no documented reconstitution procedure.",
       rem: { rank: 6, band: "High", owner: "Controls Engineering Team",
         action: "Document and resource reconstitution runbooks (golden images, spares, vendor contacts, ordered restart steps).",
         impact: "Recovery that relies on specific people extends downtime to the process after an incident." } },
     { id: "SR7.5", sl: 2, ev: "Emergency power (UPS and generator) protects the control system." },
-    { id: "SR7.6", sl: 0, ev: "There is no managed baseline for network/security configuration of OT devices; settings drift from any standard.",
+    { id: "SR7.6", sl: 0, ev: "There is no managed baseline for the network and security configuration of OT devices, so settings drift from any standard.",
       rem: { rank: 16, band: "Medium", owner: "IT/OT Network Team",
         action: "Define and enforce configuration baselines for OT network and security settings, with drift detection.",
         impact: "Drifted configurations reopen closed gaps and are hard to detect without a baseline." } },
@@ -274,10 +274,10 @@ window.App.TourSL = (function () {
       rem: { rank: 17, band: "Low", owner: "Controls Engineering Team",
         action: "Disable unused services and ports and remove unnecessary software from OT devices where supported.",
         impact: "Every enabled but unused service is additional attack surface on a long-lived device." } },
-    { id: "SR7.8", sl: 1, ev: "The OT component inventory covers roughly 80% and is maintained manually; firmware versions are incomplete.",
+    { id: "SR7.8", sl: 1, ev: "The OT component inventory covers roughly 80% of components and is maintained by hand, and its firmware versions are incomplete.",
       rem: { rank: 18, band: "Low", owner: "Controls Engineering Team",
         action: "Complete and automate the OT component inventory, including firmware versions and connectivity.",
-        impact: "You cannot protect, patch or monitor components you do not know about." } }
+        impact: "Components missing from the inventory cannot be protected, patched or monitored." } }
   ];
 
   // What differs per zone, and only that. Everything not listed here is taken
@@ -291,15 +291,15 @@ window.App.TourSL = (function () {
       // Only the base item differs: the directory does not reach this zone.
       // The missing multifactor (RE1, RE2) is missing everywhere, so those
       // stay inherited from the system-wide answer.
-      { id: "SR1.1", sl: 0, only: ["base"], ev: "The SIS engineering station was never joined to the directory: it is a standalone workstation with a single shared engineering account known to the four people who hold the key to the cabinet. The directory answer recorded for the site does not reach this zone.",
+      { id: "SR1.1", sl: 0, only: ["base"], ev: "The SIS engineering station was never joined to the directory. It is a standalone workstation with a single shared engineering account known to the four people who hold the key to the cabinet. The directory answer recorded for the site does not reach this zone.",
         rem: { rank: 4, band: "High", owner: "Controls Engineering Team",
           action: "Join the SIS engineering station to the directory, or (if the safety case forbids it) issue named local accounts and reconcile them against the directory quarterly.",
-          impact: "Nobody can say which engineer changed a protective function, on the one system where that question matters most." } },
+          impact: "Nobody can say which engineer changed a protective function, and on this system that question has safety consequences." } },
       { id: "SR1.11", sl: 2, ev: "The safety controllers lock out after three failed attempts and raise a diagnostic to the DCS." },
       // Two requirements are met at the site target of SL 2 but fall short of
       // the SL 3 this zone carries. The gap exists only here, so the action
       // does too - the site-wide answer is not the thing that needs changing.
-      { id: "SR1.3", sl: 2, ev: "OT accounts follow the site joiner/leaver process, but the safety zone's local accounts are administered separately from the rest of the control system, so account management is not unified as SL 3 requires.",
+      { id: "SR1.3", sl: 2, ev: "OT accounts follow the site joiner and leaver process, but the safety zone's local accounts are administered separately from the rest of the control system, so account management is not unified as SL 3 requires.",
         rem: { rank: 12, band: "Medium", owner: "Controls Engineering Team",
           action: "Bring the safety zone's accounts under the same managed process as the rest of the control system once the engineering station is reachable from the directory.",
           impact: "Accounts administered separately fall out of step, so a leaver removed everywhere else can stay valid on the safety engineering station." } },
@@ -307,22 +307,22 @@ window.App.TourSL = (function () {
       // needs no action; the other cannot apply here at all, and carries the
       // justification without which it would block the level rather than being
       // excluded.
-      { id: "SR2.11", sl: 2, ev: "The safety controllers take their time from the DCS gateway, which is not the site time service, and the offset is checked and recorded at each proof test." },
+      { id: "SR2.11", sl: 2, ev: "The safety controllers are synchronised from the DCS gateway, separately from the site time service, and the offset is checked and recorded at each proof test." },
       { id: "SR3.2", na: true,
         note: "The safety controllers run no general-purpose operating system, so there is no host on which endpoint protection could run. The equivalent outcome is delivered by signed logic, a physical key switch and a cabinet with no removable-media path." },
-      { id: "SR2.1", sl: 2, ev: "The safety application enforces a separate maintain/operate key switch position for logic change; operate-position accounts cannot download." },
+      { id: "SR2.1", sl: 2, ev: "The safety application enforces a separate maintain and operate key switch position for logic change, and operate-position accounts cannot download." },
       // Strong integrity is the reason the safety zone can carry an SL 3 target
       // for FR3 at all: signed logic and a hardware key switch are exactly what
       // the higher level asks for.
       { id: "SR3.1", sl: 3, ev: "Safety-related communications run on the vendor's authenticated black-channel protocol with per-message integrity, independent of the control network beneath it." },
       { id: "SR3.4", sl: 3, ev: "Safety logic is cryptographically signed by the engineering tool and the signature is verified by the controller at download and at every restart." },
-      { id: "SR5.1", sl: 3, ev: "The safety zone sits behind its own conduit with a deny-by-default rule set; only the read-only status feed to the DCS crosses it." },
-      { id: "SR7.1", sl: 3, ev: "The safety controllers are unaffected by load on the control network: the protective function runs on a separate, deterministic bus." }
+      { id: "SR5.1", sl: 3, ev: "The safety zone sits behind its own conduit with a deny-by-default rule set, and only the read-only status feed to the DCS crosses it." },
+      { id: "SR7.1", sl: 3, ev: "The safety controllers are unaffected by load on the control network, because the protective function runs on a separate, deterministic bus." }
     ],
     // The DMZ is where the site's external exposure is concentrated, and where
     // the strongest boundary controls already are.
     "Plant DMZ": [
-      { id: "SR1.13", sl: 2, ev: "Remote access into the DMZ enforces multifactor authentication at the jump host, and every session is brokered and recorded. This applies to the DMZ only; sessions that continue into the control zones do not re-authenticate." },
+      { id: "SR1.13", sl: 2, ev: "Remote access into the DMZ enforces multifactor authentication at the jump host, and every session is brokered and recorded. This applies to the DMZ only. Sessions that continue into the control zones do not re-authenticate." },
       { id: "SR5.2", sl: 3, ev: "The conduit to corporate IT is a managed firewall pair with an explicit, reviewed rule set and no direct control-network routes." },
       { id: "SR6.1", sl: 2, ev: "DMZ hosts forward their logs to the corporate collector, so this zone does have retained, searchable logs even though the control zones do not.",
         rem: null },
@@ -372,21 +372,21 @@ window.App.TourSL = (function () {
     opportunityId: "OPP-3182",
     label: "2024 baseline assessment",
     deltas: [
-      { id: "SR1.5",  sl: 0, ev: "No password policy on the control system; vendor defaults still in place on two engineering stations." },
-      { id: "SR2.1",  sl: 0, ev: "Every engineer signed in to the same operator account; no separation between view and change." },
+      { id: "SR1.5",  sl: 0, ev: "There was no password policy on the control system, and vendor defaults were still in place on two engineering stations." },
+      { id: "SR2.1",  sl: 0, ev: "Every engineer signed in to the same operator account, with no separation between view and change." },
       // SR 3.4 is deliberately NOT here. Both visits found the same thing - no
       // integrity verification - so it has not moved, and it still carries an
       // open remediation plan. A re-assessment that shows every finding closing
       // is not one anybody recognises; something outstanding since 2024 is the
       // more useful demo.
-      { id: "SR7.3",  sl: 0, ev: "Backups taken ad hoc to a local share, never tested." },
+      { id: "SR7.3",  sl: 0, ev: "Backups were taken ad hoc to a local share and never tested." },
       // These two say "flat" and "none", which is SL 0, not SL 1. Authored at 1
       // they also made no visible difference: no item of either requirement is
       // first selected at SL 2, so the captured answers were identical to this
       // year's and the comparison rightly reported no movement.
-      { id: "SR5.1",  sl: 0, ev: "Flat control network; the IT/OT boundary was a single router ACL." },
-      { id: "SR1.13", sl: 0, ev: "Vendor access by unmanaged VPN direct to the process network." },
-      { id: "SR4.1",  sl: 0, ev: "No confidentiality controls on engineering data in transit." }
+      { id: "SR5.1",  sl: 0, ev: "The control network was flat, and the IT/OT boundary was a single router ACL." },
+      { id: "SR1.13", sl: 0, ev: "Vendors connected by unmanaged VPN directly to the process network." },
+      { id: "SR4.1",  sl: 0, ev: "Engineering data in transit had no confidentiality controls." }
     ]
   };
 
@@ -576,7 +576,7 @@ window.App.TourSL = (function () {
       if (row.na) {
         // A justified N/A: the note is the justification, without which the
         // item would block the level rather than being excluded.
-        E.setItemState(tid, row.id, it.componentId, "na", row.note || "Not applicable to this zone.");
+        E.setItemState(tid, row.id, it.componentId, "na", row.note || "This requirement does not apply to this zone.");
         return;
       }
       // `partial` says the capability is there but not carried through - the

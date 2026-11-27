@@ -83,8 +83,8 @@ window.App.TourPosture = (function () {
     "marshalling cabinets. The firewall rule set at the IT/OT boundary and the OT cyber risk assessment " +
     "were reviewed on screen. Each scored answer reflects the consultant's judgement of the response " +
     "given and what could be seen at the time.\n" +
-    "This is a point-in-time, interview-based assessment. It reflects what could be established in the " +
-    "time available and the evidence offered. It does not verify controls in technical depth; that is " +
+    "This is a point-in-time, interview-based assessment of what could be established in the " +
+    "time available and from the evidence offered. It does not verify controls in technical depth, which is " +
     "the role of the detailed assessments. Where coverage was low or answers were uncertain, the grade " +
     "should be treated as provisional.";
 
@@ -111,20 +111,20 @@ window.App.TourPosture = (function () {
   //   { id, context:true, note }                context-only (not scored)
   var rows = [
     // ---- Governance and risk -------------------------------------------
-    { id: "gov.1", band: 3, ev: "A named OT Security Lead is accountable, appointed in 2024, reporting to the COO." },
+    { id: "gov.1", band: 3, ev: "A named OT Security Lead, appointed in 2024 and reporting to the COO, is accountable." },
     { id: "gov.2", band: 3, ev: "An OT-specific cyber risk assessment has been carried out and is reviewed annually.",
       adv: { owner: "OT Security Lead",
         action: "Bring the next annual review forward so it takes account of the monitoring and response findings in this report.",
-        impact: "The risk assessment is sound but predates this read; refreshing it now keeps the register and the improvement plan telling the same story to the board." } },
+        impact: "The risk assessment is sound but predates this read. Refreshing it now means the risk register and the improvement plan give the board the same picture." } },
     { id: "gov.3", band: 2, ev: "OT security policies exist and are largely followed, but not consistently across all shifts.",
       rem: { rank: 15, band: "medium", owner: "OT Security Lead",
         action: "Embed the OT policies in shift-level procedures and spot-check adherence so practice matches the written standard.",
         impact: "Policy that is followed unevenly leaves predictable gaps that an attacker or auditor will find." } },
-    { id: "gov.4", unknown: true, note: "Whether OT security features in budgeting and management reporting could not be confirmed during the interview. The answer is marked unknown, which lowers confidence without counting as a failure." },
+    { id: "gov.4", unknown: true, note: "Whether OT security features in budgeting and management reporting could not be confirmed during the interview." },
     { id: "gov.6", band: 1, ev: "Management of change is well run for safety and availability, and every OT change goes through it. Security is not one of the questions the form asks, so firewall rules, new accounts and vendor connections are approved on operational grounds alone.",
       rem: { rank: 23, band: "medium", owner: "OT Security Lead",
         action: "Add a security question to the OT management-of-change form, with a route to security review for changes touching connectivity, accounts or remote access.",
-        impact: "Controls put in place by this assessment will decay within a year if changes can bypass them one approval at a time." } },
+        impact: "Controls introduced after this assessment will decay within a year if changes can bypass them one approval at a time." } },
     { id: "gov.7", band: 1, ev: "Security awareness is the corporate phishing e-learning, delivered by email. Shift teams without routine mailbox access largely do not complete it, and nothing covers control-system behaviours such as removable media or vendor supervision.",
       rem: { rank: 24, band: "medium", owner: "Plant Manager",
         action: "Run short OT-specific awareness at shift handover covering removable media, vendor supervision and what to do when something looks wrong, and record who has attended.",
@@ -133,7 +133,7 @@ window.App.TourPosture = (function () {
       rem: { rank: 25, band: "low", owner: "Procurement Lead",
         action: "Set a short OT-specific security schedule for control-system work and ask the main suppliers to evidence it, starting at the next contract renewal.",
         impact: "Most hands-on work is done by suppliers, so their practices become the plant's whether or not anyone has asked about them." } },
-    { id: "gov.5", context: true, note: "Key OT security stakeholders: plant manager, control-engineering lead, IT security manager and the OT Security Lead." },
+    { id: "gov.5", context: true, note: "The main OT security stakeholders are the plant manager, the control-engineering lead, the IT security manager and the OT Security Lead." },
 
     // ---- Asset visibility ----------------------------------------------
     { id: "assets.1", band: 2, ev: "An OT asset inventory exists but is spreadsheet-based and not fully current.",
@@ -159,19 +159,19 @@ window.App.TourPosture = (function () {
       rem: { rank: 18, band: "low", owner: "Controls Engineering Team",
         action: "Extend zoning to reflect criticality (Purdue levels, cells, safety) so the model limits lateral movement.",
         impact: "Coarse zoning lets a compromise spread further than necessary." } },
-    { id: "arch.3", band: 3, ev: "IT/OT data exchange is via a brokered DMZ historian; there is no direct file transfer." },
-    { id: "arch.4", band: 3, ev: "Remote access for vendors and staff is via a hardened jump host with MFA.",
+    { id: "arch.3", band: 3, ev: "IT/OT data exchange runs through a brokered DMZ historian, with no direct file transfer." },
+    { id: "arch.4", band: 3, ev: "Remote access for vendors and staff runs through a hardened jump host with MFA.",
       adv: { owner: "OT Security Lead",
         action: "Review the standing vendor accounts on the jump host each quarter and retire any that no longer need access.",
         impact: "The control is well built, but standing accounts build up over time. A quarterly review keeps the accounts matched to the vendors who are engaged now." } },
     { id: "arch.5", band: 1, ev: "The safety system shares a network segment with basic process control, with no logical separation.",
       rem: { rank: 4, band: "high", owner: "Controls Engineering Team",
-        action: "Separate the safety system from the basic process control network (logical and/or physical) so a control-network compromise cannot reach safety functions.",
+        action: "Separate the safety system from the basic process control network (logically, physically or both) so a control-network compromise cannot reach safety functions.",
         impact: "Without SIS separation, a compromise of process control could reach the safety system that is the last line of defence." } },
 
     // ---- Access control ------------------------------------------------
-    { id: "access.1", band: 3, ev: "Individual user accounts are used; shared logins have largely been eliminated." },
-    { id: "access.2", band: 1, ev: "Access is broader than roles require; least privilege is not enforced on OT.",
+    { id: "access.1", band: 3, ev: "Individual user accounts are used, and shared logins have largely been eliminated." },
+    { id: "access.2", band: 1, ev: "Access is broader than roles require, and least privilege is not enforced on OT.",
       rem: { rank: 9, band: "medium", owner: "OT Security Lead",
         action: "Define and enforce least-privilege roles and remove standing broad access on the control system.",
         impact: "Broad access means one compromised account can alter process or safety parameters." } },
@@ -179,14 +179,14 @@ window.App.TourPosture = (function () {
       rem: { rank: 10, band: "medium", owner: "Controls Engineering Team",
         action: "Change default and vendor passwords across OT devices and manage them through a credential lifecycle.",
         impact: "Default credentials are among the most exploited weaknesses in OT." } },
-    { id: "access.4", band: 2, ev: "A leaver/mover process exists for IT accounts, but OT account reviews are ad hoc.",
+    { id: "access.4", band: 2, ev: "A leaver and mover process exists for IT accounts, but OT account reviews are ad hoc.",
       rem: { rank: 19, band: "low", owner: "OT Security Lead",
-        action: "Bring OT accounts into the periodic joiner/mover/leaver review cycle.",
+        action: "Bring OT accounts into the periodic joiner, mover and leaver review cycle.",
         impact: "Dormant OT accounts accumulate as unmonitored entry points." } },
     { id: "access.5", band: 1, ev: "Control engineers sign in with one account for everything: email, the engineering tools and administration of the DCS servers. Two of the four hold a separate administrative account, used inconsistently because the everyday account also works.",
       rem: { rank: 26, band: "high", owner: "IT Security Manager",
         action: "Issue separate administrative accounts to everyone who administers OT, remove standing administrative rights from everyday accounts, and block mail and web access from the administrative ones.",
-        impact: "While one account does both jobs, any routine compromise of an engineer's day-to-day working hands over administrative control of the control system." } },
+        impact: "While one account does both jobs, any compromise of an engineer's everyday account hands over administrative control of the control system." } },
     { id: "access.6", band: 0, ev: "The OT servers and engineering workstations are members of the corporate Active Directory domain, and corporate domain administrators sign in to them routinely for support. There is no tiering model, and no restriction on where a privileged account may authenticate.",
       capture: { authn: "Same domain as corporate IT" },
       rem: { rank: 27, band: "high", owner: "IT Security Manager",
@@ -196,9 +196,9 @@ window.App.TourPosture = (function () {
     // ---- Protective controls -------------------------------------------
     { id: "protect.1", band: 2, ev: "OT patching happens in maintenance windows but is not driven by a tracked process.",
       rem: { rank: 20, band: "low", owner: "OT Security Lead",
-        action: "Introduce a tracked OT patch/vulnerability process mapped to the asset inventory.",
+        action: "Introduce a tracked OT patch and vulnerability process mapped to the asset inventory.",
         impact: "Untracked patching leaves known weaknesses open indefinitely." } },
-    { id: "protect.2", band: 1, ev: "Malware protection is deployed on some OT hosts but not consistently or OT-tuned.",
+    { id: "protect.2", band: 1, ev: "Malware protection is deployed on some OT hosts, but not consistently, and it is not tuned for OT.",
       rem: { rank: 11, band: "medium", owner: "OT Security Lead",
         action: "Extend OT-aware malware protection to all supported OT hosts.",
         impact: "Unprotected hosts are an easy foothold on the control network." } },
@@ -208,25 +208,25 @@ window.App.TourPosture = (function () {
         impact: "Removable media is a common malware path into otherwise isolated OT networks." } },
     { id: "protect.4", band: 1, ev: "Backups of critical OT systems are taken but restore has not been tested.",
       rem: { rank: 12, band: "medium", owner: "Controls Engineering Team",
-        action: "Protect and regularly test restore of critical OT backups (offline/immutable copies).",
+        action: "Keep offline, immutable copies of critical OT backups and test restoring them regularly.",
         impact: "Untested backups give false assurance after a destructive incident." } },
     { id: "protect.7", band: 2, ev: "The main control room is card-controlled and the DCS cabinets are locked, with keys held by the shift team. The marshalling room on the north side is left unlocked during dayshift for maintenance access, and several patch panels there have live unused ports.",
       rem: { rank: 31, band: "low", owner: "Plant Manager",
         action: "Bring the marshalling room under the same access control as the main cabinets and disable the unused ports on its patch panels.",
-        impact: "Physical reach of a network port bypasses every logical control in this report." } },
+        impact: "Anyone who can reach a live network port can bypass every logical control in this report." } },
     { id: "protect.6", band: 1, ev: "Three HMI stations and the historian run operating systems that are past end of support, and one controller family is no longer sold or patched by the vendor. The team can name most of them from memory, but there is no consolidated list, no risk acceptance and no replacement budget.",
       rem: { rank: 28, band: "medium", owner: "Controls Engineering Team",
         action: "List the OT systems that are unsupported or approaching end of life, put a compensating control around each, and take the residual risk and replacement cost to the capital plan.",
-        impact: "Unsupported systems cannot be patched, so they can only be protected by controls placed around them, and nothing can be placed around a system nobody has written down." } },
+        impact: "Unsupported systems cannot be patched, so they can only be protected by controls placed around them, and that needs a written list of which systems they are." } },
     { id: "protect.5", band: 2, ev: "Some hardening is applied but there is no enforced baseline.",
       rem: { rank: 22, band: "low", owner: "Controls Engineering Team",
         action: "Define and enforce an OT hardening baseline (disable unused services and ports).",
         impact: "Default services are unnecessary attack surface on long-lived OT devices." } },
 
     // ---- Monitoring and detection (weakest) ----------------------------
-    { id: "monitor.1", band: 0, ev: "OT logs are not collected centrally; only local device logs exist.",
+    { id: "monitor.1", band: 0, ev: "OT logs are not collected centrally, and only local device logs exist.",
       rem: { rank: 2, band: "high", owner: "SOC Manager",
-        action: "Forward OT logs to a protected collector/SIEM with retention that supports investigation.",
+        action: "Forward OT logs to a protected collector or SIEM with retention that supports investigation.",
         impact: "Without collected logs there is nothing to detect or investigate an incident with." } },
     { id: "monitor.2", band: 0, ev: "There is no monitoring that would detect an intrusion or abnormal activity in OT.",
       rem: { rank: 1, band: "high", owner: "SOC Manager",
@@ -235,12 +235,12 @@ window.App.TourPosture = (function () {
     { id: "monitor.4", band: 0, ev: "Nobody reviews OT security events. The device logs that do exist are opened only once something has already gone wrong, and an operator who sees something odd can raise it only as a process fault, because there is no route for reporting a security concern.",
       rem: { rank: 29, band: "high", owner: "IT Security Manager",
         action: "Once OT logs reach the collector, put a weekly review and a triage owner behind them, and give shift teams a named route to report anything that looks wrong.",
-        impact: "Collecting logs nobody reads produces the cost of monitoring with none of the benefit." } },
-    { id: "monitor.5", band: 0, ev: "Retention is whatever each device holds before it overwrites: a few days on the HMIs, less on the controllers. An incident discovered a month later could not be reconstructed.",
+        impact: "If nobody reads the logs, the site pays for monitoring and still detects nothing." } },
+    { id: "monitor.5", band: 0, ev: "Retention is whatever each device holds before it overwrites, which is a few days on the HMIs and less on the controllers. An incident discovered a month later could not be reconstructed.",
       rem: { rank: 30, band: "medium", owner: "IT Security Manager",
         action: "Retain collected OT logs for at least six months on storage the OT network cannot modify, covering the DMZ, jump host and engineering workstations first.",
         impact: "OT intrusions are typically found months after they start, by which point the evidence has already rolled over." } },
-    { id: "monitor.3", band: 1, ev: "If something happened tonight it is unlikely anyone would notice; there is no out-of-hours OT monitoring.",
+    { id: "monitor.3", band: 1, ev: "There is no out-of-hours OT monitoring, so if something happened tonight it is unlikely anyone would notice.",
       rem: { rank: 5, band: "high", owner: "SOC Manager",
         action: "Establish who watches OT alerts and an out-of-hours escalation path.",
         impact: "Undetected out-of-hours activity can progress to a safety or availability event before anyone responds." } },
@@ -248,12 +248,12 @@ window.App.TourPosture = (function () {
     // ---- Response and recovery -----------------------------------------
     { id: "respond.1", band: 1, ev: "The IT incident response plan does not yet explicitly cover OT scenarios.",
       rem: { rank: 6, band: "high", owner: "Head of Operations",
-        action: "Extend the IR plan with OT scenarios, OT/safety escalation and safe-state decision authority.",
-        impact: "An IT-only plan leaves responders improvising during an OT incident, when safe, fast decisions matter most." } },
+        action: "Extend the IR plan with OT scenarios, OT and safety escalation and safe-state decision authority.",
+        impact: "An IT-only plan leaves responders improvising during an OT incident, when decisions have to be both safe and fast." } },
     { id: "respond.2", band: 1, ev: "Engineering and security have limited joint incident-working arrangements.",
       rem: { rank: 7, band: "high", owner: "Head of Operations",
-        action: "Define and rehearse joint engineering/security incident roles and decision-making.",
-        impact: "Poor coordination slows safe response exactly when speed matters most." } },
+        action: "Define and rehearse joint engineering and security incident roles and decision-making.",
+        impact: "Poor coordination between engineering and security slows a safe response to an incident." } },
     { id: "respond.3", band: 0, ev: "There is no tested capability to recover critical OT systems to a known-good state.",
       rem: { rank: 3, band: "high", owner: "Controls Engineering Team",
         action: "Document and test OT recovery (golden images, spares, ordered restart steps).",
@@ -261,7 +261,7 @@ window.App.TourPosture = (function () {
     { id: "respond.4", band: 1, ev: "No OT incident exercises or tabletops have been run.",
       rem: { rank: 8, band: "high", owner: "Head of Operations",
         action: "Run an OT tabletop exercise involving operations, engineering, IT security and safety, then feed lessons back into the plan.",
-        impact: "Untested plans fail under the pressure of a real incident." } },
+        impact: "Untested plans tend to fail under the pressure of a real incident." } },
     { id: "respond.5", band: 1, ev: "Operators are confident the plant could be brought to a safe state by hand if the DCS were lost, and one shift has done it during a power event. Nothing is written down, the newer shift teams have never done it, and the procedure that exists assumes the historian is available to read setpoints from.",
       rem: { rank: 32, band: "medium", owner: "Head of Operations",
         action: "Document the degraded and manual modes for each area, remove the dependency on systems that would be unavailable, and walk each shift through them once.",
@@ -277,15 +277,15 @@ window.App.TourPosture = (function () {
     opportunityId: "OPP-3021",
     label: "2024 posture review",
     deltas: [
-      { id: "gov.1",     band: 0, ev: "No named owner for OT security; responsibility sat informally with control engineering." },
+      { id: "gov.1",     band: 0, ev: "There was no named owner for OT security, and responsibility sat informally with control engineering." },
       { id: "gov.2",     band: 0, ev: "No OT-specific risk assessment had been carried out." },
-      { id: "gov.3",     band: 1, ev: "Corporate IT policy was assumed to cover OT; nothing was written for the plant." },
-      { id: "assets.1",  band: 1, ev: "No consolidated OT asset inventory; each area kept its own list." },
+      { id: "gov.3",     band: 1, ev: "Corporate IT policy was assumed to cover OT, and nothing was written for the plant." },
+      { id: "assets.1",  band: 1, ev: "There was no consolidated OT asset inventory, and each area kept its own list." },
       { id: "arch.1",    band: 2, ev: "A firewall separated OT from corporate, but the rule set was permissive and unreviewed." },
       { id: "arch.4",    band: 1, ev: "Vendor remote access was by individual vendor VPNs with no common control point." },
       { id: "access.1",  band: 1, ev: "Shared operator and engineering logins were normal practice." },
       { id: "protect.3", band: 0, ev: "Removable media was in routine uncontrolled use for transferring project files." },
-      { id: "respond.1", band: 0, ev: "No incident response plan covering OT; the IT plan did not mention the plant." }
+      { id: "respond.1", band: 0, ev: "There was no incident response plan covering OT, and the IT plan did not mention the plant." }
     ]
   };
 
@@ -401,14 +401,14 @@ window.App.TourPosture = (function () {
   // plant is carrying a gap alone are easy to lose in two separate reports.
   var SITE_DELTAS = {
     "Plant A - Teesside": [
-      { id: "arch.5", band: 3, ev: "The safety system sits on its own segregated network with a one-way gateway to the DCS; this was rebuilt during the 2025 turnaround." },
+      { id: "arch.5", band: 3, ev: "The safety system sits on its own segregated network with a one-way gateway to the DCS. It was rebuilt during the 2025 turnaround." },
       { id: "protect.4", band: 2, ev: "Backups run nightly to the site NAS and a quarterly restore test is recorded in the maintenance system." },
-      { id: "access.6", band: 1, ev: "Teesside runs a separate OT domain with a one-way trust from corporate; domain admins from IT cannot sign in to OT hosts, though OT admins still use one account for everything." }
+      { id: "access.6", band: 1, ev: "Teesside runs a separate OT domain with a one-way trust from corporate. IT domain admins cannot sign in to OT hosts, though OT admins still use one account for everything." }
     ],
     "Plant B - Immingham": [
-      { id: "monitor.1", band: 2, ev: "Immingham forwards OT logs to the corporate SIEM as part of the 2025 pilot; the collector covers the DMZ, jump host and engineering workstations." },
+      { id: "monitor.1", band: 2, ev: "Immingham forwards OT logs to the corporate SIEM as part of the 2025 pilot, and the collector covers the DMZ, jump host and engineering workstations." },
       { id: "monitor.4", band: 1, ev: "The SIEM raises tickets for OT sources, but nobody reviews them on a cadence and there is no OT triage owner." },
-      { id: "assets.1", band: 0, ev: "No asset inventory of any kind for the Immingham OT estate; the 2019 commissioning list is the only record and is known to be wrong." },
+      { id: "assets.1", band: 0, ev: "There is no asset inventory of any kind for the Immingham OT estate. The 2019 commissioning list is the only record and is known to be wrong." },
       { id: "protect.6", band: 0, ev: "Unsupported HMIs and an end-of-life historian are known to be present but have never been listed, risk-accepted or planned for replacement." }
     ]
   };

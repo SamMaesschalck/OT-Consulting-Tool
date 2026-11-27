@@ -374,7 +374,7 @@ H.test(function (ok) {
   // done while looking at what you are disagreeing with.
   A.UI.go("ra-verdict");
   var vm = document.getElementById("main");
-  ok(/Assessor's read/.test(vm.textContent), "there is a page for the final say");
+  ok(/Assessor's verdict/.test(vm.textContent), "there is a page for the final say");
   ok(!!vm.querySelector("select"), "with a control to record a different verdict");
   ok(!!vm.querySelector("svg"), "and the plot on the same page");
   ok(/final say/i.test(vm.textContent), "which says the judgement is the consultant's");

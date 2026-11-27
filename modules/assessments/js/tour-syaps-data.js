@@ -33,9 +33,9 @@ window.App.TourSyAPS = (function () {
       action: "Establish structured root-cause analysis and trend reporting of security events to senior leadership.",
       impact: "Lessons are not learned systematically, so the same weaknesses recur." },
     { id: "1.5.5", state: "not", band: "Medium", owner: "Security Assurance Lead",
-      ev: "Internal security assurance is largely reactive; there is no risk-based assurance schedule covering all Fundamental Security Principles.",
+      ev: "Internal security assurance is largely reactive, and there is no risk-based assurance schedule covering all Fundamental Security Principles.",
       action: "Implement a risk-based security assurance programme with a defined schedule across all FSyPs.",
-      impact: "Undetected drift in arrangements is only found after an event or an ONR inspection." },
+      impact: "Drift in the arrangements is found only after an event or an ONR inspection." },
     // FSyP 2 - Culture
     { id: "2.1.4", state: "partially", band: "Medium", owner: "Head of Security",
       ev: "Security culture is strong within the security team but awareness among operational and contractor staff is uneven and not measured.",
@@ -45,7 +45,7 @@ window.App.TourSyAPS = (function () {
     { id: "3.2.3", state: "partially", band: "Medium", owner: "Head of HR / Personnel Security",
       ev: "SQEP requirements for security roles are defined, but training records show competence gaps for several back-shift positions.",
       action: "Close the SQEP training gaps for shift security roles and maintain current competence records.",
-      impact: "Under-qualified staff on shift weaken the delivery of security functions when it matters most." },
+      impact: "Under-qualified staff on shift weaken the delivery of security functions on those shifts." },
     { id: "3.4.2", state: "partially", band: "Low", owner: "Site Security Manager",
       ev: "Security procedures exist but several are past their review date and are not consistently followed on back shift.",
       action: "Bring all security procedures under document control with a review cadence and shift-level assurance.",
@@ -84,26 +84,26 @@ window.App.TourSyAPS = (function () {
       impact: "Identified cyber risks remain open indefinitely without ownership and resourcing." },
     { id: "7.3.1", state: "partially", band: "High", owner: "CS&IA Lead",
       ev: "Characterisation of operational technology (including legacy CBSIS) is incomplete, so risk-informed controls cannot be fully applied.",
-      action: "Complete characterisation of legacy OT/CBSIS and apply risk-informed, actively-managed controls.",
+      action: "Complete the characterisation of legacy OT and CBSIS, and apply risk-informed, actively managed controls.",
       impact: "Uncharacterised control systems cannot be protected to the required outcome." },
     { id: "7.5.3", state: "not", band: "High", owner: "CS&IA Lead",
       ev: "A cyber incident response plan exists but has not been exercised with OT and engineering involvement.",
       action: "Exercise the cyber incident plan including OT scenarios and the relevant supporting agencies.",
-      impact: "An untested plan fails under the pressure of a real OT-affecting incident." },
+      impact: "An untested plan is likely to fail under the pressure of a real incident affecting OT." },
     // FSyP 8 - Workforce Trustworthiness
     { id: "8.2.2", state: "partially", band: "Medium", owner: "Head of HR / Personnel Security",
       ev: "National security vetting is in place, but the process for evaluating insider-risk roles to set the appropriate clearance level is not documented.",
       action: "Document the insider-risk role evaluation that determines vetting and clearance levels.",
       impact: "Inconsistent clearance decisions leave some high-risk roles under-vetted." },
     { id: "8.3.4", state: "partially", band: "Medium", owner: "Head of HR / Personnel Security",
-      ev: "Ongoing personnel security relies on annual appraisal; there is no clear route for reporting behaviours of concern between cycles.",
+      ev: "Ongoing personnel security relies on annual appraisal, and there is no clear route for reporting behaviours of concern between cycles.",
       action: "Establish an ongoing reporting route for behaviours of concern, with defined ONR notification triggers.",
       impact: "Emerging insider risk goes unreported for up to a year between appraisals." },
     // FSyP 9 - Policing and Guarding
     { id: "9.3.2", state: "partially", band: "Low", owner: "Site Security Manager",
       ev: "The guard-force Service Level Agreement exists but does not define resilience across all Government Response Levels.",
       action: "Update the guard-service SLA to define resilience at all Government Response Levels and performance metrics.",
-      impact: "Guarding may not scale to a raised response level when it is most needed." },
+      impact: "Guarding may not scale up when the Government Response Level is raised." },
     // FSyP 10 - Emergency Preparedness and Response
     { id: "10.1.3", state: "partially", band: "Medium", owner: "Emergency Planning Manager",
       ev: "Security contingency plans exist, but event-management strategies to manage escalation and restore control are not fully developed.",
@@ -111,8 +111,8 @@ window.App.TourSyAPS = (function () {
       impact: "Without escalation strategies, a security event is harder to bring back under control." },
     { id: "10.2.4", state: "not", band: "Medium", owner: "Emergency Planning Manager",
       ev: "Security exercises take place but do not yet test the full scope of the plan, and supporting agencies are rarely included.",
-      action: "Broaden the exercise programme to test the full scope of the plan, involving supporting agencies.",
-      impact: "Untested parts of the plan and unrehearsed agencies fail in a real event." }
+      action: "Broaden the exercise programme to test the full scope of the plan, with supporting agencies taking part.",
+      impact: "Parts of the plan that have not been tested, and agencies that have not rehearsed with the site, are likely to fail in a real event." }
   ];
 
   function makeApply(metadata, reportNarrative, basis) {
@@ -133,7 +133,7 @@ window.App.TourSyAPS = (function () {
           E.setResponse(tid, o.id, { applicable: true, state: hit.g.state, evidence: hit.g.ev,
             priorityRank: hit.rank, priorityBand: hit.g.band, owner: hit.g.owner, action: hit.g.action, impact: hit.g.impact });
         } else {
-          E.setResponse(tid, o.id, { applicable: true, state: "achieved", evidence: o.title + " - demonstrated; arrangements and evidence reviewed during the assessment." });
+          E.setResponse(tid, o.id, { applicable: true, state: "achieved", evidence: "The dutyholder demonstrated this expectation, and the arrangements and evidence were reviewed during the assessment." });
         }
       });
       if (E.setReportNarrative) E.setReportNarrative(reportNarrative);
@@ -185,7 +185,7 @@ window.App.TourSyAPS = (function () {
       { title: "Information classification and handling procedure", reference: "INFO-CLASS-04", date: "2025-10-15" }
     ],
     observations: [
-      { name: "OT network segmentation (control-systems zone)", method: "Reviewed network diagrams and firewall rule extracts; no SNI accessed" },
+      { name: "OT network segmentation (control-systems zone)", method: "Reviewed network diagrams and firewall rule extracts without access to SNI" },
       { name: "Security monitoring / SIEM", method: "Observed the alerting console and log coverage" }
     ]
   };
@@ -205,7 +205,7 @@ window.App.TourSyAPS = (function () {
       { title: "Guard force service level agreement", reference: "GF-SLA v6", date: "2025-08-01" }
     ],
     observations: [
-      { name: "Physical protection system (perimeter and vital areas)", method: "Escorted walkdown of the perimeter, portals and a vital area; no SNI accessed" },
+      { name: "Physical protection system (perimeter and vital areas)", method: "Escorted walkdown of the perimeter, portals and a vital area, with no access to SNI" },
       { name: "Central alarm station / emergency control room", method: "Observed command, control and communications arrangements" },
       { name: "OT network segmentation", method: "Reviewed network diagrams and monitoring coverage" }
     ]

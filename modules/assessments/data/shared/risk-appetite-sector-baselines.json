@@ -12,31 +12,31 @@
       "id": "water",
       "name": "Water / wastewater",
       "baseline": "high",
-      "note": "Essential service, safety-relevant (treatment chemistry), increasingly targeted; consequence can be public-health."
+      "note": "The sector is an essential service with safety-relevant treatment chemistry. It is increasingly targeted, and a compromise can affect public health."
     },
     {
       "id": "energy-grid",
       "name": "Electricity transmission / distribution",
       "baseline": "severe",
-      "note": "CNI, credible state-level targeting (Industroyer, etc.), systemic and safety consequence."
+      "note": "The grid is critical national infrastructure with credible state-level targeting, such as Industroyer. A compromise has systemic and safety consequences."
     },
     {
       "id": "oil-gas",
       "name": "Oil & gas",
       "baseline": "severe",
-      "note": "CNI, safety-critical (process safety), high-value target incl. state actors."
+      "note": "The sector is critical national infrastructure where process safety is at stake. It is a high-value target, including for state actors."
     },
     {
       "id": "nuclear",
       "name": "Nuclear",
       "baseline": "severe",
-      "note": "Safety-critical to the highest degree, heavy regulation, credible advanced targeting."
+      "note": "The sector is safety-critical to the highest degree and heavily regulated, and advanced attackers credibly target it."
     },
     {
       "id": "manufacturing-discrete",
       "name": "Discrete manufacturing",
       "baseline": "moderate",
-      "note": "Consequence mainly operational/financial; targeted risk varies with product and IP; ransomware-exposed."
+      "note": "The consequence is mainly operational and financial. Targeted risk varies with the product and IP, and ransomware is a common threat."
     },
     {
       "id": "manufacturing-process",
@@ -48,92 +48,92 @@
       "id": "food-bev",
       "name": "Food & beverage",
       "baseline": "moderate",
-      "note": "Consequence mainly operational and supply-continuity; some safety; heavily ransomware-targeted."
+      "note": "The consequence is mainly to operations and supply continuity, with some safety exposure. The sector is heavily targeted by ransomware."
     },
     {
       "id": "transport-rail",
       "name": "Rail",
       "baseline": "high",
-      "note": "Essential service, safety-relevant, regulated (NIS/CAF); consequence operational and safety."
+      "note": "Rail is an essential service with safety-relevant systems, regulated under NIS and the CAF. A compromise has operational and safety consequences."
     },
     {
       "id": "transport-aviation",
       "name": "Aviation",
       "baseline": "high",
-      "note": "Safety-critical, regulated (CAA/CAF for Aviation), targeted interest."
+      "note": "Aviation is safety-critical and regulated by the CAA under the CAF for Aviation, and it attracts targeted interest from attackers."
     },
     {
       "id": "maritime-ports",
       "name": "Maritime / ports",
       "baseline": "high",
-      "note": "Essential service, economic-systemic consequence, growing targeted interest."
+      "note": "Ports are an essential service, and a compromise has systemic economic consequences. Targeted interest is growing."
     },
     {
       "id": "health",
       "name": "Healthcare / medical",
       "baseline": "high",
-      "note": "Safety-of-life, heavily targeted (ransomware), regulated."
+      "note": "Safety of life is at stake, the sector is regulated, and ransomware targets it heavily."
     },
     {
       "id": "pharma",
       "name": "Pharmaceutical manufacturing",
       "baseline": "high",
-      "note": "Process safety plus high-value IP; targeted and ransomware-exposed."
+      "note": "Process safety and high-value IP are both at stake. The sector is targeted and exposed to ransomware."
     },
     {
       "id": "datacentre-digital",
       "name": "Data centre / digital infrastructure",
       "baseline": "high",
-      "note": "Systemic dependency for many others; NIS2 in scope; high availability consequence."
+      "note": "Many other organisations depend on it, it is in scope of NIS2, and loss of availability has a high consequence."
     },
     {
       "id": "building-mgmt",
       "name": "Building management / smart building",
       "baseline": "moderate",
-      "note": "Consequence usually operational/comfort; can rise where life-safety systems integrated."
+      "note": "The consequence is usually to operations and comfort. It rises where life-safety systems are integrated."
     },
     {
       "id": "other",
       "name": "Other / not listed",
       "baseline": "moderate",
-      "note": "Neutral starting point; assessor sets from criticality and consequence."
+      "note": "This is a neutral starting point. Set the band from the organisation's criticality and consequence."
     }
   ],
   "exposureModifiers": [
     {
       "id": "state-targeting",
       "label": "Credible state-level or advanced-actor targeting",
-      "effect": "+1 band consideration"
+      "effect": "Consider one band higher"
     },
     {
       "id": "geopolitical",
       "label": "Operates in or serves a geopolitically exposed region or contested sector",
-      "effect": "+1 band consideration"
+      "effect": "Consider one band higher"
     },
     {
       "id": "safety-critical",
       "label": "Compromise has direct safety-of-life or major environmental consequence",
-      "effect": "floor at 'high'; consider 'severe'"
+      "effect": "At least high; consider severe"
     },
     {
       "id": "cni-designated",
       "label": "Designated CNI / essential service / NIS2 essential entity",
-      "effect": "floor at 'high'"
+      "effect": "At least high"
     },
     {
       "id": "systemic",
       "label": "Many others depend on this organisation (single point of systemic failure)",
-      "effect": "+1 band consideration"
+      "effect": "Consider one band higher"
     },
     {
       "id": "high-interconnection",
       "label": "Highly interconnected / large external attack surface",
-      "effect": "consider +1"
+      "effect": "Consider one band higher"
     },
     {
       "id": "low-consequence",
       "label": "A compromise would be contained and have no safety consequence",
-      "effect": "consider -1"
+      "effect": "Consider one band lower"
     }
   ],
   "hardRules": [
