@@ -8,9 +8,9 @@ window.App.Data.shared.machineryClassification = {
   "_note": "EU Machinery Regulation (Regulation (EU) 2023/1230) Annex I classification lookup. Categories paraphrase the Annex I Part A and Part B lists; the class drives the conformity-assessment route under Article 25. Same shape as the CRA lookup so the shared layered-conformance machinery (scoring-cra.js) can use either.",
   "authorityRef": "Machinery Regulation Annex I",
   "classes": [
-    { "id": "default", "label": "Not listed in Annex I (internal control)" },
+    { "id": "default", "label": "Not listed in Annex I (internal control)", "reportLabel": "Not listed in Annex I" },
     { "id": "annex-i-part-b", "label": "Annex I Part B (higher-risk category)" },
-    { "id": "annex-i-part-a", "label": "Annex I Part A (third-party assessment mandatory)" }
+    { "id": "annex-i-part-a", "label": "Annex I Part A (third-party assessment mandatory)", "reportLabel": "Annex I Part A" }
   ],
   "severity": { "default": 0, "annex-i-part-b": 1, "annex-i-part-a": 2 },
   "deriveClass": {

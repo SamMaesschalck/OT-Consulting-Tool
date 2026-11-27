@@ -140,6 +140,29 @@ window.App.ScoringNIS2 = (function () {
     };
   }
 
+  // ---- weakest areas ----------------------------------------------------
+  // Areas differ in size, so they are compared by the share of their
+  // applicable obligations that are Partially or Not Achieved. Ties go to
+  // more Not Achieved, then more gaps. Shares are compared by cross-
+  // multiplying, so equal fractions tie exactly. 0 means level.
+  function areaOrder(a, b) {
+    var byShare = b.gaps * a.total - a.gaps * b.total;
+    if (byShare !== 0) return byShare;
+    if (b.counts.not !== a.counts.not) return b.counts.not - a.counts.not;
+    return b.gaps - a.gaps;
+  }
+  // Areas with applicable obligations, weakest first, then by id.
+  function rankAreas(areas) {
+    return (areas || []).filter(function (c) { return c.total > 0; }).sort(function (a, b) {
+      return areaOrder(a, b) || String(a.categoryId).localeCompare(String(b.categoryId));
+    });
+  }
+  // The weakest area, and any level with it. None when nothing has a gap.
+  function worstAreas(ranked) {
+    if (!ranked.length || ranked[0].gaps === 0) return [];
+    return ranked.filter(function (c) { return areaOrder(c, ranked[0]) === 0; });
+  }
+
   // ---- whole entity -----------------------------------------------------
   function scoreSite(instrument, profile, responses) {
     var byId = {};
@@ -173,20 +196,8 @@ window.App.ScoringNIS2 = (function () {
       return a.itemId.localeCompare(b.itemId);
     });
 
-    // Weakest areas: most gaps first, then lowest conformance, name all tied.
-    var ranked = byCategory.slice().filter(function (c) { return c.total > 0; });
-    ranked.sort(function (a, b) {
-      if (b.gaps !== a.gaps) return b.gaps - a.gaps;
-      var ac = a.conformance === null ? 2 : a.conformance;
-      var bc = b.conformance === null ? 2 : b.conformance;
-      if (ac !== bc) return ac - bc;
-      return a.categoryId.localeCompare(b.categoryId);
-    });
-    var worst = [];
-    if (ranked.length > 0 && ranked[0].gaps > 0) {
-      var top = ranked[0];
-      worst = ranked.filter(function (c) { return c.gaps === top.gaps; });
-    }
+    var ranked = rankAreas(byCategory);
+    var worst = worstAreas(ranked);
 
     return {
       instrumentId: instrument.id,
@@ -229,6 +240,8 @@ window.App.ScoringNIS2 = (function () {
     confidenceKey: confidenceKey,
     scoreItem: scoreItem,
     rollUp: rollUp,
+    rankAreas: rankAreas,
+    worstAreas: worstAreas,
     scoreSite: scoreSite,
     scoreEngagement: scoreEngagement,
     formatPct: formatPct

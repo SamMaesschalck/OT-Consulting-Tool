@@ -165,16 +165,27 @@ window.App.ScoringCSMS = (function () {
   }
 
   // ---- weakest-area ranking (shared by categories and element groups) ---
+  // Areas differ in size, so they are compared by the share of their
+  // applicable elements that are Not in place or Partially in place. Ties go
+  // to more Not in place, then more gaps. Shares are compared by cross-
+  // multiplying, so equal fractions tie exactly. 0 means level. The CRA and
+  // Machinery layers are ranked with the same order.
+  function areaOrder(a, b) {
+    var byShare = b.gaps * a.total - a.gaps * b.total;
+    if (byShare !== 0) return byShare;
+    if (b.counts.notInPlace !== a.counts.notInPlace) return b.counts.notInPlace - a.counts.notInPlace;
+    return b.gaps - a.gaps;
+  }
+  // Areas with applicable elements, weakest first, then by id.
   function rankAreas(areas) {
-    var ranked = areas.slice().filter(function (a) { return a.total > 0; });
-    ranked.sort(function (a, b) {
-      if (b.gaps !== a.gaps) return b.gaps - a.gaps;
-      var ac = a.conformance === null ? 2 : a.conformance;
-      var bc = b.conformance === null ? 2 : b.conformance;
-      if (ac !== bc) return ac - bc;
-      return String(a.id).localeCompare(String(b.id));
+    return (areas || []).filter(function (a) { return a.total > 0; }).sort(function (a, b) {
+      return areaOrder(a, b) || String(a.id).localeCompare(String(b.id));
     });
-    return ranked;
+  }
+  // The weakest area, and any level with it. None when nothing has a gap.
+  function worstAreas(ranked) {
+    if (!ranked.length || ranked[0].gaps === 0) return [];
+    return ranked.filter(function (a) { return areaOrder(a, ranked[0]) === 0; });
   }
 
   // ---- whole organisation -----------------------------------------------
@@ -217,9 +228,7 @@ window.App.ScoringCSMS = (function () {
 
     var rankedCategories = rankAreas(byCategory);
     var rankedGroups = rankAreas(byGroup);
-    var worstCategories = (rankedCategories.length && rankedCategories[0].gaps > 0)
-      ? rankedCategories.filter(function (c) { return c.gaps === rankedCategories[0].gaps; })
-      : [];
+    var worstCategories = worstAreas(rankedCategories);
 
     return {
       instrumentId: instrument.id,
@@ -265,6 +274,8 @@ window.App.ScoringCSMS = (function () {
     confidenceKey: confidenceKey,
     scoreElement: scoreElement,
     rollUp: rollUp,
+    rankAreas: rankAreas,
+    worstAreas: worstAreas,
     scoreSite: scoreSite,
     scoreEngagement: scoreEngagement,
     formatPct: formatPct

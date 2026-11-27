@@ -1,0 +1,175 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Weakest area by share</title></head>
+<body>
+<!--
+  The weakest area is the group with the largest SHARE of its applicable items
+  below the expected state, not the most items. Counting favoured big groups:
+  the CAF demo named objective B (10 of 19 outcomes short) while objective C
+  had 6 of 7 short. Ties go to more items in the worst state, then more gaps,
+  then the lower id, and a group with no gaps is never the weakest.
+
+  Checks the comparator in each scorer (CAF family, NIS2, 2-1:2010 and the
+  CRA/Machinery layers), the demo picks it changes in the Word report, the How
+  to read sentence that explains it, and two report wording fixes from the
+  same review: the Machinery class prints without the route in brackets when
+  the route follows, and the NIS2 report says once that only the competent
+  authority can determine compliance.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function wordParas(blob) {
+  return H.unzipText(blob).then(function (parts) {
+    var xml = (parts.filter(function (p) { return p.name === "word/document.xml"; })[0] || {}).text || "";
+    var doc = new DOMParser().parseFromString(xml, "application/xml");
+    return Array.prototype.map.call(doc.getElementsByTagNameNS(W, "p"), function (p) {
+      return Array.prototype.map.call(p.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join("").replace(/\s+/g, " ").trim();
+    }).filter(Boolean);
+  });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply) m.apply(E); });
+
+  // ---- 1. the comparators ---------------------------------------------------
+  var C = A.ScoringCAF;
+  function obj(id, ach, part, not, unk) {
+    return { objectiveId: id, name: "Objective " + id, counts: { achieved: ach, partially: part, not: not, unknown: unk || 0 }, total: ach + part + not + (unk || 0) };
+  }
+  var r = C.rankGroups([obj("B", 9, 9, 1), obj("C", 0, 1, 5)]);
+  ok(r[0].id === "C", "CAF: 6 of 6 short outranks 10 of 19 short", r.map(function (x) { return x.id; }).join(","));
+  r = C.rankGroups([obj("A", 2, 2, 0), obj("B", 2, 1, 1)]);
+  ok(r[0].id === "B", "CAF: on an equal share, more Not Achieved ranks first");
+  r = C.rankGroups([obj("A", 1, 0, 1), obj("B", 2, 1, 1)]);
+  ok(r[0].id === "B", "CAF: on an equal share and Not Achieved count, more gaps ranks first");
+  r = C.rankGroups([obj("B", 1, 1, 0), obj("A", 1, 1, 0)]);
+  ok(r[0].id === "A", "CAF: a full tie goes to the lower id");
+  r = C.rankGroups([obj("A", 3, 0, 0), obj("B", 0, 0, 0)]);
+  ok(r.length === 1 && r[0].gaps === 0, "CAF: groups with nothing applicable drop out, and a group with no gaps reports 0 gaps");
+  var ob = obj("A", 1, 1, 0, 2); ob.below = 3;
+  var oc = obj("B", 0, 1, 1); oc.below = 2;
+  r = C.rankGroups([ob, oc], { useBelow: true });
+  ok(r[0].id === "B" && r[1].gaps === 3, "CAF: with useBelow the gaps are the outcomes below the profile's expected state", JSON.stringify(r.map(function (x) { return [x.id, x.gaps, x.total]; })));
+  ok(C.compareGapShare({ id: "x", gaps: 1, total: 3, worst: 0 }, { id: "y", gaps: 2, total: 6, worst: 1 }) > 0,
+     "CAF: 1 of 3 and 2 of 6 are an equal share, so the Not Achieved count decides");
+
+  var N = A.ScoringNIS2;
+  function area(id, total, part, not) { return { categoryId: id, name: id, total: total, gaps: part + not, counts: { partially: part, not: not } }; }
+  var nr = N.rankAreas([area("RM", 10, 3, 2), area("REP", 1, 0, 1), area("GOV", 1, 1, 0)]);
+  ok(nr.map(function (x) { return x.categoryId; }).join(",") === "REP,GOV,RM", "NIS2: share first, then Not Achieved", nr.map(function (x) { return x.categoryId; }).join(","));
+  var nw = N.worstAreas(N.rankAreas([area("B", 2, 0, 1), area("A", 2, 0, 1), area("C", 4, 0, 2)]));
+  ok(nw.map(function (x) { return x.categoryId; }).join(",") === "C", "NIS2: on an equal share, more Not Achieved ranks first", nw.map(function (x) { return x.categoryId; }).join(","));
+  nw = N.worstAreas(N.rankAreas([area("B", 2, 1, 0), area("A", 2, 1, 0), area("C", 5, 1, 0)]));
+  ok(nw.map(function (x) { return x.categoryId; }).join(",") === "A,B", "NIS2: areas level on share, Not Achieved and gaps are named together", nw.map(function (x) { return x.categoryId; }).join(","));
+  ok(N.worstAreas(N.rankAreas([area("A", 3, 0, 0)])).length === 0, "NIS2: no area is the weakest when none has a gap");
+
+  var S = A.ScoringCSMS;
+  function cat(id, total, part, nip) { return { id: id, total: total, gaps: part + nip, counts: { partially: part, notInPlace: nip } }; }
+  var cw = S.worstAreas(S.rankAreas([cat("CAT-ADDR", 15, 5, 1), cat("CAT-MON", 2, 0, 2), cat("CAT-RA", 2, 0, 0)]));
+  ok(cw.length === 1 && cw[0].id === "CAT-MON", "2-1:2010: 2 of 2 Not in place outranks 6 of 15", cw.map(function (x) { return x.id; }).join(","));
+  ok(S.worstAreas(S.rankAreas([cat("A", 3, 0, 0)])).length === 0, "2-1:2010: no category is the weakest when none has a gap");
+
+  // ---- 2. the demos ---------------------------------------------------------
+  function scoredOf(id) { E.activateInstrument(id); var s = E.scoreActiveTarget(); return s && (s.result || s); }
+  var sNis = scoredOf("nis2-assessment");
+  var mf = (sNis.byCategory || []).filter(function (c) { return c.categoryId === "M-F"; })[0];
+  ok(mf && mf.gaps === mf.total && (sNis.worstCategories || []).map(function (c) { return c.categoryId; }).join(",") === "REP",
+     "NIS2 demo: REP (5 of 5, 3 Not Achieved) beats M-F (1 of 1, none Not Achieved) on the Not Achieved count", (sNis.worstCategories || []).map(function (c) { return c.categoryId; }).join(","));
+  var sQuick = scoredOf("nis2-quick-gap");
+  ok((sQuick.worstCategories || []).map(function (c) { return c.categoryId; }).join(",") === "REP",
+     "NIS2 quick demo: REP (1 of 1 Not Achieved) replaces RM (5 of 10), the old pick by count");
+  var sCsms = scoredOf("iec-62443-2-1-2010");
+  ok((sCsms.worstCategories || []).map(function (c) { return c.categoryId; }).join(",") === "CAT-MON",
+     "2-1:2010 demo: Monitoring and improving (2 of 2) replaces Addressing risk (6 of 15)");
+  var sMach = scoredOf("eu-machinery");
+  ok((sMach.weakestLayers || []).map(function (l) { return l.layerId; }).join(",") === "M3", "Machinery demo: the scorer names M3 as the weakest layer (8 of 9 open)");
+
+  function word(id) {
+    E.activateInstrument(id);
+    var opts = {
+      cafProfileRegistry: E.getCAFProfileRegistry ? E.getCAFProfileRegistry() : null,
+      cafProfileId: E.getActiveCAFProfileId ? E.getActiveCAFProfileId() : null,
+      cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null,
+      cafOverlay: E.getActiveCAFOverlay ? E.getActiveCAFOverlay() : null,
+      targetId: E.state.activeTargetId,
+      craSetup: E.getCRASetupRaw ? E.getCRASetupRaw() : null
+    };
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+        E.getActiveNarrative ? E.getActiveNarrative() : null, opts, function (err, blob) { res(err ? null : blob); });
+    }).then(function (blob) { return blob ? wordParas(blob) : []; });
+  }
+  function screenText(id) { E.activateInstrument(id); A.UI.go("report"); return document.getElementById("main").textContent.replace(/\s+/g, " "); }
+  function has(paras, s) { return paras.some(function (p) { return p.indexOf(s) !== -1; }); }
+  function count(paras, s) { return paras.join("\n").split(s).length - 1; }
+
+  word("ncsc-caf").then(function (p) {
+    ok(has(p, "The weakest alignment is in C Detecting cyber security events, where 6 of 7 outcomes are Partially Achieved or Not Achieved."),
+       "CAF demo (Word): names C (6 of 7) rather than B (10 of 19)", p.filter(function (x) { return /weakest alignment/.test(x); })[0]);
+    var i = p.indexOf("Where to focus first");
+    ok(i !== -1 && p[i + 3] === "C Detecting cyber security events" && p[i + 4] === "6 of 7 below expected",
+       "CAF demo (Word): Where to focus first leads with C on the same order", p.slice(i, i + 5).join(" | "));
+    ok(has(p, "measured by the share of their applicable outcomes below the expected state."), "CAF demo (Word): the focus cards say they are ranked by share");
+    ok(has(p, "The weakest objective is the one with the largest share of its applicable outcomes below the expected state."), "CAF demo (Word): How to read explains the pick");
+    var st = screenText("ncsc-caf");
+    ok(st.indexOf("The weakest objective is the one with the largest share of its applicable outcomes below the expected state.") !== -1, "CAF demo (screen): How to read explains the pick");
+    return word("cis-controls-v8");
+  }).then(function (p) {
+    ok(has(p, "The weakest Control is the one with the largest share of its applicable Safeguards below the expected state."), "CIS (Word): How to read uses the instrument's own nouns");
+    return word("onr-syaps-cyber");
+  }).then(function (p) {
+    ok(has(p, "The weakest coverage is in 7.3 Protection of Nuclear Technology and Operations, where 1 of 3 expectations is Partially achieved."),
+       "ONR cyber demo (Word): names 7.3 (1 of 3), and the detail names only the state present", p.filter(function (x) { return /weakest coverage/.test(x); })[0]);
+    return word("iec-62443-2-1-2010");
+  }).then(function (p) {
+    ok(has(p, "The weakest category is Monitoring and improving the CSMS, where both applicable elements are Not in place."),
+       "2-1:2010 demo (Word): names Monitoring and improving the CSMS", p.filter(function (x) { return /weakest category/.test(x); })[0]);
+    ok(has(p, "This CSMS category has the largest share of its elements still to put in place."), "2-1:2010 demo (Word): the focus card intro speaks of share, in the singular for one card");
+    ok(has(p, "The weakest category is the one with the largest share of its applicable elements Not in place or Partially in place."), "2-1:2010 (Word): How to read explains the pick");
+    var st = screenText("iec-62443-2-1-2010");
+    ok(st.indexOf("The weakest category is the one with the largest share") !== -1, "2-1:2010 (screen): How to read explains the pick");
+    return word("nis2-quick-gap");
+  }).then(function (p) {
+    ok(has(p, "The weakest area is Incident reporting, where its one applicable obligation is Not Achieved."),
+       "NIS2 quick demo (Word): names Incident reporting", p.filter(function (x) { return /weakest area/.test(x); })[0]);
+    return word("nis2-assessment");
+  }).then(function (p) {
+    ok(has(p, "The weakest area is Incident reporting obligations, where all 5 applicable obligations are Partially or Not Achieved."),
+       "NIS2 demo (Word): all five short reads as all, not 5 of 5", p.filter(function (x) { return /weakest area is Incident/.test(x); })[0]);
+    ok(has(p, "The weakest area is the one with the largest share of its applicable obligations Partially or Not Achieved."), "NIS2 (Word): How to read explains the pick");
+    // The competent-authority point, said once, in the Status box.
+    ok(count(p, "Only the relevant competent authority can make that determination.") === 1, "NIS2 (Word): the competent-authority point is made once");
+    var box = p.indexOf("Limits of this gap analysis");
+    ok(box !== -1 && p[box + 1].indexOf("Only the relevant competent authority can make that determination.") !== -1, "NIS2 (Word): it sits in the Status box");
+    ok(!has(p, "intended to support improvement and to prepare for engagement with the regulator"), "NIS2 (Word): the paragraph that repeated the Status box is gone");
+    ok(!/not_determination/.test(JSON.stringify(A.Data.instruments["nis2-assessment"].narrative.boilerplate)) &&
+       !/not_determination/.test(JSON.stringify(A.Data.instruments["nis2-quick-gap"].narrative.boilerplate)), "NIS2 packs no longer carry the paragraph");
+    var st = screenText("nis2-assessment");
+    ok(st.split("Only the relevant competent authority can make that determination.").length - 1 === 1, "NIS2 (screen): the Status box makes the point once");
+    ok(st.indexOf("The weakest area is the one with the largest share") !== -1, "NIS2 (screen): How to read explains the pick");
+    return word("eu-machinery");
+  }).then(function (p) {
+    ok(has(p, "The machine is classified as Annex I Part A. Third-party conformity assessment is mandatory"), "Machinery (Word): the class prints without the route in brackets before the route sentence",
+       p.filter(function (x) { return /classified as/.test(x); })[0]);
+    ok(!has(p, "(third-party assessment mandatory)"), "Machinery (Word): the bracketed route is not printed anywhere");
+    var inst = E.state.instrument, CRA = A.ScoringCRA;
+    var partA = CRA.classes(inst).filter(function (c) { return c.id === "annex-i-part-a"; })[0];
+    ok(partA && partA.label === "Annex I Part A (third-party assessment mandatory)", "Machinery: the capture dropdown keeps the full label");
+    ok(CRA.classReportLabel("default", inst) === "Not listed in Annex I", "Machinery: the default class has a report label too");
+    var st = screenText("eu-machinery");
+    ok(/Machine class\s*Annex I Part A\s*Layers in scope/.test(st), "Machinery (screen): the class card prints the short label above the route");
+    var cra = A.Data.instruments["eu-cra"].instrument;
+    ok(CRA.classReportLabel("default", cra) === "Default (not listed in Annex III or IV)" && CRA.classLabel("default", cra) === "Default (self-assessment)",
+       "CRA: the default class reports without its route, and the dropdown label is unchanged");
+    done();
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>

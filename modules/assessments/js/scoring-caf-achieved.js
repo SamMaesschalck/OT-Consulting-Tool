@@ -246,6 +246,37 @@ window.App.ScoringCAF = (function () {
     };
   }
 
+  // ---- weakest groups ---------------------------------------------------
+  // Groups differ in size, so they are compared by the share of their
+  // applicable outcomes below the expected state: an objective with 6 of 7
+  // short is weaker than one with 10 of 19. Ties go to more outcomes in the
+  // worst state, then more gaps, then the lower id. The shares are compared
+  // by cross-multiplying, so equal fractions tie exactly.
+  function compareGapShare(a, b) {
+    var byShare = b.gaps * a.total - a.gaps * b.total;
+    if (byShare !== 0) return byShare;
+    if (b.worst !== a.worst) return b.worst - a.worst;
+    if (b.gaps !== a.gaps) return b.gaps - a.gaps;
+    return String(a.id).localeCompare(String(b.id));
+  }
+  // groups: byObjective or byPrinciple entries. With opts.useBelow the gaps
+  // are the outcomes below the selected profile's expected state; otherwise
+  // the Partially and Not answers. Returns the groups with applicable
+  // outcomes, weakest first, as { id, name, total, gaps, worst, counts, group }.
+  // A group with no gaps is never the weakest, so check gaps > 0 on the first.
+  function rankGroups(groups, opts) {
+    opts = opts || {};
+    return (groups || []).filter(function (g) { return (g.total || 0) > 0; }).map(function (g) {
+      var c = g.counts || {};
+      return {
+        id: g.principleId !== undefined ? g.principleId : g.objectiveId,
+        name: g.name, total: g.total, counts: c, group: g,
+        gaps: opts.useBelow ? (g.below || 0) : ((c.partially || 0) + (c.not || 0)),
+        worst: c.not || 0
+      };
+    }).sort(compareGapShare);
+  }
+
   // ---- whole site -------------------------------------------------------
 
   function scoreSite(instrument, profile, responses, overlay) {
@@ -394,6 +425,8 @@ window.App.ScoringCAF = (function () {
     vocab: vocab,
     pluralNoun: pluralNoun,
     profilePhrase: profilePhrase,
+    compareGapShare: compareGapShare,
+    rankGroups: rankGroups,
     STATE_RANK: STATE_RANK,
     rankOf: rankOf,
     meetsExpected: meetsExpected,

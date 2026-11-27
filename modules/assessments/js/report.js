@@ -2972,6 +2972,19 @@ window.App.Report = (function () {
     ]);
   }
 
+  // How the Word executive summary picks its weakest area, for How to read.
+  // Single-objective instruments (CIS, ONR SyAPs cyber) rank their principles.
+  function cafWeakestRule(instrument) {
+    var V = window.App.ScoringCAF.vocab(instrument);
+    var objs = (instrument && instrument.taxonomy && instrument.taxonomy.objectives) || [];
+    var noun = objs.length >= 2 ? V.objective : V.principle;
+    return "The weakest " + noun + " is the one with the largest share of its applicable " + V.units + " below the expected state.";
+  }
+  // The pack's How to read, with the weakest-area rule after it.
+  function cafHowToRead(instrument, text) {
+    return text ? text + " " + cafWeakestRule(instrument) : text;
+  }
+
   function cafBoilerplateCard(title, text) {
     if (!text) return null;
     return h("div", { class: "card" }, [
@@ -3242,7 +3255,7 @@ window.App.Report = (function () {
       withAttribution(cafBoilerplateCard("About the CAF", bp.about_caf), instrument),
       cafBoilerplateCard("OT focus", bp.ot_focus),
       cafBoilerplateCard("Implementation context", bp.implementation_context),
-      cafBoilerplateCard("How to read this report", bp.how_to_read)
+      cafBoilerplateCard("How to read this report", cafHowToRead(instrument, bp.how_to_read))
     ]);
     if (boiler) container.appendChild(boiler);
     appendReportTail(container, opts);
@@ -3768,7 +3781,7 @@ window.App.Report = (function () {
       h("div", { class: "card-h" }, [h("h2", { text: "Status of this gap analysis" })]),
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--gap); background:var(--gap-bg); padding:10px 14px; margin:0; color:var(--text);",
-          text: "This is a readiness and gap analysis against the obligations of the EU NIS2 Directive (Directive (EU) 2022/2555). The consultant has judged each obligation as Achieved, Partially Achieved or Not Achieved, and there is no single grade or pass mark. The analysis does not determine legal compliance with NIS2 or with the national law that transposes it. Scope should be confirmed against the applicable national transposition." })
+          text: "This is a readiness and gap analysis against the obligations of the EU NIS2 Directive (Directive (EU) 2022/2555). The consultant has judged each obligation as Achieved, Partially Achieved or Not Achieved, and there is no single grade or pass mark. The analysis does not determine legal compliance with NIS2 or with the national law that transposes it. Only the relevant competent authority can make that determination. Scope should be confirmed against the applicable national transposition." })
       ])
     ]));
 
@@ -3783,7 +3796,7 @@ window.App.Report = (function () {
     // Standing prose + cover sheet close the preview.
     var nis2Boiler = boilerplateStack([
       withAttribution(proseCard("About this assessment", instrument.framing), instrument),
-      proseCard("How to read this report", "Each NIS2 obligation is judged Achieved, Partially Achieved or Not Achieved against full conformance with the Directive. Results are reported as a conformance profile by NIS2 area. The conformance percentage is shown for context only and is not a pass mark. Unknown answers reduce coverage and lower confidence, and Not applicable obligations are excluded.")
+      proseCard("How to read this report", "Each NIS2 obligation is judged Achieved, Partially Achieved or Not Achieved against full conformance with the Directive. Results are reported as a conformance profile by NIS2 area. The conformance percentage is shown for context only and is not a pass mark. Unknown answers reduce coverage and lower confidence, and Not applicable obligations are excluded. The weakest area is the one with the largest share of its applicable obligations Partially or Not Achieved.")
     ]);
     if (nis2Boiler) container.appendChild(nis2Boiler);
     appendReportTail(container, opts);
@@ -4472,7 +4485,7 @@ window.App.Report = (function () {
     // Standing prose + cover sheet close the preview.
     var csmsBoiler = boilerplateStack([
       withAttribution(proseCard("About this assessment", instrument.framing), instrument),
-      proseCard("How to read this report", "Each CSMS element is judged Not in place, Partially in place, Largely in place or In place against full conformance. Results are reported as a conformance profile by category and element group. The conformance percentage is shown for context only. Unknown answers reduce coverage and lower confidence, and Not applicable elements are excluded.")
+      proseCard("How to read this report", "Each CSMS element is judged Not in place, Partially in place, Largely in place or In place against full conformance. Results are reported as a conformance profile by category and element group. The conformance percentage is shown for context only. Unknown answers reduce coverage and lower confidence, and Not applicable elements are excluded. The weakest category is the one with the largest share of its applicable elements Not in place or Partially in place.")
     ]);
     if (csmsBoiler) container.appendChild(csmsBoiler);
     appendReportTail(container, opts);
@@ -4547,7 +4560,7 @@ window.App.Report = (function () {
       h("div", { class: "card-b" }, [
         h("div", { class: "kpi-row" }, [
           h("div", { class: "kpi" }, [ h("div", { class: "lbl", text: NounR }), h("div", { class: "val kpi-small", text: (target && target.name) || "(not set)" }) ]),
-          h("div", { class: "kpi" }, [ h("div", { class: "lbl", text: NounR + " class" }), h("div", { class: "val kpi-small", text: cls.classLabel || "Default" }) ]),
+          h("div", { class: "kpi" }, [ h("div", { class: "lbl", text: NounR + " class" }), h("div", { class: "val kpi-small", text: cls.classReportLabel || cls.classLabel || "Default" }) ]),
           h("div", { class: "kpi" }, [ h("div", { class: "lbl", text: "Layers in scope" }), h("div", { class: "val kpi-small", text: (scored.layersInScope || []).join(", ") }) ]),
           h("div", { class: "kpi" }, [ h("div", { class: "lbl", text: "Target" }), h("div", { class: "val kpi-small", text: target ? target.name : "" }) ])
         ]),
@@ -4673,6 +4686,7 @@ window.App.Report = (function () {
     rollupVerdictLabel: function (v) { return (ROLLUP_VERDICT[v] || ROLLUP_VERDICT.unassessed).label; },
     standardRef: standardRef,
     mlNoun: mlNoun,
+    cafHowToRead: cafHowToRead,
     mlLevels: mlLevels,
     mlHowToRead: mlHowToRead,
     mlOutOfScopeLine: mlOutOfScopeLine,

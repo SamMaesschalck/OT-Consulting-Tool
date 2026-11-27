@@ -1762,7 +1762,7 @@ window.App.ExportXLSX = (function () {
     var cls = scored.classification || {};
     front.push([styledCell("Client", { bold: true }), e.clientName || ""]);
     front.push([styledCell(Noun, { bold: true }), (target && target.name) || ""]);
-    front.push([styledCell(Noun + " class", { bold: true }), cls.classLabel || "Default"]);
+    front.push([styledCell(Noun + " class", { bold: true }), cls.classReportLabel || cls.classLabel || "Default"]);
     front.push([styledCell("Matched category", { bold: true }), cls.categoryText || "(none)"]);
     front.push([styledCell("Conformity route (" + confId + ")", { bold: true }), cls.route || ""]);
     front.push([styledCell("Layers in scope", { bold: true }), (scored.layersInScope || []).join(", ")]);

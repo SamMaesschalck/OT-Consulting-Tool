@@ -40,7 +40,7 @@ window.App.ScoringCRA = (function () {
   // routes have inline fallbacks so classification works even if the shared
   // lookup file (window.App.Data.shared.craProductClassification) is absent.
   var CLASSES = [
-    { id: "default", label: "Default (self-assessment)" },
+    { id: "default", label: "Default (self-assessment)", reportLabel: "Default (not listed in Annex III or IV)" },
     { id: "important-class-i", label: "Important - Class I (Annex III)" },
     { id: "important-class-ii", label: "Important - Class II (Annex III)" },
     { id: "critical", label: "Critical (Annex IV)" }
@@ -80,6 +80,17 @@ window.App.ScoringCRA = (function () {
     }
     for (var i = 0; i < CLASSES.length; i++) if (CLASSES[i].id === id) return CLASSES[i].label;
     return id || "Default (self-assessment)";
+  }
+  // The class as the report prints it where the conformity route follows. A
+  // class whose label carries its route in brackets ("Annex I Part A
+  // (third-party assessment mandatory)") gives a reportLabel without it, so
+  // the route is said once. The capture dropdown keeps the full label.
+  function classReportLabel(id, instrument) {
+    var lk = classificationLookup(instrument);
+    var list = (lk && lk.classes && lk.classes.length) ? lk.classes : CLASSES;
+    var key = id || (list[0] && list[0].id);
+    var hit = list.filter(function (c) { return c.id === key; })[0];
+    return (hit && hit.reportLabel) || classLabel(id, instrument);
   }
   function groupLabel(id, instrument) {
     var lk = classificationLookup(instrument);
@@ -140,6 +151,7 @@ window.App.ScoringCRA = (function () {
       groupId: sel.groupId, groupLabel: sel.groupId ? groupLabel(sel.groupId, instrument) : "",
       categoryText: categoryText,
       classId: chosen, classLabel: classLabel(chosen, instrument),
+      classReportLabel: classReportLabel(chosen, instrument),
       route: routeFor(chosen, instrument),
       suggestedClassId: suggested, suggestedClassLabel: suggested ? classLabel(suggested, instrument) : "",
       misclassification: misclassification,
@@ -240,12 +252,18 @@ window.App.ScoringCRA = (function () {
     var missingTech = (ilSpec.technicalLayers || []).filter(function (id) { return !has(id); });
     var interlockTriggered = has(ilSpec.conformityLayer) && missingTech.length > 0;
 
+    // The weakest layer, on the same share-of-gaps order as the CSMS areas.
+    var rankedLayers = CSMS.rankAreas(layers.map(function (l) {
+      return { id: l.layerId, layerId: l.layerId, name: l.name, total: l.overall.total, gaps: l.overall.gaps, counts: l.overall.counts, layer: l };
+    }));
+
     return {
       instrumentId: instrument.id,
       instrumentTitle: instrument.title,
       indicative: instrument.indicative !== false,
       layersInScope: inScope,
       layers: layers,                       // in-scope layers, side by side
+      weakestLayers: CSMS.worstAreas(rankedLayers), // the weakest layer(s) with a gap, ties together
       interlock: {
         triggered: interlockTriggered,
         missingLayers: missingTech,
@@ -332,6 +350,7 @@ window.App.ScoringCRA = (function () {
     deriveClassification: deriveClassification,
     classes: classes,
     classLabel: classLabel,
+    classReportLabel: classReportLabel,
     groupLabel: groupLabel,
     suggestedFromCategory: suggestedFromCategory,
     flattenSetup: flattenSetup,

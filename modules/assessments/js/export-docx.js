@@ -3300,19 +3300,25 @@ window.App.ExportDOCX = (function () {
       return { id: (useObjectives ? g.objectiveId : g.principleId), name: g.name, counts: g.counts, total: g.total };
     });
 
-    var ranked = groups.slice().filter(function (o) { return (o.total || 0) > 0; });
-    ranked.sort(function (x, y) {
-      var xg = (x.counts.partially + x.counts.not), yg = (y.counts.partially + y.counts.not);
-      if (yg !== xg) return yg - xg;
-      return String(x.id).localeCompare(String(y.id));
-    });
+    // The scorer ranks the groups by the share of their applicable outcomes
+    // below the expected state, so a small group with every outcome short
+    // outranks a large one with a few. Below the expected state is read from
+    // the profile, as on the scorecard, so an Unknown that counts as a finding
+    // (CIS) counts here too.
+    var rankSrc = useObjectives ? scored.byObjective : scored.byPrinciple;
+    var useBelow = !info.placeholder && (rankSrc || []).some(function (g) { return (g.below || 0) > 0; });
+    var ranked = N.rankGroups(rankSrc, { useBelow: useBelow });
     var w0 = ranked[0], weakestObjectiveName, weakestObjectiveDetail;
-    if (w0 && (w0.counts.partially + w0.counts.not) > 0) {
+    if (w0 && w0.gaps > 0) {
       weakestObjectiveName = w0.id + " " + w0.name;
-      var wc = w0.counts, wgaps = wc.partially + wc.not;
-      weakestObjectiveDetail = (wc.achieved === 0 && wc.partially === 0)
-        ? (wc.not === 1 ? "its one applicable " + V.unit + " is " + notLabel : "all " + wc.not + " applicable " + V.units + " are " + notLabel)
-        : wgaps + " of " + w0.total + " " + (w0.total === 1 ? V.unit : V.units) + (wgaps === 1 ? " is " : " are ") + gapWord;
+      var wc = w0.counts, wgaps = w0.gaps;
+      var wAnswered = (wc.partially || 0) + (wc.not || 0);
+      var wUnknown = Math.max(0, wgaps - wAnswered);
+      var wLabel = (wc.partially || 0) === 0 ? notLabel : ((wc.not || 0) === 0 && partialState ? partialState.label : gapWord);
+      if (wUnknown > 0) wLabel = wAnswered === 0 ? "Unknown" : wLabel.replace(" or ", ", ") + " or Unknown";
+      weakestObjectiveDetail = (wgaps === w0.total)
+        ? allApplicable(w0.total, V.unit, V.units) + wLabel
+        : wgaps + " of " + w0.total + " " + (w0.total === 1 ? V.unit : V.units) + (wgaps === 1 ? " is " : " are ") + wLabel;
     } else {
       weakestObjectiveName = "no single area";
       weakestObjectiveDetail = "no " + V.units + " are below the expected state";
@@ -3468,7 +3474,7 @@ window.App.ExportDOCX = (function () {
     // preview and silently dropped it from the client document. Order matches
     // the screen's boilerplate stack.
     if (bp.implementation_context) { out.push(h1("Implementation context")); out.push(body(bp.implementation_context)); }
-    if (bp.how_to_read){ out.push(h1("How to read this report")); out.push(body(bp.how_to_read)); }
+    if (bp.how_to_read){ out.push(h1("How to read this report")); out.push(body(window.App.Report.cafHowToRead(instrument, bp.how_to_read))); }
     return out;
   }
 
@@ -3783,12 +3789,14 @@ window.App.ExportDOCX = (function () {
     children.push(new window.docx.Paragraph({spacing:{before:120,after:0},children:legendKids}));
     // Where to focus first: numbered cards
     var useBelow=!info.placeholder && groups.some(function(o){return (o.below||0)>0;});
-    var foc=groups.slice().sort(function(a,b){return useBelow?((b.below||0)-(a.below||0)):(b.counts.not-a.counts.not);}).filter(function(o){return useBelow?((o.below||0)>0):(o.counts.not>0);}).slice(0,3);
+    // Ranked by the scorer on the share of each group's applicable outcomes
+    // below the expected state (the same order as the executive summary).
+    var foc=window.App.ScoringCAF.rankGroups(groups,{useBelow:useBelow}).filter(function(r){return r.gaps>0;}).slice(0,3).map(function(r){return r.group;});
     if(foc.length){
       children.push(h2("Where to focus first"));
-      children.push(body("These "+groupNoun+" are furthest from "+window.App.ScoringCAF.profilePhrase(info.name)+", measured by the number of "+V.units+" below the expected state.",{color:COLOR.muted,spacing:{after:40}}));
+      children.push(body((foc.length===1?"This "+groupSingular+" is":"These "+groupNoun+" are")+" furthest from "+window.App.ScoringCAF.profilePhrase(info.name)+", measured by the share of "+(foc.length===1?"its":"their")+" applicable "+V.units+" below the expected state.",{color:COLOR.muted,spacing:{after:40}}));
       foc.forEach(function(o,i){
-        var tag=useBelow?(o.below+" of "+(o.meeting+o.below)+" below expected"):(o.counts.not+" "+gapState.label.toLowerCase());
+        var tag=useBelow?(o.below+" of "+o.total+" below expected"):((o.counts.partially+o.counts.not)+" of "+o.total+" with gaps");
         children.push(new window.docx.Table({width:{size:100,type:WT.PERCENTAGE},layout:TLT.FIXED,columnWidths:[620,5800,2606],borders:TBL_NONE,rows:[new TR({children:[
           new TC({borders:TBL_NONE,width:dxaW(620),shading:{type:SH.SOLID,color:COLOR.navy,fill:COLOR.navy},verticalAlign:"center",margins:{top:90,bottom:90},children:[P(String(i+1),{align:AT.CENTER,bold:true,color:"FFFFFF",size:18})]}),
           new TC({borders:TBL_NONE,width:dxaW(5800),shading:{type:SH.SOLID,color:"F5F8FA",fill:"F5F8FA"},verticalAlign:"center",margins:{top:90,bottom:90,left:170,right:80},children:[P(gid(o)+" "+o.name,{size:17,color:COLOR.text})]}),
@@ -5209,7 +5217,7 @@ window.App.ExportDOCX = (function () {
     return [ h1("Document control and confidentiality"), fixedTable(rows, [labelW, valueW]), body("", { spacing: { after: 200 } }) ];
   }
 
-  var NIS2_CAVEAT_TEXT = "This is a readiness and gap analysis against the obligations of the EU NIS2 Directive (Directive (EU) 2022/2555). The consultant judged each obligation as Achieved, Partially Achieved or Not Achieved, and the report gives no single grade or pass mark. The analysis does not determine legal compliance with NIS2 or with the national law that transposes it. The scope should be confirmed against the applicable national transposition.";
+  var NIS2_CAVEAT_TEXT = "This is a readiness and gap analysis against the obligations of the EU NIS2 Directive (Directive (EU) 2022/2555). The consultant judged each obligation as Achieved, Partially Achieved or Not Achieved, and the report gives no single grade or pass mark. The analysis does not determine legal compliance with NIS2 or with the national law that transposes it. Only the relevant competent authority can make that determination. The scope should be confirmed against the applicable national transposition.";
   function nis2CaveatBlock() {
     var TableRow = window.docx.TableRow, WidthType = window.docx.WidthType, Table = window.docx.Table, ShadingType = window.docx.ShadingType, TableCell = window.docx.TableCell;
     var tbl = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [ new TableRow({ cantSplit: true, children: [ new TableCell({
@@ -5238,6 +5246,14 @@ window.App.ExportDOCX = (function () {
     if (arr.length <= 1) return arr[0] || "";
     if (arr.length === 2) return arr[0] + " and " + arr[1];
     return arr.slice(0, -1).join(", ") + " and " + arr[arr.length - 1];
+  }
+  // The opening of a detail clause when every applicable item in the weakest
+  // area is short: "its one applicable outcome is ", "both applicable
+  // outcomes are ", "all 6 applicable outcomes are ".
+  function allApplicable(n, unit, units) {
+    if (n === 1) return "its one applicable " + unit + " is ";
+    if (n === 2) return "both applicable " + units + " are ";
+    return "all " + n + " applicable " + units + " are ";
   }
 
   // Expanded executive summary, composed from the narrative pack:
@@ -5275,10 +5291,14 @@ window.App.ExportDOCX = (function () {
     var weakestAreaName, weakestAreaDetail;
     if (worst.length) {
       weakestAreaName = nis2ListJoin(worst.map(function (w) { return w.name; }));
+      // The scorer ranks areas by the share of their obligations with a gap.
+      // Areas level on that order have the same counts, so the first speaks
+      // for all of them.
       var w0 = worst[0], wc = w0.counts || {};
-      weakestAreaDetail = ((wc.achieved || 0) === 0 && (wc.partially || 0) === 0 && (wc.not || 0) > 0)
-        ? (wc.not === 1 ? "its one applicable obligation is Not Achieved" : "all " + wc.not + " applicable obligations are Not Achieved")
-        : w0.gaps + " of " + w0.total + (w0.total === 1 ? " obligation" : " obligations") + (w0.gaps === 1 ? " is" : " are") + " Partially or Not Achieved";
+      var nLabel = (wc.partially || 0) === 0 ? "Not Achieved" : ((wc.not || 0) === 0 ? "Partially Achieved" : "Partially or Not Achieved");
+      weakestAreaDetail = (worst.length > 1 ? "in each area " : "") + ((w0.gaps === w0.total)
+        ? allApplicable(w0.total, "obligation", "obligations") + nLabel
+        : w0.gaps + " of " + w0.total + (w0.total === 1 ? " obligation" : " obligations") + (w0.gaps === 1 ? " is " : " are ") + nLabel);
     } else {
       weakestAreaName = "no single area";
       weakestAreaDetail = "no obligations are Partially or Not Achieved";
@@ -5328,7 +5348,10 @@ window.App.ExportDOCX = (function () {
     };
 
     // 1. Verdict - leads with the finding, not the numbers.
-    children.push(body(nis2Fill(hasGaps ? T.exec_verdict : T.exec_verdict_nogaps, slots)));
+    // The pack says "The weakest area is"; level areas take the plural.
+    var nisVerdict = nis2Fill(hasGaps ? T.exec_verdict : T.exec_verdict_nogaps, slots);
+    if (worst.length > 1) nisVerdict = nisVerdict.replace("The weakest area is ", "The weakest areas are ");
+    children.push(body(nisVerdict));
 
     // 2. Scope and profile.
     children.push(body(nis2Fill(T.exec_scope, slots) + " " + nis2Fill(T.exec_profile, slots)));
@@ -5374,7 +5397,7 @@ window.App.ExportDOCX = (function () {
     if (sc) out.push(body(sc));
     out = out.concat(attributionParas(instrument, true));
     out.push(h1("How to read this report"));
-    out.push(body("Each NIS2 obligation is judged Achieved, Partially Achieved or Not Achieved against full conformance with the Directive. The conformance percentage is given for context and is not a pass mark. Unknown reduces coverage and lowers confidence, and Not applicable obligations are excluded. The gap roadmap lists every obligation that is Partially or Not Achieved, in priority order, with the recommended action."));
+    out.push(body("Each NIS2 obligation is judged Achieved, Partially Achieved or Not Achieved against full conformance with the Directive. The conformance percentage is given for context and is not a pass mark. Unknown reduces coverage and lowers confidence, and Not applicable obligations are excluded. The gap roadmap lists every obligation that is Partially or Not Achieved, in priority order, with the recommended action. The weakest area is the one with the largest share of its applicable obligations Partially or Not Achieved."));
     return out;
   }
 
@@ -5604,7 +5627,7 @@ window.App.ExportDOCX = (function () {
     var worst = (scored.worstCategories || []).slice(0, 3);
     if (worst.length) {
       children.push(h2("Where to focus first"));
-      children.push(body("These NIS2 areas have the most obligations still to address.", { color: COLOR.muted, spacing: { after: 40 } }));
+      children.push(body(worst.length === 1 ? "This NIS2 area has the largest share of its obligations still to address." : "These NIS2 areas are tied for the largest share of their obligations still to address.", { color: COLOR.muted, spacing: { after: 40 } }));
       worst.forEach(function (w, i) {
         var cat = scored.byCategory.filter(function (b) { return b.categoryId === w.categoryId; })[0] || w;
         var gaps = cat.counts ? (cat.counts.partially + cat.counts.not) : null;
@@ -6165,8 +6188,11 @@ window.App.ExportDOCX = (function () {
       ? phrases.substantial : (hasGaps ? phrases.recognised : phrases.strong);
     var worst = scored.worstCategories || [];
     var weakestCategoryName = worst.length ? nis2ListJoin(worst.map(function (w) { return w.name; })) : "no single category";
-    var w0 = worst[0];
-    var weakestDetail = (w0 && worst.length === 1) ? (", where " + w0.gaps + " of " + w0.total + (w0.total === 1 ? " element" : " elements") + (w0.gaps === 1 ? " is" : " are") + " Not in place or Partially in place") : "";
+    // The scorer ranks categories by the share of their elements with a gap.
+    var w0 = worst[0], wLabel = !w0 ? "" : w0.counts.partially === 0 ? "Not in place" : (w0.counts.notInPlace === 0 ? "Partially in place" : "Not in place or Partially in place");
+    var weakestDetail = (w0 && worst.length === 1) ? (", where " + ((w0.gaps === w0.total)
+      ? allApplicable(w0.total, "element", "elements") + wLabel
+      : w0.gaps + " of " + w0.total + (w0.total === 1 ? " element" : " elements") + (w0.gaps === 1 ? " is " : " are ") + wLabel)) : "";
     var gcParts = [];
     if (c.notInPlace > 0 && gcFrags.notInPlace) gcParts.push(nis2Fill(gcFrags.notInPlace, { notInPlace: c.notInPlace }));
     if (c.partially > 0 && gcFrags.partially) gcParts.push(nis2Fill(gcFrags.partially, { partially: c.partially }));
@@ -6254,7 +6280,7 @@ window.App.ExportDOCX = (function () {
     var worst = (scored.worstCategories || []).slice(0, 3);
     if (worst.length) {
       children.push(h2("Where to focus first"));
-      children.push(body("These CSMS categories have the most elements still to put in place.", { color: COLOR.muted, spacing: { after: 40 } }));
+      children.push(body(worst.length === 1 ? "This CSMS category has the largest share of its elements still to put in place." : "These CSMS categories are tied for the largest share of their elements still to put in place.", { color: COLOR.muted, spacing: { after: 40 } }));
       worst.forEach(function (w, i) {
         children.push(sbFocusCard(i + 1, w.name, w.gaps + " of " + w.total + " with gaps"));
         children.push(sbSpacer());
@@ -6270,7 +6296,7 @@ window.App.ExportDOCX = (function () {
     if (sc) out.push(body(sc));
     out = out.concat(attributionParas(instrument, !!instrument.framing));
     out.push(h1("How to read this report"));
-    out.push(body("Each CSMS element is judged Not in place, Partially in place, Largely in place or In place against full conformance. The conformance index is given for context. Unknown reduces coverage and lowers confidence, and Not applicable elements are excluded. The roadmap lists every element that is Not in place or Partially in place."));
+    out.push(body("Each CSMS element is judged Not in place, Partially in place, Largely in place or In place against full conformance. The conformance index is given for context. Unknown reduces coverage and lowers confidence, and Not applicable elements are excluded. The roadmap lists every element that is Not in place or Partially in place. The weakest category is the one with the largest share of its applicable elements Not in place or Partially in place."));
     return out;
   }
 
@@ -6466,7 +6492,7 @@ window.App.ExportDOCX = (function () {
     // it follows the class sentence instead of being spliced into it.
     var routeText = String(cls.route || "").trim();
     if (routeText && !/[.!?]$/.test(routeText)) routeText += ".";
-    children.push(body(clientName + " commissioned a gap assessment of " + product + " against " + pk.regName + ". The " + pk.noun + " is classified as " + String(cls.classLabel || pk.defaultClassLabel).replace(/\.$/, "") + ". " + (routeText ? routeText + " " : "") + pk.layersSentence));
+    children.push(body(clientName + " commissioned a gap assessment of " + product + " against " + pk.regName + ". The " + pk.noun + " is classified as " + String(cls.classReportLabel || cls.classLabel || pk.defaultClassLabel).replace(/\.$/, "") + ". " + (routeText ? routeText + " " : "") + pk.layersSentence));
 
     layers.forEach(function (l) {
       var c = l.overall.counts;
@@ -6483,13 +6509,14 @@ window.App.ExportDOCX = (function () {
         run("With " + nBlock + " conformity obligation" + (nBlock === 1 ? "" : "s") + " not in place, the " + pk.noun + (nBlock === 1 ? pk.blockerTail.replace("until those obligations are met", "until that obligation is met") : pk.blockerTail))
       ]));
     } else if (layers.length) {
-      var worst = layers.slice().sort(function (a, b) {
-        var ac = a.overall.conformance === null ? 2 : a.overall.conformance;
-        var bc = b.overall.conformance === null ? 2 : b.overall.conformance;
-        return ac - bc;
-      })[0];
-      if (worst && craLayerBand(worst.overall) !== "met") {
-        children.push(body("The weakest layer is " + worst.layerId + " " + worst.name + "."));
+      // The scorer ranks the layers by the share of their requirements still
+      // open, so a small layer with most of it open outranks a large one.
+      var weakL = scored.weakestLayers || [];
+      if (weakL.length) {
+        var wl0 = weakL[0];
+        children.push(body((weakL.length === 1
+          ? "The weakest layer is " + wl0.layerId + " " + wl0.name + ", with the largest share of its requirements open (" + wl0.gaps + " of " + wl0.total + ")."
+          : "The weakest layers are " + nis2ListJoin(weakL.map(function (l) { return l.layerId + " " + l.name; })) + ", each with " + wl0.gaps + " of " + wl0.total + " requirements open.")));
       } else if (gaps.length === 0) {
         children.push(body("On the evidence captured, all layers in scope are at full conformance. The remaining work is to keep that position current as the product and the supporting standards change."));
       }
@@ -6562,7 +6589,7 @@ window.App.ExportDOCX = (function () {
         return { t: CRA.formatPct(l.overall.conformance), color: b.color, label: l.layerId + "  " + l.name + "  (" + l.overall.gaps + " gap" + (l.overall.gaps === 1 ? "" : "s") + ")", fill: b.fill, size: 40 };
       })));
     }
-    children.push(body(pk.Noun + ": " + ((target && target.name) || "(not set)") + " (classified " + (cls.classLabel || "Default") + "). The conformance index for each layer is given for context only.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+    children.push(body(pk.Noun + ": " + ((target && target.name) || "(not set)") + " (classified " + (cls.classReportLabel || cls.classLabel || "Default") + "). The conformance index for each layer is given for context only.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
 
     children.push(h2("Conformance profile by layer"));
     children.push(sbStackTable(layers.map(function (l) {
@@ -6620,7 +6647,7 @@ window.App.ExportDOCX = (function () {
     }
     var rows = [
       kv(pk.Noun, (target && target.name) || "(not set)"),
-      kv(pk.Noun + " class", cls.classLabel || pk.defaultClassLabel),
+      kv(pk.Noun + " class", cls.classReportLabel || cls.classLabel || pk.defaultClassLabel),
       kv(pk.categoryRowLabel, cls.categoryText || "(none)"),
       kv("Conformity route (" + pk.conformityLayer + ")", cls.route || ""),
       kv("Layers in scope", (scored.layersInScope || []).join(", "))
@@ -6926,7 +6953,7 @@ window.App.ExportDOCX = (function () {
       var cls = pt.result.classification || {};
       rows.push(new TableRow({ children: [
         cellDxa(body(pt.target.name, { bold: true }), widths[0], { valign: "center" }),
-        cellDxa(body(cls.classLabel || "Default"), widths[1], { valign: "center" }),
+        cellDxa(body(cls.classReportLabel || cls.classLabel || "Default"), widths[1], { valign: "center" }),
         cellDxa(body(cls.categoryText || "(none)"), widths[2], { valign: "center" }),
         cellDxa(body(cls.route || ""), widths[3], { valign: "center" })
       ] }));
