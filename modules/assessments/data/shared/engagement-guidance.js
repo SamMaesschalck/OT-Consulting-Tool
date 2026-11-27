@@ -298,10 +298,10 @@ window.App.Data.shared.engagementGuidance = {
     "eu-machinery": {
       "commonDocuments": [
         "Machine risk assessment file (Annex III General Principles) and EHSR applicability mapping",
-        "Technical documentation / technical file per machine (Annex IV Part A), incl. sensor/autonomous system descriptions",
+        "Technical documentation or technical file per machine (Annex IV Part A), including descriptions of sensor and autonomous systems",
         "Control-system safety case (ISO 13849 / IEC 62061) and its security extension for 1.2.1",
         "Safety-software inventory, integrity protection and version/upload logging design (1.1.9, 1.2.1(f))",
-        "EU declaration of conformity (or declaration of incorporation + assembly instructions for partly completed machinery)",
+        "EU declaration of conformity (or the declaration of incorporation and assembly instructions for partly completed machinery)",
         "Harmonised-standards mapping and any EU-type examination certificates with expiry dates",
         "Instructions for use and the digital-instructions hosting arrangement (10-year availability)"
       ],
