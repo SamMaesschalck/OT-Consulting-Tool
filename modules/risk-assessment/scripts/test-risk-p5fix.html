@@ -336,7 +336,7 @@
       var c = M.presetCriteria(id);
       ok(c.likelihood.concat(c.impact).every(function (l) { return l.note.indexOf(":") < 0; }), "the " + id + " preset's definitions have no colon in them");
     });
-    ok(/^House method: SolutionsPT's risk matrix, as the standard does not prescribe one\. Tolerable risk is medium \(step 1\)\.$/.test(main().querySelector(".framing-note").textContent), "step 5's framing note", main().querySelector(".framing-note").textContent);
+    ok(/^This assessment uses the SolutionsPT risk matrix, which is part of the house method, because the standard does not prescribe one\. Tolerable risk is medium \(step 1\)\.$/.test(main().querySelector(".framing-note").textContent), "step 5's framing note", main().querySelector(".framing-note").textContent);
     var LIB = RT.scenarioLibrary.scenarios;
     function hs(id) { return LIB.filter(function (s) { return s.id === id; })[0]; }
     ok(same(hs("HS04").countermeasures[2].srRefs, ["SR 3.4"]) && same(hs("HS08").countermeasures[2].srRefs, ["SR 7.6", "SR 7.7"]) && same(hs("HS15").countermeasures[1].srRefs, ["SR 6.2"]) &&

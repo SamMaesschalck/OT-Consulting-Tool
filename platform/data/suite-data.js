@@ -12,7 +12,7 @@ window.Suite.Data = {
                         "shortName":  "Assessments",
                         "navLabel":  "Assess",
                         "summary":  "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and other standards.",
-                        "useWhen":  "Use it to report a customer\u0027s gaps against a standard, and keep later re-assessments in the same project file.",
+                        "useWhen":  "Use it to report the gaps against a standard. One project file can also hold later re-assessments.",
                         "entry":  "../modules/assessments/index.html",
                         "payload":  "assessments",
                         "tour":  {

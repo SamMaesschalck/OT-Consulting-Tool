@@ -66,7 +66,7 @@ window.SPT_TOUR_PROJECT = {
   "suc": {
     "name": "Acme Petrochemicals - Unit 300 Alkylation Control System",
     "description": "The basic process control system, safety instrumented system and supporting OT infrastructure for the Unit 300 alkylation unit at the Teesport refinery. The system comprises redundant SCADA/DCS servers and operator HMIs in the central control room, unit PLCs and remote I/O in the field auxiliary rooms, the SIS that performs the unit's safety instrumented functions, the engineering workstations, and the plant DMZ, which carries the historian and the vendor access paths.",
-    "scopeStatement": "The scope covers all Unit 300 control, safety and engineering systems from the field controllers up to and including the plant DMZ, and the conduits that cross the boundary for historian replication, vendor remote access and corporate reporting. The corporate IT network beyond the DMZ firewall, the other process units and the terminal loading systems are out of scope. The loading systems are assessed separately.",
+    "scopeStatement": "All Unit 300 control, safety and engineering systems from the field controllers up to and including the plant DMZ are in scope, with the conduits that cross the boundary for historian replication, vendor remote access and corporate reporting. The corporate IT network beyond the DMZ firewall, the other process units and the terminal loading systems are out of scope. The loading systems are assessed separately.",
     "assumptions": [
       "Physical access to the control room and field auxiliary rooms is badge-controlled and logged",
       "The corporate network is treated as untrusted and assumed compromised for this assessment",
@@ -96,12 +96,12 @@ window.SPT_TOUR_PROJECT = {
     "tolerableRisk": "medium",
     "tolerableConfirmed": "medium",
     "highLevelAssets": [
-      { "id": "A1", "name": "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", "functionLocation": "Closed-loop control and operator interface - control room / field aux rooms", "consequence": "serious", "consequenceSource": "HAZOP revalidation, 2025", "likelihood": "medium", "note": "The primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. Assigned to Z1 and assessed in detail." },
-      { "id": "A2", "name": "Safety Instrumented System (SIS)", "functionLocation": "Emergency depressurisation and acid isolation - field aux room 2", "consequence": "severe", "consequenceSource": "LOPA and SIL determination", "likelihood": "low", "note": "The last layer of protection, so any compromise is intolerable whatever its likelihood. Assigned to Z2 and assessed in detail." },
-      { "id": "A3", "name": "Plant DMZ & process historian", "functionLocation": "Data brokerage between OT and corporate - server room", "consequence": "serious", "likelihood": "medium", "note": "Every external path passes through the DMZ, and a foothold here gives a route into the BPCS. Assigned to Z3 and assessed in detail." },
-      { "id": "A4", "name": "Engineering workstations & config management", "functionLocation": "DCS/PLC/SIS configuration - control building office", "consequence": "serious", "likelihood": "medium", "note": "These workstations can change every controller, and removable media and legacy tools are in routine use. Assigned to Z4 and assessed in detail." },
-      { "id": "A5", "name": "Laboratory information system link", "functionLocation": "Sample results feed to the historian - lab", "consequence": "serious", "likelihood": "low", "note": "A one-way feed with no control path, ranked medium. The feed ends at the historian, which Z3 covers.", "inSuc": false },
-      { "id": "A6", "name": "CCTV & physical security systems", "functionLocation": "Site perimeter and unit cameras - site-wide", "consequence": "negligible", "likelihood": "high", "note": "Commodity IP equipment that is often probed but has no process consequence. It is ranked low.", "inSuc": false }
+      { "id": "A1", "name": "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", "functionLocation": "Closed-loop control and operator interface - control room / field aux rooms", "consequence": "serious", "consequenceSource": "HAZOP revalidation, 2025", "likelihood": "medium", "note": "The BPCS is the primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. It is assigned to Z1 and assessed in detail." },
+      { "id": "A2", "name": "Safety Instrumented System (SIS)", "functionLocation": "Emergency depressurisation and acid isolation - field aux room 2", "consequence": "severe", "consequenceSource": "LOPA and SIL determination", "likelihood": "low", "note": "The SIS is the last layer of protection, so any compromise is intolerable whatever its likelihood. It is assigned to Z2 and assessed in detail." },
+      { "id": "A3", "name": "Plant DMZ & process historian", "functionLocation": "Data brokerage between OT and corporate - server room", "consequence": "serious", "likelihood": "medium", "note": "Every external path passes through the DMZ, and a foothold here gives a route into the BPCS. The DMZ is assigned to Z3 and assessed in detail." },
+      { "id": "A4", "name": "Engineering workstations & config management", "functionLocation": "DCS/PLC/SIS configuration - control building office", "consequence": "serious", "likelihood": "medium", "note": "These workstations can change every controller, and removable media and legacy tools are in routine use. They are assigned to Z4 and assessed in detail." },
+      { "id": "A5", "name": "Laboratory information system link", "functionLocation": "Sample results feed to the historian - lab", "consequence": "serious", "likelihood": "low", "note": "The link is a one-way feed with no control path, and it ranks medium. The feed ends at the historian, which Z3 covers.", "inSuc": false },
+      { "id": "A6", "name": "CCTV & physical security systems", "functionLocation": "Site perimeter and unit cameras - site-wide", "consequence": "negligible", "likelihood": "high", "note": "The cameras are commodity IP equipment that is often probed, but they have no process consequence, so they rank low.", "inSuc": false }
     ],
     "threatSources": [
       "NCSC threat reports and advisories",
@@ -151,9 +151,9 @@ window.SPT_TOUR_PROJECT = {
       { "id": "D4", "title": "COMAH safety report extract - Unit 300", "reference": "COMAH-U300-2025", "source": "HSE submission", "relevance": "Worst-case consequence calibration" }
     ],
     "observations": [
-      { "id": "O1", "description": "Control room and field auxiliary room walkdown", "location": "Unit 300", "date": "2026-07-01", "notes": "Badge control verified; unlocked engineering cabinet noted and raised" },
-      { "id": "O2", "description": "DMZ firewall rule review at the console", "location": "Server room", "date": "2026-07-02", "notes": "Rules match diagram; two stale vendor rules removed during review" },
-      { "id": "O3", "description": "Vendor remote access session demonstration", "location": "Control building", "date": "2026-07-02", "notes": "Session activation, attribution and recording observed from start to finish" }
+      { "id": "O1", "description": "Control room and field auxiliary room walkdown", "location": "Unit 300", "date": "2026-07-01", "notes": "Badge control was verified. An unlocked engineering cabinet was noted and raised." },
+      { "id": "O2", "description": "DMZ firewall rule review at the console", "location": "Server room", "date": "2026-07-02", "notes": "The rules match the diagram. Two stale vendor rules were removed during the review." },
+      { "id": "O3", "description": "Vendor remote access session demonstration", "location": "Control building", "date": "2026-07-02", "notes": "Session activation, attribution and recording were observed from start to finish." }
     ]
   },
   "approval": {
@@ -214,7 +214,7 @@ window.SPT_TOUR_PROJECT = {
       ],
       "securityPolicies": [
         "No engineering changes without MoC approval",
-        "Vendor sessions activated per ticket, time-bounded"
+        "Vendor sessions are activated per ticket and time-bounded"
       ],
       "securityRequirements": [
         "IEC 62443-3-3 system requirements and requirement enhancements at its SL-T",
@@ -235,7 +235,7 @@ window.SPT_TOUR_PROJECT = {
         { "id": "T3", "consequenceId": "K3", "statement": "A flooding or resource-exhaustion event on the control network degrades operator view of the unit.", "source": "Network fault or deliberate DoS", "entryPoint": "Any host on the control network", "consequence": "Operator view is degraded, and the unit is shut down by hand within 30 minutes if view is not restored.", "assetIds": ["AS2"], "vulnerabilityIds": [], "countermeasureIds": [], "affectedFR": ["RA"], "likelihood": "low", "impact": "serious", "likelihoodRationale": "No external path reaches the control network directly.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": null, "confirmed": false, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
-      "justification": "The worst unmitigated risks in this zone are High against a Medium tolerable risk (an attacker riding the vendor remote access path, and malware brought in over an engineering connection). The permanent remote access path also raises the likelihood of attacks on IAC, UC and RDF. IAC, SI and RDF are therefore set to SL3. UC stays at SL2 because procedures limit use control inside the control room and no High risk bears on it directly. DC is set to SL1, as process data has a low confidentiality consequence. TRE and RA at SL2 support forensic investigation and the resilience the unit needs, as an outage forces a manual shutdown within 30 minutes."
+      "justification": "The worst unmitigated risks in this zone are High against a Medium tolerable risk (an attacker riding the vendor remote access path, and malware brought in over an engineering connection). The permanent remote access path also makes threats to IAC, UC and RDF more likely. IAC, SI and RDF are therefore set to SL3. UC stays at SL2 because procedures limit use control inside the control room and no High risk bears on it directly. DC is set to SL1, as process data has a low confidentiality consequence. TRE and RA at SL2 support forensic investigation and the resilience the unit needs, as an outage forces a manual shutdown within 30 minutes."
     },
     {
       "id": "Z2",
@@ -320,7 +320,7 @@ window.SPT_TOUR_PROJECT = {
         "The corporate network beyond the DMZ firewall is untrusted"
       ],
       "separation": {
-        "external": { "answer": "met", "reason": "The DMZ is the zone built to meet external networks: it holds no controllers, and the historian it holds is a replica." }
+        "external": { "answer": "met", "reason": "The DMZ is the zone built to face external networks. It holds no controllers, and its historian is a replica." }
       },
       "externalDependencies": [
         "Corporate AD federation for jump-host MFA",
@@ -328,7 +328,7 @@ window.SPT_TOUR_PROJECT = {
       ],
       "securityPolicies": [
         "All exchange between OT and corporate passes through the DMZ, with no direct paths",
-        "DMZ hosts patched monthly (IT window)"
+        "DMZ hosts are patched monthly in the IT window"
       ],
       "securityRequirements": [
         "IEC 62443-3-3 system requirements and requirement enhancements at its SL-T",
@@ -386,8 +386,8 @@ window.SPT_TOUR_PROJECT = {
         "Vendor licence dongles and offline update bundles"
       ],
       "securityPolicies": [
-        "USB media scanned at the kiosk before OT use",
-        "Engineering accounts are individual; admin by exception"
+        "USB media is scanned at the kiosk before OT use",
+        "Engineering accounts are individual, and admin rights are given by exception"
       ],
       "securityRequirements": [
         "IEC 62443-3-3 system requirements and requirement enhancements at its SL-T",
@@ -451,7 +451,7 @@ window.SPT_TOUR_PROJECT = {
       "accessPoints": ["Vendor VPN concentrator", "Jump host remote desktop service"],
       "physicalAccessPoints": ["Server room, OT rack 4"],
       "dataFlows": ["Vendor engineer sessions to the DCS servers, both ways while a session is open"],
-      "securityPolicies": ["Vendor sessions activated per ticket, time-bounded"],
+      "securityPolicies": ["Vendor sessions are activated per ticket and time-bounded"],
       "assumptions": ["The vendor issues and revokes its engineers' credentials and reports leavers"],
       "externalDependencies": ["DCS vendor support contract (remote diagnostics)", "Site internet link"],
       "securityRequirements": ["IEC 62443-3-3 system requirements and requirement enhancements at its SL-T", "Acme third-party remote access procedure OPS-PROC-118"],
@@ -494,7 +494,7 @@ window.SPT_TOUR_PROJECT = {
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 2, "UC": 2, "SI": 2, "DC": 2, "RDF": 2, "TRE": 2, "RA": 1 },
-      "justification": "C3 is the boundary conduit to the untrusted corporate network and carries no control traffic. Its targets match the DMZ it serves. It is SL2 on every foundational requirement except RA, for the read-only brokerage and the confidentiality of throughput data, and SL1 on RA, because losing corporate reporting does not affect operator view or control. The house method suggests SL3 on IAC, SI and RDF because the DMZ's own suggestion is SL3, and the DMZ holds those at SL2 for the reasons in its justification.",
+      "justification": "C3 is the boundary conduit to the untrusted corporate network and carries no control traffic. Its targets match the DMZ it serves. It is SL2 on every foundational requirement except RA, for the read-only brokerage and the confidentiality of throughput data. RA is SL1, because losing corporate reporting does not affect operator view or control. The house method suggests SL3 on IAC, SI and RDF because the DMZ's own suggestion is SL3, and the DMZ holds those at SL2 for the reasons in its justification.",
       "assessment": { "depth": "proportionate", "considered": "A compromised client on the out-of-scope corporate network using the read-only reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6." }
     },
     {
@@ -512,7 +512,7 @@ window.SPT_TOUR_PROJECT = {
       "accessPoints": ["Engineering VLAN ports on the control network core switch"],
       "physicalAccessPoints": ["Engineering office network cabinet"],
       "dataFlows": ["Configuration downloads and diagnostics, engineering workstations to the BPCS, both ways while a session is open"],
-      "securityPolicies": ["No engineering changes without MoC approval", "Engineering accounts are individual; admin by exception"],
+      "securityPolicies": ["No engineering changes without MoC approval", "Engineering accounts are individual, and admin rights are given by exception"],
       "assumptions": ["Only the engineering workstations in Z4 are on the engineering VLAN"],
       "externalDependencies": ["DCS and PLC vendor engineering software licences"],
       "securityRequirements": ["IEC 62443-3-3 system requirements and requirement enhancements at its SL-T", "Acme OT security standard GS-104, section 6 (engineering access and removable media)"],
@@ -529,7 +529,7 @@ window.SPT_TOUR_PROJECT = {
       "toZone": "Z2",
       "name": "Keyed SIS engineering connection",
       "channels": ["SIS engineering protocol"],
-      "notes": "Patched in only for an authorised SIS change, with the program-mode keyswitch turned and a keyed bypass record, and disconnected at all other times.",
+      "notes": "The connection is patched in only for an authorised SIS change, with the program-mode keyswitch turned and a keyed bypass record, and disconnected at all other times.",
       "direction": "both",
       "temporary": true,
       "safetyRelated": true,

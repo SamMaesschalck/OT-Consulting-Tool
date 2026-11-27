@@ -37,7 +37,7 @@
     "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Some document control fields are empty. They may be filled in at issue." },
     "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "A skipped section number usually means a section was hidden." },
     "figures": { title: "Figures that disagree", severity: "must-fix", about: "A count printed in the report does not match the assessment behind it." },
-    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat is above the tolerable risk and has no confirmed treatment decision, or its decision is incomplete." },
+    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat is above the tolerable risk and has no confirmed decision to reduce it, accept it, transfer it or treat it through the target levels, or a decision is missing its countermeasure, reason or arrangement, who accepted it, or the acceptance of a risk that stays above tolerable." },
     "risk-slt-justification": { title: "Target levels with no justification", severity: "should-fix", about: "A zone or conduit has target security levels set and no justification recorded." }
   };
 

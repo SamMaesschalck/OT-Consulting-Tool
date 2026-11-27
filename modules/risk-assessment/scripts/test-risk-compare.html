@@ -303,10 +303,10 @@
     // (was: "the high-level report has no such section"). Re-pointed, same intent: it says nothing the
     // high-level report does not hold (no zones, threats or countermeasures).
     var hlB = docText(RX.buildWordDoc(P(), { highLevelOnly: true }));
-    var hFound = hlB.indexOf("\nWhat we found\n"), hPr = hlB.indexOf("\nProgress since the previous assessment\n"), hNext = hlB.indexOf("\nWhat happens next\n");
+    var hFound = hlB.indexOf("\nFindings\n"), hPr = hlB.indexOf("\nProgress since the previous assessment\n"), hNext = hlB.indexOf("\nWhat happens next\n");
     var hSec = hlB.slice(hPr, hNext);
     ok(hFound > 0 && hPr > hFound && hNext > hPr && /Nothing recorded has changed since\./.test(hSec) && !/\nZones and conduits\n|\nSL-T\n|\nThreat scenarios\n|\nAccepted risks\n/.test(hSec),
-      "the high-level report's section, after What we found, holds no zone, SL-T, threat or accepted risk change", hSec.replace(/\n/g, " | ").slice(0, 300));
+      "the high-level report's section, after Findings, holds no zone, SL-T, threat or accepted risk change", hSec.replace(/\n/g, " | ").slice(0, 300));
     var sameP = clone(P()); sameP.baseline = RT.baselineFrom(JSON.stringify(DEMO), "d.json").baseline;
     var sameT = docText(RX.buildWordDoc(sameP, {}));
     ok(/This assessment is compared with the previous assessment of .+\. Nothing recorded has changed since\.\n/.test(sameT), "against the same assessment it says nothing has changed");

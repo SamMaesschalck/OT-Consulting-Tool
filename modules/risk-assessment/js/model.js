@@ -78,7 +78,8 @@ window.RiskApp.Model = (function () {
   var SECTION_KEY_ALIASES = {
     "high-level-risk-ranking-4-2": "high-level-risk-ranking",
     "mandatory-security-functions": "security-functions-that-must-be-kept",
-    "known-or-presumed-threats": "threat-environment"
+    "known-or-presumed-threats": "threat-environment",
+    "what-we-found": "findings"
   };
   function sectionKeyAlias(key) {
     return Object.prototype.hasOwnProperty.call(SECTION_KEY_ALIASES, key) ? SECTION_KEY_ALIASES[key] : key;
@@ -388,8 +389,18 @@ window.RiskApp.Model = (function () {
   var LEVEL_MIN = 3, LEVEL_MAX = 5;
   var CONSEQUENCE_SOURCES = ["HAZOP", "LOPA", "Business impact analysis", "Interview", "Site walk-down"];
   function plainNote(s) { s = String(s || "").replace(/^House default:\s*/i, ""); return s.charAt(0).toUpperCase() + s.slice(1); }
-  function houseCriteria() {
-    function lv(arr) { return arr.map(function (x) { return { id: x.id, name: x.name, note: plainNote(x.note) }; }); }
+  // The house likelihood definitions as written before the wording fixes
+  // (Nov 2026). A project holding a copy of the house criteria with them is
+  // still on the house criteria (isHouseContent), so its approvals and its
+  // reports' words do not move.
+  var HOUSE_LIKELIHOOD_NOTES_WAS = {
+    low: "No known history; would require an unlikely combination of access, capability and intent.",
+    medium: "Plausible given the exposure and a capable adversary; occurrence would not be surprising over the system's life.",
+    high: "Known-exploited path, an exposed access point, or an actively targeted asset; expected without intervention."
+  };
+  function houseCriteria(asWas) {
+    function lv(arr, was) { return arr.map(function (x) { return { id: x.id, name: x.name, note: was && was[x.id] ? was[x.id] : plainNote(x.note) }; }); }
+    if (asWas) { var o = houseCriteria(); o.likelihood = lv(LIK, HOUSE_LIKELIHOOD_NOTES_WAS); return o; }
     var m = {};
     SEV.forEach(function (s) { m[s.id] = {}; LIK.forEach(function (l) { m[s.id][l.id] = RULES.riskMatrix[s.id][l.id]; }); });
     return { likelihood: lv(LIK), impact: lv(SEV), matrix: m, categories: CATS.map(function (c) { return { id: c.id, name: c.name }; }) };
@@ -457,8 +468,8 @@ window.RiskApp.Model = (function () {
   }
   var HOUSE_CONTENT = null;
   function isHouseContent(c) {
-    if (HOUSE_CONTENT == null) HOUSE_CONTENT = criteriaContent(houseCriteria());
-    return criteriaContent(c) === HOUSE_CONTENT;
+    if (HOUSE_CONTENT == null) HOUSE_CONTENT = [criteriaContent(houseCriteria()), criteriaContent(houseCriteria(true))];
+    return HOUSE_CONTENT.indexOf(criteriaContent(c)) >= 0;
   }
   // The generic preset (3x3, 4x4 or 5x5) the project's stored criteria still
   // are, levels, definitions and cells unchanged, or "" (the categories are

@@ -193,7 +193,7 @@ window.RiskApp.Reports = (function () {
     var p = state.project;
     main.appendChild(h("div", { class: "print-only" }, [
       h("h1", { class: "page-title", text: "OT cyber risk assessment summary: " + (p.suc.name || "unnamed SUC") }),
-      h("p", { class: "page-sub", text: "IEC 62443-3-2 zones and conduits assessment · " + todayISO() + ". The suggested SLs come from a SolutionsPT heuristic. Each SL-T, set per FR, and its justification are the consultant's judgement." })
+      h("p", { class: "page-sub", text: "IEC 62443-3-2 zones and conduits assessment · " + todayISO() + ". The suggested SLs come from the SolutionsPT house method. Each SL-T, set per FR, and its justification are the consultant's judgement." })
     ]));
     main.appendChild(h("h1", { class: "page-title no-print", text: "Detailed report summary" }));
     main.appendChild(h("p", { class: "page-sub no-print", text: "The assessment on one page, with the SL-T shown for each FR (" + FR_IDS.join("/") + ")." }));

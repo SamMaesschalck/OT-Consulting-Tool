@@ -1966,7 +1966,7 @@
     // on a narrow window); with two reports, which one this is.
     var who = [e.client, e.site].filter(Boolean).join(", "), me = state.review && state.review.reviewer;
     main.appendChild(h("p", { class: "page-sub", text: (who ? who + ". " : "") +
-      (multi ? "The " + (doc.title || "report") : "The Word report") + " as the client will read it, round " + pack.round + "." +
+      "This is " + (multi ? "the " + (doc.title || "report") : "the Word report") + " as the client will read it, round " + pack.round + "." +
       (me ? " You are reviewing as " + me + "." : "") }));
     var rq = requestPanel();
     if (rq) main.appendChild(rq);

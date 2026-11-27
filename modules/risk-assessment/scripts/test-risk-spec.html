@@ -325,7 +325,7 @@
       // Phase 4b: its new headings get keys of their own, and the headings it kept keep theirs.
       ok(keys["Risk position"] === "risk-position" && keys["Decisions required"] === "decisions-required" && keys["Risk register"] === "risk-register" && keys["Treatment plan"] === "treatment-plan" && keys["Accepted risks"] === "accepted-risks" && keys["Driving scenarios"] === "driving-scenarios",
         "Word: phase 4's new headings get keys of their own", JSON.stringify([keys["Risk position"], keys["Risk register"], keys["Driving scenarios"]]));
-      ok(keys["Executive summary"] === "executive-summary" && keys["What we found"] === "what-we-found" && keys["Zones, conduits and the detailed risk assessment"] === "zones-conduits-and-the-detailed-risk-assessment" && keys["Target security levels (SL-T, per foundational requirement)"] === "target-security-levels-sl-t-per-foundational-requirement",
+      ok(keys["Executive summary"] === "executive-summary" && keys["Findings"] === "findings" && keys["Zones, conduits and the detailed risk assessment"] === "zones-conduits-and-the-detailed-risk-assessment" && keys["Target security levels (SL-T, per foundational requirement)"] === "target-security-levels-sl-t-per-foundational-requirement",
         "Word: and the headings phase 4 kept keep theirs", JSON.stringify([keys["Zones, conduits and the detailed risk assessment"], keys["Target security levels (SL-T, per foundational requirement)"]]));
       // ---- the review hash leaves the approvers out ----
       return RR.buildDocuments();

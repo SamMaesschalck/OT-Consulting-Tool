@@ -10,7 +10,7 @@
       "shortName": "Assessments",
       "navLabel": "Assess",
       "summary": "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and other standards.",
-      "useWhen": "Use it to report a customer's gaps against a standard, and keep later re-assessments in the same project file.",
+      "useWhen": "Use it to report the gaps against a standard. One project file can also hold later re-assessments.",
       "tour": { "entry": "tour.html", "label": "Take the tour", "note": "A finished demo of every assessment" }
     },
     {

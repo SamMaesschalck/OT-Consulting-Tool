@@ -201,7 +201,7 @@
     // Since the zone-depth step: the standard's comparison is the SUC's, once;
     // each zone's and conduit's own initial risk only suggests its depth
     // (house method), which is set on step 5.
-    ok(/House method/.test(m.querySelector(".framing-note").textContent) && /By the same method, a conduit takes/.test(m.querySelector(".framing-note").textContent) &&!/standard requires|the standard says/i.test(m.textContent) &&
+    ok(/^Under the house method, /.test(m.querySelector(".framing-note").textContent) && /By the same method, a conduit takes/.test(m.querySelector(".framing-note").textContent) &&!/standard requires|the standard says/i.test(m.textContent) &&
       !!m.querySelector('[data-check-anchor="suc-compare"]') && /SUC against tolerable risk/.test(m.querySelector('[data-check-anchor="suc-compare"]').textContent),
       "comparing per zone and conduit is stated as the house method for the depth, beside the SUC's one comparison, and the conduit rule as a house rule");
     var rowIds = [].map.call(m.querySelectorAll(".cmp-table tbody tr"), function (r) { return r.getAttribute("data-owner-id"); }).join(",");

@@ -340,13 +340,16 @@
       ok(ss.slice(0, 3).join("|") === "Date|Topic|Participants" && ss[3] === "2026-07-01", "Word: the basis lists the risk assessment sessions");
       // 10 and 12
       ok(det.some(function (x) { return /^Acme Group incident response plan, OT annex\. It is implemented by the OT annex playbooks, with the jump host's session recordings and the DMZ firewall logs as evidence\.$/.test(x); }), "Word: each policy with what implements it");
+      // Wording fixes: only an ordinary capitalised word is lowered, so an acronym such as MoC keeps its capitals.
+      ok(det.some(function (x) { return /^Teesport permit-to-work and management of change procedures\. It is implemented by MoC approval for every engineering change, /.test(x); }) && !det.some(function (x) { return /moC approval/.test(x); }), "Word: a policy implemented by MoC approval keeps the acronym's capitals");
+      ok(det.some(function (x) { return /\. It is implemented by the zone and conduit SL-T, /.test(x); }), "Word: an ordinary first word is still lowered inside the sentence");
       ok(after(det, "Access points of the system under consideration").slice(0, 4).join("|") === "Access point|Enters|Vendor remote access over the site internet link, to the VPN concentrator in the DMZ|C2 Vendor remote access", "Word: the SUC's access points, each with what it enters");
       // 16. the register's examples
       ok(!det.some(function (x) { return /mechanical safeguards|emergency procedures/.test(x); }), "Word: none of the standard's examples");
       return wordParas(P(), { highLevelOnly: true });
     }).then(function (hl) {
       ok(hl.filter(function (x) { return /which the standard calls the initial cyber security risk assessment/.test(x); }).length === 1, "high-level: the standard's term is named once");
-      ok(hl.some(function (x) { return /Under the house method, the systems above the tolerable risk of .*\) are the candidates for a detailed assessment/.test(x); }) && hl.some(function (x) { return /\. Under the house method, a system rated in one of those cells is a candidate for a detailed assessment\.$/.test(x); }), "high-level: the candidates are the house method's");
+      ok(hl.some(function (x) { return /Under the house method, the systems above the tolerable risk of \w+ are the candidates for a detailed assessment: .+\./.test(x); }) && hl.some(function (x) { return /\. Under the house method, a system rated in one of those cells is a candidate for a detailed assessment\.$/.test(x); }), "high-level: the candidates are the house method's");
       ok(hl.some(function (x) { return /^The approvals are recorded below\. An approval covers the tolerable risk and the ranking in this report, within the scope given for it\. The scopes below were given for the full assessment, whose other results are in the detailed report\.$/.test(x); }), "high-level: it says whose scopes it prints");
       return wordParas(P(), { spec: true });
     }).then(function (spec) {

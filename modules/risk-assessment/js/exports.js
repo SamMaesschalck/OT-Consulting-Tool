@@ -74,6 +74,20 @@ window.RiskExports = (function () {
   function noStop(s) { return String(s || "").replace(/[.\s]+$/, ""); }
   function slug(s) { return String(s || "risk-assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "risk-assessment"; }
   function notSet(v) { return (v && String(v).trim()) ? String(v) : "(not set)"; }
+  // A consultant's phrase going inside one of our sentences, its first
+  // letter lowered only where the first word is an ordinary capitalised word
+  // ("The OT annex" reads "the OT annex"). An acronym or a word with a
+  // capital inside it keeps its capitals ("MoC approval", "SIS", "GS-104"),
+  // and so does a word of the client's name ("Acme Group ...").
+  function lowerLead(s, p) {
+    s = String(s || "");
+    var w = (s.match(/^[^\s,;:.()]+/) || [""])[0];
+    if (!/^(?:A|[A-Z][a-z]+(?:[-'’][a-z]+)*)$/.test(w)) return s;
+    var base = w.replace(/['’]s$/, "");
+    var client = String((p && p.engagement && p.engagement.client) || "").split(/[^A-Za-z]+/);
+    if (client.indexOf(base) >= 0) return s;
+    return s.charAt(0).toLowerCase() + s.slice(1);
+  }
   // The clock, unless a test has pinned today (RiskTool.setToday).
   function todayISO() {
     var E = window.RiskApp && window.RiskApp.Engine, pin = E && E.todayPinned ? E.todayPinned() : null;
@@ -911,7 +925,7 @@ window.RiskExports = (function () {
       // (shared/docx-blocks.js), as an approval is what fills it in.
       ["QA review by", notSet(eng.qaReviewBy)],
       ["Confidentiality", notSet(eng.confidentiality)],
-      ["Method", opts.highLevelOnly ? "IEC 62443-3-2 high-level risk assessment, using " + CWD.matrix : "IEC 62443-3-2, using " + CWD.matrix + (houseWords ? " and risk-to-SL mapping" : " and the house method's risk-to-SL mapping")],
+      ["Method", opts.highLevelOnly ? "IEC 62443-3-2 high-level risk assessment, using " + CWD.matrix + (houseWords ? " (house method)" : "") :"IEC 62443-3-2, using " + CWD.matrix + (houseWords ? " and risk-to-SL mapping (house method)" : " and the house method's risk-to-SL mapping")],
       ["Asset-owner sign-off", signOffLine(p, "Not yet signed off")]
     ]));
     children.push(pageBreak());
@@ -960,7 +974,7 @@ window.RiskExports = (function () {
       }
       // The consultant's own phrase inside our sentence: "are Continuous control"
       // reads as a typo, but an acronym such as "SIS" keeps its capitals.
-      function lc1(s) { s = String(s || "").replace(/\.\s*$/, ""); return /^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+      function lc1(s) { return lowerLead(String(s || "").replace(/\.\s*$/, ""), p); }
       function stakesKids() {
         var out = [];
         if (p.srs.essentialFunctions || p.srs.worstCase) {
@@ -978,10 +992,10 @@ window.RiskExports = (function () {
         children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Before committing to detailed security engineering, " + notSet(eng.client) + " needs to know which systems across " + (p.suc.name || "the systems in scope") + " carry the most risk and which justify a detailed assessment."));
         children = children.concat(stakesKids());
         children.push(h2("What this report is"));
-        children.push(body("This is the first tier of an IEC 62443-3-2 risk assessment, the high-level cyber security risk assessment, which the standard calls the initial cyber security risk assessment" + (eng.assessmentDate ? ", carried out " + eng.assessmentDate : "") + ". Each system in scope was ranked by the consequence and likelihood of its compromise, and the resulting risk band compared with the tolerable risk of " + tolName + ". The ranking is relative. It puts the systems in priority order but does not measure absolute risk or set security targets."));
+        children.push(body("This report is the first tier of an IEC 62443-3-2 risk assessment" + (eng.assessmentDate ? ", carried out " + eng.assessmentDate : "") + ". It is the high-level cyber security risk assessment, which the standard calls the initial cyber security risk assessment. Each system in scope was ranked by the consequence and likelihood of its compromise, and the resulting risk band compared with the tolerable risk of " + tolName + ". The ranking is relative. It puts the systems in priority order but does not measure absolute risk or set security targets."));
         var bSent = basisSentence();
         if (bSent) children.push(body(bSent));
-        children.push(h2("What we found"));
+        children.push(h2("Findings"));
         var perBandHL = { "very-high": [], "high": [], "medium": [], "low": [] };
         ranked.forEach(function (a) { var b0 = rt.riskFor(a.consequence, a.likelihood, p); if (b0 && perBandHL[b0]) perBandHL[b0].push(a); });
         var bandBits = [];
@@ -1004,7 +1018,7 @@ window.RiskExports = (function () {
         if (ranked.length) {
           var found = ranked.length + " systems were ranked" + (bandBits.length ? ": " + bandBits.join(", ") : "") + ".";
           if (candidates.length) {
-            found += " Under the house method, the systems above the tolerable risk of " + tolName + " (" + candidates.map(function (a) { return a.name; }).join(", ") + ") are the candidates for a detailed assessment." +
+            found += " Under the house method, the systems above the tolerable risk of " + tolName + " are the candidates for a detailed assessment: " + candidates.map(function (a) { return a.name; }).join("; ") + "." +
               (!hlOnlyType && forDetail.length ? " Of the ranked systems, " + forDetail.length + (forDetail.length === 1 ? " is" : " are") + " in zones taken to a detailed assessment." : "");
           } else if (!aboveTol.length) {
             found += " No system is above the tolerable risk of " + tolName + ", so on this evidence a detailed assessment is optional.";
@@ -1017,7 +1031,7 @@ window.RiskExports = (function () {
         }
         progressSection(["criteria", "ranked"]);
         children.push(h2("What happens next"));
-        children.push(body("Next, the systems are grouped into security zones and conduits. Where the initial risk of the system under consideration is above the tolerable risk, every zone and conduit then has a detailed risk assessment at a depth that matches its risk. Its threats are registered and treated, and target security levels are set to scope the engineering work. A system below the threshold should be ranked again if its connectivity, criticality or threat exposure changes."));
+        children.push(body("Next, the systems are grouped into security zones and conduits. Where the initial risk of the system under consideration is above the tolerable risk, every zone and conduit then has a detailed risk assessment at a depth that matches its risk. The threats to each are registered and treated, and target security levels are set to scope the engineering work. A system below the threshold should be ranked again if its connectivity, criticality or threat exposure changes."));
       } else {
         var exceed = S.threats.filter(function (x) { return x.exceeds; });
         function nOf(n, one, many) { return n + " " + (n === 1 ? one : many); }
@@ -1171,7 +1185,7 @@ window.RiskExports = (function () {
         children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk, and the system under consideration was" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " (each a group of assets with the same security requirements) and " + nOf(p.conduits.length, "conduit", "conduits") + " (the communication paths between them). " + ratedSentence() + " Each zone and conduit " + (deferredOf(p).length ? "assessed " : "") + "then has a target security level (SL-T), the protection it must be engineered and maintained to."));
         var bSent = basisSentence();
         if (bSent) children.push(body(bSent));
-        children.push(h2("What we found"));
+        children.push(h2("Findings"));
         // Where the risk sits.
         var hottest = null, hotCount = 0;
         S.owners.forEach(function (row) {
@@ -1189,7 +1203,7 @@ window.RiskExports = (function () {
         if (S.worst) {
           findRuns.push(run(" The highest unmitigated risk is "));
           findRuns.push(run(bandStyle(S.worst.risk).name, { bold: true, color: bandStyle(S.worst.risk).text }));
-          findRuns.push(run(": " + noStop(S.worst.t.statement) + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
+          findRuns.push(run(", in " + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ". " + noStop(S.worst.t.statement) + "."));
         }
         children.push(asBody(para(findRuns), findRuns.map(function (r) { return r.__text; }).join("")));
         // The treatment position is the section above; an accepted risk not
@@ -1216,7 +1230,7 @@ window.RiskExports = (function () {
             if (hit) drivers.push(row.o.id + (row.o.name ? " " + row.o.name : ""));
           });
         }
-        children.push(body((sameAll ? "The highest target security level across the system is SL" + overallMax + " on every foundational requirement." : "The highest target security levels across the system are " + sltBits + ".") + (overallMax != null && drivers.length ? " The SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) + "." : "") + " An IEC 62443-3-3 assessment against these targets will measure the achieved security level (SL-A), and its gaps form the security improvement programme."));
+        children.push(body((sameAll ? "The highest target security level across the system is SL" + overallMax + " on every foundational requirement." : "The highest target security levels across the system are " + sltBits + ".") + (overallMax != null && drivers.length ? " The SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) + "." : "") + " An IEC 62443-3-3 assessment against these targets will measure the achieved security level (SL-A). The gaps between the SL-A and the SL-T form the security improvement programme."));
         children.push(body("Repeat this assessment after a significant change to the system or its connectivity, after a security incident, and otherwise at regular intervals."));
       }
       if (rt.approvalStates(p).some(function (s) { return s.signed; })) {
@@ -1235,7 +1249,7 @@ window.RiskExports = (function () {
       // what it holds, so it reads without the report beside it ----
       children.push(heading("About this specification", docx.HeadingLevel.HEADING_1, { before: 0 }));
       children.push(body("This is the cyber security requirements specification for " + (p.suc.name || "the system under consideration") + ", from the IEC 62443-3-2 risk assessment" + (eng.assessmentDate ? " carried out " + eng.assessmentDate : "") + "."));
-      children.push(body("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The tolerable risk is stated, with the target security level (SL-T) of each zone and conduit, which is the protection it is to be engineered and maintained to. The specification also lists the mandatory security countermeasures that come out of the risk assessment."));
+      children.push(body("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The specification states the tolerable risk and the target security level (SL-T) of each zone and conduit, which is the protection that zone or conduit must be engineered and maintained to. It also lists the mandatory security countermeasures that come out of the risk assessment."));
       children.push(body("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval."));
       // No page break: three paragraphs alone on a page read as a gap.
     }
@@ -1337,9 +1351,8 @@ window.RiskExports = (function () {
     // Each policy with what implements it, where recorded (step 5).
     listSection("Organisational security policies", (Array.isArray(p.suc.policies) ? p.suc.policies : []).map(function (pol) {
       var by = rt.policyImplementedBy(pol, p);
-      // The consultant's phrase inside our sentence: "The OT annex" reads
-      // "the OT annex", while "MoC approval" keeps its capitals.
-      var lead = /^[A-Z][a-z]/.test(by) ? by.charAt(0).toLowerCase() + by.slice(1) : by;
+      // "The OT annex" reads "the OT annex", while "MoC approval" keeps its capitals.
+      var lead = lowerLead(by, p);
       return by ? noStop(pol) + ". It is implemented by " + noStop(lead) + "." : pol;
     }));
     children.push(h2("Tolerable risk"));
@@ -1619,7 +1632,7 @@ window.RiskExports = (function () {
           children.push(body("Vulnerabilities: " + vulns.map(function (v) { return v.id + " " + noStop(v.description) + (String(v.reference || "").trim() ? " (source: " + noStop(v.reference) + ")" : ""); }).join(" · "), { color: COLOR.muted }));
         }
         // How it was assessed, when not in detail on its own scenarios.
-        var od = rt.depthOf(o, p), depthLine = od.depth === "grouped" ? (od.withId ? "Assessed with " + od.withId + ", whose threat scenarios it shares." : "Grouped with another zone or conduit, which is not recorded.")
+        var od = rt.depthOf(o, p), depthLine = od.depth === "grouped" ? (od.withId ? "Assessed with " + od.withId + ", whose threat scenarios it shares." : "Grouped with another zone or conduit that is not named.")
           : od.depth === "reused" ? (od.reuseSource ? "Results reused from " + noStop(od.reuseSource) + "." : "Results reused from a source that is not recorded.")
           : od.depth === "proportionate" ? "Assessed by a proportionate review." +(od.considered ? " Threats considered: " + noStop(od.considered) + "." : "")
           : od.depth === "deferred" ? "Deferred to a later assessment (see Method and limitations)." : "";
